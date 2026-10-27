@@ -8,6 +8,8 @@
 from __future__ import annotations
 
 import dataclasses
+import platform
+import re
 
 import psutil
 
@@ -43,7 +45,40 @@ class HostMetrics:
     swap_used_mb: int | None = None
     swap_total_mb: int | None = None
     cpu_percent: float | None = None
+    cpu_model: str = ""           # например: «Xeon E5-2680 v4» (статично, читается один раз)
+    cpu_cores: int | None = None  # физические ядра
+    cpu_threads: int | None = None  # логические потоки
+    cpu_ghz: float | None = None  # текущая частота, ГГц
     disks: tuple = ()            # ((path, total_gb, free_gb), ...)
+
+
+def fmt_mem_mb(mb) -> str:
+    """Единицы памяти по-человечески: 13784 → «13.78 ГБ», 64197 → «64.2 ГБ»
+
+    Десятичные гигабайты (1 ГБ = 1000 МБ), 1–2 знака без лишних нулей;
+    ниже 0.95 ГБ — МБ, ниже 1 МБ — КБ. None → «нет данных».
+    """
+    if mb is None:
+        return "нет данных"
+    try:
+        mb = float(mb)
+    except (TypeError, ValueError):
+        return "нет данных"
+    if mb >= 950:
+        gb = mb / 1000.0
+        s = f"{gb:.2f}" if gb < 40 else f"{gb:.1f}"   # 13.78 ГБ, 32.77 ГБ; 50.4 ГБ, 64.2 ГБ
+        return f"{s.rstrip('0').rstrip('.')} ГБ"
+    if mb >= 1:
+        return f"{int(round(mb))} МБ"
+    return f"{mb * 1000:.0f} КБ"
+
+
+def _clean_cpu_model(raw: str) -> str:
+    """«Intel(R) Xeon(R) CPU E5-2680 v4 @ 2.40GHz» → «Xeon E5-2680 v4»."""
+    s = raw.replace("(R)", "").replace("(TM)", " ")
+    s = re.split(r"@", s)[0]
+    s = re.sub(r"\bCPU\b", "", s).replace("Intel", "").replace("AMD", "")
+    return re.sub(r"\s+", " ", s).strip()
 
 
 class MetricsCollector:
@@ -51,6 +86,31 @@ class MetricsCollector:
         self._nvml_ready = False
         self._nvml_error = ""
         self._init_nvml()
+        # Статичные данные CPU (модель/ядра/потоки) читаются один раз
+        self._cpu_model, self._cpu_cores, self._cpu_threads = self._read_cpu_static()
+
+    def _read_cpu_static(self) -> tuple[str, int | None, int | None]:
+        model = ""
+        try:
+            with open("/proc/cpuinfo", encoding="utf-8", errors="replace") as f:
+                for line in f:
+                    if line.startswith("model name") and ":" in line:
+                        model = _clean_cpu_model(line.split(":", 1)[1])
+                        break
+        except OSError:
+            pass
+        if not model:
+            try:
+                model = _clean_cpu_model(platform.processor() or "")
+            except Exception:  # noqa: BLE001 — на экзотике не падаем
+                model = ""
+        cores = threads = None
+        try:
+            threads = psutil.cpu_count(logical=True)
+            cores = psutil.cpu_count(logical=False)
+        except Exception:  # noqa: BLE001
+            pass
+        return model, cores, threads
 
     def _init_nvml(self) -> None:
         if not _PYNVML_AVAILABLE:
@@ -152,6 +212,15 @@ class MetricsCollector:
             h.swap_used_mb = int(s.used / (1024 * 1024))
             h.swap_total_mb = int(s.total / (1024 * 1024))
             h.cpu_percent = float(psutil.cpu_percent(interval=None))
+            h.cpu_model = self._cpu_model
+            h.cpu_cores = self._cpu_cores
+            h.cpu_threads = self._cpu_threads
+            try:
+                f = psutil.cpu_freq()
+                if f and f.current:
+                    h.cpu_ghz = round(f.current / 1000.0, 2)
+            except Exception:  # noqa: BLE001 — частота доступна не везде
+                pass
         except Exception:  # noqa: BLE001 — «нет данных» вместо значений
             pass
         disks = []

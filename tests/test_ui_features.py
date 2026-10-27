@@ -173,6 +173,44 @@ def test_logout_with_auto_csrf(authed_client):
 
 
 # ------------------------------------------------------------ имена GPU
+def test_fmt_mem_mb_units():
+    from llm_panel.metrics import fmt_mem_mb
+
+    assert fmt_mem_mb(13784) == "13.78 ГБ"
+    assert fmt_mem_mb(64197) == "64.2 ГБ"
+    assert fmt_mem_mb(50413) == "50.4 ГБ"
+    assert fmt_mem_mb(32768) == "32.77 ГБ"
+    assert fmt_mem_mb(512) == "512 МБ"
+    assert fmt_mem_mb(0.5) == "500 КБ"
+    assert fmt_mem_mb(None) == "нет данных"
+
+
+def test_host_cpu_and_units(authed_client):
+    c = authed_client
+    _set_snapshot(c, [], gpus=None)
+    c.app.state.panel.collector.snapshot.host = {
+        "ram_used_mb": 13784, "ram_total_mb": 64197, "ram_available_mb": 50413,
+        "swap_used_mb": 512, "swap_total_mb": 8192, "cpu_percent": 45.7,
+        "cpu_model": "Xeon E5-2680 v4", "cpu_cores": 14, "cpu_threads": 28,
+        "cpu_ghz": 2.0, "disks": [],
+    }
+    page = c.get("/", headers={"host": "localhost"})
+    assert "13.78 ГБ / 64.2 ГБ (доступно 50.4 ГБ)" in page.text    # RAM в ГБ
+    assert "Swap: 512 МБ / 8.19 ГБ" in page.text                   # Swap в той же строке
+    assert "Xeon E5-2680 v4 14c(28t) 2.0 ГГц" in page.text         # модель/ядра(потоки)/частота
+    assert 'class="meter-fill m-ok' in page.text                   # индикатор CPU
+    assert ">46%</span>" in page.text                              # % по центру заполнения
+    # у GPU шкалы тоже с подписью по центру
+    gpu = {"index": 0, "uuid": "GPU-9f764cdf-08bd-48a9-c219-a8660a71c1d6", "name": "Tesla V100-SXM2-32GB",
+           "mem_total_mb": 32768, "mem_used_mb": 31159, "mem_pct": 95,
+           "power_w": 56.5, "power_limit_w": 150.0, "power_pct": 38,
+           "procs": [], "assigned": []}
+    c.app.state.panel.collector.snapshot.gpus = [gpu]
+    page = c.get("/", headers={"host": "localhost"})
+    assert "31.16 ГБ / 32.77 ГБ" in page.text                      # память GPU в ГБ
+    assert "56.5 Вт (150 Вт)" in page.text                         # мощность с единицей у лимита
+    assert ">38%</span>" in page.text
+
 def test_gpu_names_in_card(authed_client):
     c = authed_client
     gpu = {"uuid": "GPU-9f764cdf-08bd-48a9-c219-a8660a71c1d6", "name": "Tesla V100-SXM2-32GB"}

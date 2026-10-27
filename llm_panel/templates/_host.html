@@ -1,10 +1,25 @@
+{% from "_uimacros.html" import meter with context %}
 <div class="host-line card">
-  <dl class="kv">
-    <dt>RAM</dt><dd>{% if snapshot.host.ram_used_mb is not none %}{{ snapshot.host.ram_used_mb }} / {{ snapshot.host.ram_total_mb }} МБ (доступно {{ snapshot.host.ram_available_mb }}){% else %}нет данных{% endif %}</dd>
-    <dt>Swap</dt><dd>{% if snapshot.host.swap_total_mb is not none %}{{ snapshot.host.swap_used_mb }} / {{ snapshot.host.swap_total_mb }} МБ{% else %}нет данных{% endif %}</dd>
-    <dt>CPU</dt><dd>{% if snapshot.host.cpu_percent is not none %}{{ snapshot.host.cpu_percent }} %{% else %}нет данных{% endif %}</dd>
-    {% for d in snapshot.host.disks %}
-    <dt>Диск {{ d[0] }}</dt><dd>{% if d[1] is not none %}{{ d[2] }} ГБ свободно из {{ d[1] }}{% else %}нет данных{% endif %}</dd>
-    {% endfor %}
-  </dl>
+  {#- RAM слева, Swap справа в той же строке. Единицы: ГБ/МБ/КБ (фильтр «mem»). -#}
+  <div class="host-row">
+    <span class="host-label">RAM</span>
+    <span class="host-val">{% if snapshot.host.get('ram_used_mb') %}{{ snapshot.host.ram_used_mb | mem }} / {{ snapshot.host.ram_total_mb | mem }} (доступно {{ snapshot.host.ram_available_mb | mem }}){% else %}нет данных{% endif %}</span>
+    <span class="host-swap">Swap: {% if snapshot.host.get('swap_total_mb') %}{{ snapshot.host.swap_used_mb | mem }} / {{ snapshot.host.swap_total_mb | mem }}{% else %}нет данных{% endif %}</span>
+  </div>
+  {#- CPU: модель, ядра(потоки), частота; справа — линейный индикатор нагрузки, % по центру заполнения. -#}
+  <div class="host-row">
+    <span class="host-cpu">CPU{% if snapshot.host.get('cpu_model') %} — {{ snapshot.host.cpu_model }}{% endif %}
+      {%- set cores = snapshot.host.get('cpu_cores') -%}{% set threads = snapshot.host.get('cpu_threads') -%}
+      {%- if cores %} {{ cores }}c({{ threads or '?' }}t){% endif %}
+      {%- if snapshot.host.get('cpu_ghz') %} {{ snapshot.host.cpu_ghz }} ГГц{% endif %}
+      {%- if snapshot.host.get('cpu_percent') is not defined or snapshot.host.get('cpu_percent') in (none, '') -%}
+      <span class="muted"> · нагрузка нет данных</span>{% endif %}</span>
+    <span class="host-cpu-meter">{% set cpup = snapshot.host.get('cpu_percent') %}{{ meter(cpup | round | int) if cpup else '' }}</span>
+  </div>
+  {% for d in snapshot.host.disks %}
+  <div class="host-row">
+    <span class="host-label">Диск {{ d[0] }}</span>
+    <span class="host-val">{% if d[1] is not none %}{{ d[2] }} ГБ свободно из {{ d[1] }} ГБ{% else %}нет данных{% endif %}</span>
+  </div>
+  {% endfor %}
 </div>

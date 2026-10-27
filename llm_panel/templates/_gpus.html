@@ -1,11 +1,4 @@
-{#- pct может отсутствовать в строке снапшота (Undefined) — всё это трактуем как «нет данных» -#}
-{%- macro bar(pct) -%}
-  {%- if pct -%}
-  <div class="bar {{ 'b-ok' if pct <= 60 else ('b-warn' if pct <= 80 else 'b-err') }}">
-    <div class="bar-fill" style="width: {{ pct if pct < 100 else 100 }}%"></div>
-  </div>
-  {%- endif -%}
-{%- endmacro -%}
+{% from "_uimacros.html" import meter %}
 {% if snapshot.gpus is none %}
 <p class="muted">Нет данных по GPU: NVML недоступен в этом окружении (на станции значение появится).</p>
 {% else %}
@@ -19,11 +12,10 @@
     <dl class="kv">
       <dt>UUID</dt><dd><code title="{{ g.get('uuid') }}">{{ (g.get('uuid') or '—')[-16:] }}</code></dd>
       {% set mem_pct = g.get('mem_pct') %}
-      <dt>Память</dt><dd>{% if g.get('mem_used_mb') %}{{ g.mem_used_mb }} / {{ g.get('mem_total_mb') }} МБ{% if mem_pct %} · {{ mem_pct }}%{% endif %}{% else %}нет данных{% endif %} {{ bar(mem_pct) }}</dd>
-      {% set util_pct = g.get('util_gpu_pct') %}
-      <dt>Загрузка</dt><dd>{% if util_pct %}{{ util_pct }} %{% else %}нет данных{% endif %} {{ bar(util_pct) }}</dd>
+      <dt>Память</dt><dd>{% if g.get('mem_used_mb') %}{{ g.mem_used_mb | mem }} / {{ g.get('mem_total_mb') | mem }}{% if mem_pct %} · {{ mem_pct }}%{% endif %}{% else %}нет данных{% endif %} {{ meter(mem_pct) }}</dd>
       {% set power_pct = g.get('power_pct') %}
-      <dt>Мощность</dt><dd>{% if g.get('power_w') %}{{ g.power_w }} Вт{% if g.get('power_limit_w') %} ({{ g.power_limit_w }}){% endif %}{% if power_pct %} · {{ power_pct }}%{% endif %}{% else %}нет данных{% endif %} {{ bar(power_pct) }}</dd>
+      {% set power_w = g.get('power_w') %}
+      <dt>Мощность</dt><dd>{% if power_w %}{{ power_w }} Вт{% if g.get('power_limit_w') %} ({{ g.power_limit_w | int }} Вт){% endif %}{% if power_pct %} · {{ power_pct }}%{% endif %}{% else %}нет данных{% endif %} {{ meter(power_pct) }}</dd>
       <dt>Темп.</dt><dd>{% if g.get('temp_c') %}{{ g.temp_c }} °C{% else %}нет данных{% endif %}</dd>
       <dt>Конфиг. сервисы</dt><dd>
         {% if g.get('assigned') %}{% for s in g.assigned %}<code>{{ s }}</code> {% endfor %}{% else %}—{% endif %}

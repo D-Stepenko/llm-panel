@@ -16,7 +16,7 @@ import pathlib
 from .collector import Collector
 from .config import PanelConfig, load_config
 from .db import Database
-from .metrics import MetricsCollector
+from .metrics import MetricsCollector, fmt_mem_mb
 from .registry import load_services
 from .sse import Hub
 from .security import (
@@ -67,6 +67,7 @@ def create_app(config: PanelConfig) -> FastAPI:
     app.state.panel = state
 
     templates = Jinja2Templates(directory=str(BASE_DIR / "templates"))
+    templates.env.filters["mem"] = fmt_mem_mb   # человекочитаемые ГБ/МБ/КБ
     state.templates = templates
 
     def render(name: str, **ctx):

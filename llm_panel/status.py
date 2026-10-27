@@ -24,7 +24,7 @@ class DisplayState(str, Enum):
 STATE_RU = {
     "stopped": "остановлен",
     "starting": "запускается",
-    "ready": "готов",
+    "ready": "запущен",
     "unhealthy": "неисправен (был готов)",
     "readiness_timeout": "не стал готов (тайм-аут)",
     "failed": "сбой",

@@ -48,9 +48,9 @@
     {%- if svc.autostart == 'enabled' or svc.autostart == 'enabled-runtime' %}
     <form method="post" action="/services/{{ svc.id }}/disable"><input type="hidden" name="csrf" value="{{ csrf }}"><button>Выключить автозапуск</button></form>
     {% elif svc.autostart == 'disabled' %}
-    <form method="post" action="/services/{{ svc.id }}/enable"><input type="hidden" name="csrf" value="{{ csrf }}"><button>Включить автозапуск</button></form>
+    <form method="post" action="/services/{{ svc.id }}/enable"><input type="hidden" name="csrf" value="{{ csrf }}"><button class="btn-muted">Включить автозапуск</button></form>
     {% endif %}
-    <a class="btn gear" href="/services/{{ svc.id }}/settings" title="Настройки" aria-label="Настройки">&#9881;</a>
+    <a class="btn gear" href="/services/{{ svc.id }}/settings" title="Настройки" aria-label="Настройки">&#9881;&#xFE0E;</a>
   </div>
 </div>
 {% else %}
