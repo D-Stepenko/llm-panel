@@ -77,19 +77,17 @@ h1 { margin: 0; font-size: clamp(26px,3vw,34px); line-height: 1.14; letter-spaci
 .section-meta { color: var(--muted); font-size: 12px; }
 .section-meta.sub { margin: 5px 0 0 40px; }
 
-/* -------------------------- метрики системы ----------------------------- */
-.metric-grid { display: grid; grid-template-columns: repeat(4, minmax(0,1fr)); gap: 14px; }
-.metric { min-width: 0; padding: 18px 19px 17px; background: linear-gradient(145deg, rgba(21,29,42,.98), rgba(16,22,32,.98)); border: 1px solid var(--line-soft); border-radius: var(--radius); box-shadow: var(--shadow); }
-.metric-top { display: flex; justify-content: space-between; align-items: center; gap: 10px; color: var(--muted); font-size: 12px; font-weight: 650; }
-.metric-top svg { width: 18px; height: 18px; color: #8090a7; flex: none; }
-.metric-value { margin-top: 13px; font-size: 25px; font-weight: 760; letter-spacing: -.04em; line-height: 1.2; white-space: nowrap; overflow-wrap: anywhere; }
-.metric-value small { color: var(--muted); font-size: 13px; font-weight: 600; letter-spacing: 0; }
-.metric-foot { margin-top: 9px; color: var(--muted); font-size: 11px; min-height: 16px; overflow-wrap: anywhere; }
-.mini-track { height: 5px; background: #2a3444; border-radius: 99px; overflow: hidden; margin-top: 13px; }
+/* -------------------------- единый блок системы -------------------------- */
+.host-card { padding: 14px 18px; background: linear-gradient(145deg, rgba(21,29,42,.98), rgba(16,22,32,.98)); border: 1px solid var(--line-soft); border-radius: var(--radius); box-shadow: var(--shadow); display: flex; flex-direction: column; gap: 9px; }
+.host-row { display: flex; align-items: center; gap: 12px; min-width: 0; }
+.host-label { color: var(--muted); font-size: 12px; font-weight: 650; min-width: 62px; flex: none; }
+.host-val { color: #d4deeb; font-size: 13px; font-weight: 620; min-width: 0; overflow-wrap: anywhere; }
+.host-track { flex: 0 1 240px; }
+.host-track .mini-track { margin-top: 0; }
+.mini-track { height: 5px; background: #2a3444; border-radius: 99px; overflow: hidden; }
 .mini-track span { display: block; height: 100%; border-radius: 99px; background: var(--accent); transition: width .6s ease; }
 .mini-track span.t-warn { background: var(--amber); }
 .mini-track span.t-err { background: var(--red); }
-.metric-warn { border-color: #4a3d28; }
 
 /* ------------------------------ GPU-карты ------------------------------- */
 .gpu-grid { display: grid; grid-template-columns: repeat(3, minmax(0,1fr)); gap: 14px; }
@@ -221,7 +219,7 @@ button.btn { font: inherit; }
 /* ------------------------------ адаптив --------------------------------- */
 @media (max-width: 1200px) {
   .brand { min-width: auto; } .topbar { gap: 18px; }
-  .metric-grid { grid-template-columns: repeat(2, minmax(0,1fr)); }
+  .host-track { flex: 0 1 180px; }
   .gpu-grid { grid-template-columns: repeat(2, minmax(0,1fr)); }
   .gpu-card:last-child { grid-column: span 2; }
   .service-fields { grid-template-columns: repeat(2, minmax(0,1fr)); }
@@ -241,9 +239,7 @@ button.btn { font: inherit; }
 @media (max-width: 520px) {
   main { padding: 22px 13px 30px; } .topbar { padding-left: 13px; padding-right: 13px; }
   .brand-name { font-size: 14px; } .version { font-size: 10px; } .order-btn { padding: 9px; font-size: 11px; }
-  .metric-grid { gap: 9px; } .metric { padding: 14px; } .metric-value { font-size: 20px; }
-  .metric-foot { font-size: 10px; } .metric-top { font-size: 11px; }
-  .section-heading { align-items: flex-start; } .section-meta { display: none; }
+  .host-row { flex-wrap: wrap; row-gap: 4px; } .host-track { flex: 1 1 100%; }
   .gpu-card-head, .gpu-body { padding-left: 14px; padding-right: 14px; }
   .service-main { padding: 15px; } .service-bottom { padding: 11px 12px; align-items: flex-start; flex-direction: column; }
   .actions { width: 100%; } .actions .action-btn { flex: 1; padding: 8px 7px; } .actions .icon-btn { flex: none; }

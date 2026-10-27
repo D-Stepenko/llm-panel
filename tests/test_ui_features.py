@@ -195,12 +195,15 @@ def test_host_cpu_and_units(authed_client):
         "cpu_ghz": 2.0, "disks": [],
     }
     page = c.get("/", headers={"host": "localhost"})
-    assert "13.78 ГБ <small>/ 64.2 ГБ" in page.text                       # RAM: красивые ГБ
-    assert "Доступно 50.4 ГБ" in page.text                                # RAM foot
-    assert "512 МБ <small>/ 8.19 ГБ" in page.text                         # Swap в ГБ/МБ
-    assert "Xeon E5-2680 v4 · 14 ядер / 28 потоков · 2.0 ГГц" in page.text  # CPU foot
-    assert "46 <small>% загрузки</small>" in page.text                    # CPU value
-    assert 'width: 46%' in page.text                                      # track заполнен
+    assert ">RAM:</span>" in page.text and "13.78 ГБ / 64.2 ГБ (доступно 50.4 ГБ)" in page.text  # RAM: красивые ГБ
+    assert ">Swap:</span>" in page.text and "512 МБ / 8.19 ГБ" in page.text                      # Swap в ГБ/МБ
+    assert ">CPU:</span>" in page.text and "Xeon E5-2680 v4 · 14 ядер / 28 потоков · 2.0 ГГц — 46 %" in page.text  # модель/ядра/частота/загрузка
+    assert 'width: 46%' in page.text                                                             # track заполнен
+    # диски в одной строке единого блока
+    c.app.state.panel.collector.snapshot.host["disks"] = [["/models", 457.0, 72.3], ["/ling", 500.0, 61.0]]
+    page = c.get("/", headers={"host": "localhost"})
+    assert ">Диск:</span>" in page.text
+    assert "/models: 72.3 ГБ свободно из 457 ГБ · /ling: 61.0 ГБ свободно из 500 ГБ" in page.text
     # ---- GPU-карточки в стиле макета ----
     gpu = {"index": 0, "uuid": "GPU-9f764cdf-08bd-48a9-c219-a8660a71c1d6", "name": "Tesla V100-SXM2-32GB",
            "mem_total_mb": 32768, "mem_used_mb": 31159, "mem_pct": 95,
