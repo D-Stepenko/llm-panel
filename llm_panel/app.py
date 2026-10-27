@@ -29,6 +29,14 @@ from .security import (
 BASE_DIR = pathlib.Path(__file__).resolve().parent
 
 
+def _hms(v) -> str:
+    """Время снимка в ЧЧ:ММ:СС (None/пусто — пустая строка)."""
+    if not v:
+        return ""
+    import datetime
+    return datetime.datetime.fromtimestamp(float(v)).strftime("%H:%M:%S")
+
+
 class AppState:
     """Единая точка доступа к общим объектам (app.state.panel)."""
 
@@ -68,6 +76,7 @@ def create_app(config: PanelConfig) -> FastAPI:
 
     templates = Jinja2Templates(directory=str(BASE_DIR / "templates"))
     templates.env.filters["mem"] = fmt_mem_mb   # человекочитаемые ГБ/МБ/КБ
+    templates.env.filters["hms"] = _hms         # время снимка: HH:MM:SS
     state.templates = templates
 
     def render(name: str, **ctx):

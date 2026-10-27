@@ -1,22 +1,28 @@
 {% extends "base.html" %}
-{% block title %}Настройки {{ svc.name }} — llm-panel{% endblock %}
+{% block title %}Параметры {{ svc.name }} — llm-panel{% endblock %}
 {% block content %}
-<h1>Настройки: {{ svc.name }}</h1>
-
-<div class="alert alert-warn">
-  Этап 1: режим <b>{{ svc.edit_mode }}</b>. Редактор конфигураций (Environment/ExecStart,
-  версии/diff/rollback, матрица GPU) появится на этапе 2 — по ТЗ §11. Сейчас доступен только просмотр
-  и start/stop/restart.
+<div class="page-head">
+  <div>
+    <div class="eyebrow"><span class="live-dot" style="background: var(--tur)"></span>Конфигурация</div>
+    <h1>Параметры: {{ svc.name }}</h1>
+    <p class="subtitle"><code>{{ svc.unit }}</code> — описание, статус и настройки</p>
+  </div>
 </div>
 
-<div class="card">
+<div class="notice">
+  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><path d="M12 9v4M12 17h.01"/><path d="M10.3 3.9 1.8 18a2 2 0 0 0 1.7 3h17a2 2 0 0 0 1.7-3L13.7 3.9a2 2 0 0 0-3.4 0z"/></svg>
+  <span>Этап 1: режим <b>{{ svc.edit_mode }}</b>. Тонкое редактирование (Environment/ExecStart, версия конфига/diff/rollback,
+    переразметка GPU) — этап 2 ТЗ-§11. Сейчас доступны просмотр и операции Start/Stop/Restart.</span>
+</div>
+
+<div class="page-card">
   <dl class="kv">
     <dt>id</dt><dd><code>{{ svc.id }}</code></dd>
     <dt>Тип</dt><dd>{{ svc.type }}</dd>
     <dt>Юнит</dt><dd><code>{{ svc.unit }}</code></dd>
     <dt>managed</dt><dd>{{ svc.managed }}</dd>
     <dt>edit_mode</dt><dd>{{ svc.edit_mode }}</dd>
-    <dt>Порт</dt><dd>{% if svc.port %}{{ svc.bind_host or '127.0.0.1' }}:{{ svc.port }}{% else %}не задан{% endif %}</dd>
+    <dt>Порт</dt><dd>{% if svc.port %}{{ svc.bind_host or '127.0.0.1' }}:{{ svc.port }}{% else %}без порта{% endif %}</dd>
     <dt>GPU</dt><dd>
       {% if gpu_info %}
         {% for g in gpu_info %}
@@ -31,10 +37,10 @@
     <dt>GPU (UUID)</dt><dd>
       {% if svc.gpus %}{% for g in svc.gpus %}<code>{{ g }}</code> {% endfor %}{% else %}—{% endif %}
     </dd>
-    <dt>startup_timeout</dt><dd>{{ svc.startup_timeout }} с</dd>
-    <dt>stop_signal</dt><dd>{{ svc.stop_signal }} ({{ svc.stop_timeout }} с)</dd>
+    <dt>startup_timeout</dt><dd>{{ svc.startup_timeout }} сек</dd>
+    <dt>stop_signal</dt><dd>{{ svc.stop_signal }} ({{ svc.stop_timeout }} сек)</dd>
     <dt>ram_exclusive</dt><dd>{{ 'да' if svc.ram_exclusive else 'нет' }}</dd>
-    <dt>health</dt><dd>{% if svc.health %}{{ svc.health.kind }}: {{ svc.health.url or (svc.health.host ~ ':' ~ svc.health.port) }}{% else %}не настроено{% endif %}</dd>
+    <dt>health</dt><dd>{% if svc.health %}{{ svc.health.kind }}: {{ svc.health.url or (svc.health.host ~ ':' ~ svc.health.port) }}{% else %}бинд? добавьте healthcheck{% endif %}</dd>
   </dl>
   {% if svc.notes %}<p class="muted">{{ svc.notes }}</p>{% endif %}
   <p class="settings-links">

@@ -9,23 +9,37 @@
   <script src="/static/htmx.min.js" defer></script>
 </head>
 <body data-csrf="{{ csrf }}">
-<header class="topbar">
-  <div class="brand">llm-panel <span class="ver">v{{ version | default('') }}</span></div>
-  <nav>
-    <a href="/">Статусы</a>
-    <a href="/audit">Аудит</a>
-    {% block header_extra %}{% endblock %}
-  </nav>
-  {% if username %}
-  <form method="post" action="/logout" class="logout">
-    <input type="hidden" name="csrf" value="{{ csrf }}">
-    <span class="user">{{ username }}</span>
-    <button type="submit">Выйти</button>
-  </form>
-  {% endif %}
-</header>
-<main>
-  {% block content %}{% endblock %}
-</main>
+<div class="shell">
+  <header class="topbar">
+    <div class="brand">
+      <div class="brand-mark" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><rect x="4" y="4" width="16" height="16" rx="4"/><path d="M8 9h8M8 12h5M8 15h8M2 8h2M2 12h2M2 16h2M20 8h2M20 12h2M20 16h2"/></svg></div>
+      <div><div class="brand-name">llm-panel</div><div class="version">VERSION {{ version | default('0.1.0') }}</div></div>
+    </div>
+    <nav class="nav" aria-label="Основная навигация">
+      <a class="nav-btn {{ 'active' if request.url.path == '/' }}" href="/">Статусы</a>
+      <a class="nav-btn {{ 'active' if request.url.path == '/audit' }}" href="/audit">Аудит</a>
+    </nav>
+    <div class="top-spacer"></div>
+    {% block topbar_actions %}{% endblock %}
+    {% if username %}
+    <div class="user-area">
+      <div class="avatar">{{ (username[:2] or 'AD') | upper }}</div>
+      <div class="user-details"><div class="user-name">{{ username }}</div><div class="user-role">Администратор</div></div>
+      <form method="post" action="/logout" class="logout-wrap">
+        <input type="hidden" name="csrf" value="{{ csrf }}">
+        <button type="submit" class="logout" aria-label="Выйти" title="Выйти"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M10 17l5-5-5-5M15 12H3"/><path d="M12 3h6a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2h-6"/></svg></button>
+      </form>
+    </div>
+    {% endif %}
+  </header>
+  <main>
+    {% block content %}{% endblock %}
+    <footer class="footer">
+      <div class="footer-left"><span class="tiny-dot"></span><span>llm-panel {{ version | default('') }}</span><span>·</span><span>Интерфейс управления LLM-сервисами</span></div>
+      <div>Локальная инфраструктура · Admin console</div>
+    </footer>
+  </main>
+</div>
+<script src="/static/app.js" defer></script>
 </body>
 </html>

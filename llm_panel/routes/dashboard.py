@@ -65,6 +65,7 @@ async def index(request: Request):
         username=request.state.session["username"],
         version=_version(),
         sse_available=initial["services"] != "",
+        snapshot_ts=snap.ts if snap is not None else None,
         initial_services=initial["services"],
         initial_gpus=initial["gpus"],
         initial_host=initial["host"],

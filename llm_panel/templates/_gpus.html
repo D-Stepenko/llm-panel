@@ -1,42 +1,58 @@
-{% from "_uimacros.html" import meter %}
-{% if snapshot.gpus is none %}
-<p class="muted">Нет данных по GPU: NVML недоступен в этом окружении (на станции значение появится).</p>
+{% set g_list = gpus if gpus is defined and gpus is not none else (snapshot.gpus if snapshot.gpus is not none else none) %}
+{% if g_list is none %}
+<div class="notice info">
+  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M12 8h.01M11 12h1v4h1"/></svg>
+  <span>Нет данных по GPU: NVML недоступен в этом окружении (на станции появятся значения).</span>
+</div>
 {% else %}
 <div class="gpu-grid">
-{% for g in snapshot.gpus %}
-  <div class="card gpu-card">
-    <div class="card-head">
-      <b>{{ g.get('name') or 'нет данных' }}</b>
-      <span class="badge">idx {{ g.get('index') }}</span>
+{% for g in g_list %}
+  {% set mem_pct = g.get('mem_pct') %}
+  {% set pill_tone = 'pill-err' if (mem_pct or 0) > 80 else ('pill-warn' if (mem_pct or 0) > 60 else 'pill-ok') %}
+  <article class="gpu-card">
+    <div class="gpu-card-head">
+      <div class="gpu-ident">
+        <span class="gpu-chip" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><rect x="6" y="6" width="12" height="12" rx="3"/><rect x="10" y="10" width="4" height="4" rx="1"/><path d="M10 2v4M14 2v4M10 18v4M14 18v4M2 10h4M2 14h4M18 10h4M18 14h4"/></svg></span>
+        <div class="gpu-ident-txt">
+          <div class="gpu-label">GPU {{ g.get('index') }}</div>
+          <div class="gpu-name">{{ g.get('name') or 'нет данных' }}</div>
+        </div>
+      </div>
+      {% if mem_pct %}<span class="load-pill {{ pill_tone }}">{{ mem_pct }}%</span>{% endif %}
     </div>
-    <dl class="kv">
-      <dt>UUID</dt><dd><code title="{{ g.get('uuid') }}">{{ (g.get('uuid') or '—')[-16:] }}</code></dd>
-      {% set mem_pct = g.get('mem_pct') %}
-      <dt>Память</dt><dd>{% if g.get('mem_used_mb') %}{{ g.mem_used_mb | mem }} / {{ g.get('mem_total_mb') | mem }}{% if mem_pct %} · {{ mem_pct }}%{% endif %}{% else %}нет данных{% endif %} {{ meter(mem_pct) }}</dd>
-      {% set power_pct = g.get('power_pct') %}
-      {% set power_w = g.get('power_w') %}
-      <dt>Мощность</dt><dd>{% if power_w %}{{ power_w }} Вт{% if g.get('power_limit_w') %} ({{ g.power_limit_w | int }} Вт){% endif %}{% if power_pct %} · {{ power_pct }}%{% endif %}{% else %}нет данных{% endif %} {{ meter(power_pct) }}</dd>
-      <dt>Темп.</dt><dd>{% if g.get('temp_c') %}{{ g.temp_c }} °C{% else %}нет данных{% endif %}</dd>
-      <dt>Конфиг. сервисы</dt><dd>
-        {% if g.get('assigned') %}{% for s in g.assigned %}<code>{{ s }}</code> {% endfor %}{% else %}—{% endif %}
-      </dd>
-    </dl>
-    {% if g.get('procs') %}
-    <table class="mini">
-      <thead><tr><th>PID</th><th>Процесс</th><th>МБ</th><th>Сервис</th></tr></thead>
-      <tbody>
-      {% for p in g.procs %}
-        <tr>
-          <td>{{ p.pid }}</td><td>{{ p.name }}</td><td>{{ p.mem_mb }}</td>
-          <td>{% if p.owner %}<code>{{ p.owner }}</code>{% else %}<span class="unknown-proc" title="Не принадлежит известному управляемому сервису; без подтверждения процессу не приписывается сервис (ТЗ §5.2)">неизвестный</span>{% endif %}</td>
-        </tr>
+    <div class="gpu-body">
+      <div class="memory-row">
+        <span class="memory-label">Видеопамять</span>
+        <span class="memory-val">{% if g.get('mem_used_mb') is not none %}{{ g.mem_used_mb | mem }} / {{ g.get('mem_total_mb') | mem }}{% else %}нет данных{% endif %}</span>
+      </div>
+      <div class="memory-track"><span class="{{ 't-err' if (mem_pct or 0) > 80 else ('t-warn' if (mem_pct or 0) > 60) }}" style="width: {{ mem_pct or 0 }}%"></span></div>
+
+      <div class="gpu-stats">
+        <div class="gpu-stat">
+          <div class="gpu-stat-label">Мощность</div>
+          <div class="gpu-stat-value">{% if g.get('power_w') is not none %}{{ g.power_w }} <small>Вт / {{ g.get('power_limit_w') | int }} Вт</small>{% else %}—{% endif %}</div>
+        </div>
+        <div class="gpu-stat">
+          <div class="gpu-stat-label">Температура</div>
+          <div class="gpu-stat-value">{% if g.get('temp_c') is not none %}{{ g.temp_c }} <small>°C</small>{% else %}—{% endif %}</div>
+        </div>
+      </div>
+
+      <div class="gpu-tags">
+        {% if g.get('assigned') %}{% for s in g.assigned %}<span class="tag">{{ s }}</span>{% endfor %}
+        {% else %}<span class="tag">Сервисы не назначены</span>{% endif %}
+      </div>
+
+      {% for p in g.get('procs') or [] %}
+      <div class="gpu-process">
+        <span>PID {{ p.pid }} · {{ p.mem_mb }} МБ{% if p.name %} · {{ p.name }}{% endif %}</span>
+        <span class="process-state">{% if p.owner %}{{ p.owner }}{% else %}Сервис не определён{% endif %}</span>
+      </div>
       {% endfor %}
-      </tbody>
-    </table>
-    {% else %}
-    <p class="muted">Процессов на карте нет.</p>
-    {% endif %}
-  </div>
+
+      <div class="gpu-process"><span class="muted" title="{{ g.get('uuid') }}">UUID: {{ g.get('uuid') or '—' }}</span></div>
+    </div>
+  </article>
 {% endfor %}
 </div>
 {% endif %}

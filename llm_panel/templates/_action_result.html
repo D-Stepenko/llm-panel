@@ -1,8 +1,17 @@
 {% extends "base.html" %}
 {% block title %}Результат действия — llm-panel{% endblock %}
 {% block content %}
-<div class="alert {{ 'alert-ok' if ok else 'alert-error' }}" id="flash">
-  {% if ok %}<b>Готово.</b> {% else %}<b>Ошибка.</b> {% endif %}{{ message }}
+<div class="page-head">
+  <div>
+    <div class="eyebrow">{{ 'Успех' if ok else 'Ошибка' }}</div>
+    <h1>{{ 'Готово' if ok else 'Ошибка' }}</h1>
+  </div>
 </div>
-<p><a class="btn" href="/">← К статусам</a></p>
+<div class="notice {{ 'ok' if ok else 'err' }}">
+  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true">
+    {% if ok %}<path d="M20 6 9 17l-5-5"/>{% else %}<path d="M12 9v4M12 17h.01"/><path d="M10.3 3.9 1.8 18a2 2 0 0 0 1.7 3h17a2 2 0 0 0 1.7-3L13.7 3.9a2 2 0 0 0-3.4 0z"/>{% endif %}
+  </svg>
+  <span id="flash">{{ message }}</span>
+</div>
+<p><a class="btn" href="/" style="margin-top:14px">← К статусам</a></p>
 {% endblock %}

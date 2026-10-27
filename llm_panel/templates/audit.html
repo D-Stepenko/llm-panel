@@ -1,19 +1,28 @@
 {% extends "base.html" %}
 {% block title %}Аудит — llm-panel{% endblock %}
 {% block content %}
-<h1>Журнал аудита (последние {{ rows | length }} событий)</h1>
-<table class="tbl">
-  <thead><tr><th>Время</th><th>IP</th><th>Пользователь</th><th>Действие</th><th>Объект</th><th>Результат</th><th>Детали</th></tr></thead>
-  <tbody>
+<div class="page-head">
+  <div>
+    <div class="eyebrow"><span class="live-dot" style="background: var(--blue)"></span>Journal</div>
+    <h1>Журнал аудита</h1>
+    <p class="subtitle">Последние {{ rows | length }} событий: входы, действия с сервисами и изменения порядка.</p>
+  </div>
+  <div class="snapshot">Записывается в локальную БД панели · {{ rows | length }} шт.</div>
+</div>
+
+<div class="audit-card">
   {% for r in rows %}
-    <tr class="{{ 'row-err' if r.result in ['failed','denied','helper_error'] else '' }}">
-      <td>{{ r.ts_str if r.ts_str is defined else r.ts }}</td>
-      <td>{{ r.ip }}</td><td>{{ r.username }}</td><td>{{ r.action }}</td>
-      <td>{{ r.object }}</td><td>{{ r.result }}</td><td class="muted">{{ r.detail }}</td>
-    </tr>
+  {% set kind = 'err' if r.result in ['failed','denied','helper_error'] else ('ok' if r.result == 'ok' else '') %}
+  <div class="audit-row">
+    <div class="audit-time">{{ r.ts_str }}</div>
+    <div class="audit-kind {{ kind }}">{{ r.action }}</div>
+    <div class="audit-msg">
+      {{ r.object or '—' }}{% if r.detail %} · {{ r.detail }}{% endif %}
+      <span class="muted"> · {{ r.username or '?' }} @ {{ r.ip or '?' }} · {{ r.result }}</span>
+    </div>
+  </div>
   {% else %}
-    <tr><td colspan="7" class="muted">Событий нет.</td></tr>
+  <div class="audit-row"><div class="audit-msg muted">Событий нет.</div></div>
   {% endfor %}
-  </tbody>
-</table>
+</div>
 {% endblock %}

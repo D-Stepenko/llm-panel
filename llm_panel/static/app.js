@@ -14,11 +14,12 @@
   }
 
   function toast(msg, kind) {
-    var d = document.createElement("div");
-    d.className = "alert " + kind;
-    d.textContent = msg;
-    (root || document.body).prepend(d);
-    setTimeout(function () { d.remove(); }, 4000);
+    var el = document.getElementById("toast");
+    if (!el) { el = document.createElement("div"); el.id = "toast"; el.className = "toast"; document.body.appendChild(el); }
+    el.textContent = msg;
+    el.className = "toast show" + (kind ? " " + kind : "");
+    clearTimeout(toast._t);
+    toast._t = setTimeout(function () { el.className = "toast"; }, 3500);
   }
 
   // --------------------------- SSE ---------------------------------------
@@ -53,11 +54,11 @@
   // ------------------- Порядок карточек сервисов --------------------------
   if (!orderBtn) return;
 
-  function cards(c) { return Array.prototype.slice.call(c.querySelectorAll(".svc-card")); }
+  function cards(c) { return Array.prototype.slice.call(c.querySelectorAll(".service-card")); }
 
   function enterOrder() {
     var c = servicesContainer();
-    if (!c) { toast("Карточки сервисов не найдены", "alert-error"); return; }
+    if (!c) { toast("Карточки сервисов не найдены", "err"); return; }
     order.active = true;
     orderBtn.textContent = "Запомнить порядок";
     orderBtn.classList.add("order-active");
@@ -108,7 +109,7 @@
     e.preventDefault();
     if (!order.active || !order.dragEl) return;
     var card = e.target;
-    while (card && !card.classList.contains("svc-card")) card = card.parentElement;
+    while (card && !card.classList.contains("service-card")) card = card.parentElement;
     if (!card || card === order.dragEl) return;
     var rect = card.getBoundingClientRect();
     var before = (e.clientY - rect.top) / rect.height < 0.5;
@@ -126,10 +127,10 @@
     fetch("/ui/order", { method: "POST", body: fd, credentials: "same-origin" })
       .then(function (r) {
         if (!r.ok) return r.text().then(function (t) { throw new Error(t || ("HTTP " + r.status)); });
-        exitOrder(["Порядок сохранён", "alert-ok"]);
+        exitOrder(["Порядок сохранён", "ok"]);
       })
       .catch(function (e) {
-        exitOrder(["Не удалось сохранить порядок: " + (e && e.message || e), "alert-error"]);
+        exitOrder(["Не удалось сохранить порядок: " + (e && e.message || e), "err"]);
       });
   }
 

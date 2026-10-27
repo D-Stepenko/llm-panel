@@ -1,25 +1,70 @@
-{% from "_uimacros.html" import meter with context %}
-<div class="host-line card">
-  {#- RAM слева, Swap справа в той же строке. Единицы: ГБ/МБ/КБ (фильтр «mem»). -#}
-  <div class="host-row">
-    <span class="host-label">RAM</span>
-    <span class="host-val">{% if snapshot.host.get('ram_used_mb') %}{{ snapshot.host.ram_used_mb | mem }} / {{ snapshot.host.ram_total_mb | mem }} (доступно {{ snapshot.host.ram_available_mb | mem }}){% else %}нет данных{% endif %}</span>
-    <span class="host-swap">Swap: {% if snapshot.host.get('swap_total_mb') %}{{ snapshot.host.swap_used_mb | mem }} / {{ snapshot.host.swap_total_mb | mem }}{% else %}нет данных{% endif %}</span>
+{% set h = host or snapshot.host %}
+{% set ram_u = h.get('ram_used_mb') %}{% set ram_t = h.get('ram_total_mb') %}{% set ram_a = h.get('ram_available_mb') %}
+{% set swp_u = h.get('swap_used_mb') %}{% set swp_t = h.get('swap_total_mb') %}
+{% set cpu_p = h.get('cpu_percent') %}
+<div class="metric-grid">
+
+  <div class="metric">
+    <div class="metric-top"><span>Использование RAM</span>
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><path d="M4 7h16v10H4z"/><path d="M7 14h5"/></svg>
+    </div>
+    {% if ram_u is not none and ram_t %}
+    {% set ram_pct = (ram_u / ram_t * 100) | round(0, 'common') | int %}
+    <div class="metric-value">{{ ram_u | mem }} <small>/ {{ ram_t | mem }}</small></div>
+    <div class="mini-track"><span class="{{ 't-err' if ram_pct > 80 else ('t-warn' if ram_pct > 60) }}" style="width: {{ ram_pct }}%"></span></div>
+    <div class="metric-foot">Доступно {{ ram_a | mem }} · занято {{ ram_pct }}%</div>
+    {% else %}
+    <div class="metric-value muted">—</div>
+    <div class="mini-track"><span style="width: 0%"></span></div>
+    <div class="metric-foot">нет данных</div>
+    {% endif %}
   </div>
-  {#- CPU: модель, ядра(потоки), частота; справа — линейный индикатор нагрузки, % по центру заполнения. -#}
-  <div class="host-row">
-    <span class="host-cpu">CPU{% if snapshot.host.get('cpu_model') %} — {{ snapshot.host.cpu_model }}{% endif %}
-      {%- set cores = snapshot.host.get('cpu_cores') -%}{% set threads = snapshot.host.get('cpu_threads') -%}
-      {%- if cores %} {{ cores }}c({{ threads or '?' }}t){% endif %}
-      {%- if snapshot.host.get('cpu_ghz') %} {{ snapshot.host.cpu_ghz }} ГГц{% endif %}
-      {%- if snapshot.host.get('cpu_percent') is not defined or snapshot.host.get('cpu_percent') in (none, '') -%}
-      <span class="muted"> · нагрузка нет данных</span>{% endif %}</span>
-    <span class="host-cpu-meter">{% set cpup = snapshot.host.get('cpu_percent') %}{{ meter(cpup | round | int) if cpup else '' }}</span>
+
+  <div class="metric">
+    <div class="metric-top"><span>Swap / подкачка</span>
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><path d="M8 3v10m4-7V3m4 3V3M4 13h16v8H4z"/><path d="M10 17h4"/></svg>
+    </div>
+    {% if swp_t %}
+    {% set swp_pct = (swp_u / swp_t * 100) | round(0, 'common') | int %}
+    <div class="metric-value">{{ swp_u | mem }} <small>/ {{ swp_t | mem }}</small></div>
+    <div class="mini-track"><span class="{{ 't-err' if swp_pct > 80 }}" style="width: {{ swp_pct }}%"></span></div>
+    <div class="metric-foot">{% if swp_pct == 0 %}Подкачка не используется{% else %}Занято {{ swp_pct }}% подкачки{% endif %}</div>
+    {% else %}
+    <div class="metric-value muted">—</div>
+    <div class="mini-track"><span style="width: 0%"></span></div>
+    <div class="metric-foot">нет данных</div>
+    {% endif %}
   </div>
-  {% for d in snapshot.host.disks %}
-  <div class="host-row">
-    <span class="host-label">Диск {{ d[0] }}</span>
-    <span class="host-val">{% if d[1] is not none %}{{ d[2] }} ГБ свободно из {{ d[1] }} ГБ{% else %}нет данных{% endif %}</span>
+
+  <div class="metric">
+    <div class="metric-top"><span>Процессор</span>
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><rect x="6" y="6" width="12" height="12" rx="2"/><path d="M10 2v3M14 2v3M10 19v3M14 19v3M2 10h3M2 14h3M19 10h3M19 14h3"/></svg>
+    </div>
+    {% if cpu_p is not none %}
+    {% set cpu_pct = cpu_p | round(0, 'common') | int %}
+    <div class="metric-value">{{ cpu_pct }} <small>% загрузки</small></div>
+    <div class="mini-track"><span class="{{ 't-err' if cpu_pct > 80 else ('t-warn' if cpu_pct > 60) }}" style="width: {{ cpu_pct }}%"></span></div>
+    <div class="metric-foot">{% if h.get('cpu_model') %}{{ h.cpu_model }} · {% endif %}{% if h.get('cpu_cores') %}{{ h.cpu_cores }} ядер / {{ h.get('cpu_threads') or '?' }} потоков{% if h.get('cpu_ghz') %} · {{ h.cpu_ghz }} ГГц{% endif %}{% else %}нет данных{% endif %}</div>
+    {% else %}
+    <div class="metric-value muted">—</div>
+    <div class="mini-track"><span style="width: 0%"></span></div>
+    <div class="metric-foot">нет данных</div>
+    {% endif %}
   </div>
+
+  {% for d in h.get('disks') or [] %}
+  {% set d_total = d[1] %}{% set d_free = d[2] %}
+  {% if d_total %}
+  {% set d_pct = ((d_total - d_free) / d_total * 100) | round(0, 'common') | int %}
+  <div class="metric{{ ' metric-warn' if d_pct >= 80 }}">
+    <div class="metric-top"><span>Диск {{ d[0] }}</span>
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><rect x="5" y="3" width="14" height="18" rx="2"/><circle cx="12" cy="12" r="3.5"/></svg>
+    </div>
+    <div class="metric-value">{{ d_free | round(1) }} <small>ГБ свободно</small></div>
+    <div class="mini-track"><span class="{{ 't-err' if d_pct >= 90 else ('t-warn' if d_pct >= 80) }}" style="width: {{ d_pct }}%"></span></div>
+    <div class="metric-foot">Из {{ d_total | int }} ГБ · занято около {{ d_pct }}%</div>
+  </div>
+  {% endif %}
   {% endfor %}
+
 </div>
