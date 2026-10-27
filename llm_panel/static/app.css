@@ -91,33 +91,18 @@ h1 { margin: 0; font-size: clamp(26px,3vw,34px); line-height: 1.14; letter-spaci
 
 /* ------------------------------ GPU-карты ------------------------------- */
 .gpu-grid { display: grid; grid-template-columns: repeat(3, minmax(0,1fr)); gap: 14px; }
-.gpu-card { overflow: hidden; min-width: 0; border: 1px solid #362d35; border-radius: var(--radius); background: linear-gradient(150deg,#191923,#121720 78%); box-shadow: var(--shadow); }
-.gpu-card-head { padding: 17px 18px 14px; display: flex; align-items: flex-start; justify-content: space-between; gap: 10px; border-bottom: 1px solid var(--line-soft); }
-.gpu-ident { display: flex; align-items: center; gap: 12px; min-width: 0; }
-.gpu-chip { flex: none; width: 38px; height: 38px; display: grid; place-items: center; border-radius: 11px; background: #30252e; color: #ff9ba2; border: 1px solid #4d343e; }
-.gpu-chip svg { width: 20px; height: 20px; }
+.gpu-card { overflow: hidden; min-width: 0; border: 1px solid #285241; border-radius: var(--radius); background: linear-gradient(150deg,#131d1a,#121720 78%); box-shadow: var(--shadow); }
+.gpu-card-head { padding: 15px 18px 12px; display: flex; align-items: flex-start; justify-content: space-between; gap: 10px; border-bottom: 1px solid rgba(40,82,65,.55); }
+.gpu-ident-txt { min-width: 0; }
 .gpu-label { color: var(--muted); font-size: 11px; font-weight: 700; letter-spacing: .08em; text-transform: uppercase; }
 .gpu-name { font-weight: 740; margin-top: 3px; font-size: 13px; line-height: 1.35; overflow-wrap: anywhere; }
 .load-pill { flex: none; padding: 5px 8px; border: 1px solid #64363f; color: #ff9ba2; background: #331f27; border-radius: 8px; font-weight: 800; font-size: 12px; }
 .load-pill.pill-ok { color: var(--accent); border-color: #2a5c50; background: #16251f; }
 .load-pill.pill-warn { color: var(--amber); border-color: #64543a; background: #35301f; }
-.gpu-body { padding: 16px 18px 17px; }
-.memory-row { display: flex; align-items: baseline; justify-content: space-between; gap: 10px; }
-.memory-label { color: var(--muted); font-size: 12px; }
-.memory-val { font-weight: 750; font-size: 13px; white-space: nowrap; }
-.memory-track { height: 8px; background: #332a34; border-radius: 99px; overflow: hidden; margin: 10px 0 16px; }
-.memory-track span { display: block; height: 100%; border-radius: 99px; background: var(--accent); transition: width .6s ease; }
-.memory-track span.t-warn { background: var(--amber); }
-.memory-track span.t-err { background: linear-gradient(90deg, #e9a45f, #ff727d); }
-.gpu-stats { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
-.gpu-stat { min-width: 0; }
-.gpu-stat-label { font-size: 11px; color: var(--faint); }
-.gpu-stat-value { margin-top: 3px; font-size: 14px; font-weight: 740; }
-.gpu-stat-value small { color: var(--muted); font-size: 11px; font-weight: 550; }
-.gpu-tags { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 16px; padding-top: 13px; border-top: 1px solid var(--line-soft); }
+.gpu-body { padding: 14px 18px 15px; display: flex; flex-direction: column; gap: 9px; }
+.gpu-body .host-label { min-width: 104px; }
+.gpu-tags { display: flex; flex-wrap: wrap; gap: 6px; }
 .tag { max-width: 100%; border-radius: 6px; border: 1px solid #303d50; background: var(--surface-3); padding: 4px 7px; color: #b7c6d9; font-size: 10px; font-weight: 650; overflow-wrap: anywhere; }
-.gpu-process { display: flex; flex-wrap: wrap; justify-content: space-between; gap: 6px; color: var(--muted); font-size: 11px; margin-top: 12px; }
-.gpu-process .process-state { color: var(--amber); }
 .notice { display: flex; align-items: flex-start; gap: 12px; padding: 13px 15px; border: 1px solid #493a2a; border-radius: 12px; background: rgba(57,43,27,.38); margin-top: 14px; color: #d8c4a6; font-size: 12px; }
 .notice svg { flex: none; width: 17px; height: 17px; color: var(--amber); margin-top: 1px; }
 .notice strong { color: #f5d8a8; }
@@ -136,10 +121,7 @@ h1 { margin: 0; font-size: clamp(26px,3vw,34px); line-height: 1.14; letter-spaci
 .service-main { padding: 18px 19px 15px; }
 .service-head { display: flex; align-items: flex-start; justify-content: space-between; gap: 12px; }
 .service-title-wrap { display: flex; align-items: flex-start; gap: 12px; min-width: 0; }
-.service-icon { flex: none; width: 38px; height: 38px; display: grid; place-items: center; border-radius: 11px; background: #1c2a39; border: 1px solid #2b3c50; color: #9cc7ff; }
-.service-icon.llama { color: var(--tur); background: var(--tur-dark); border-color: #393254; }
-.service-icon.generic { color: #8de2c4; background: #1e342f; border-color: #29483e; }
-.service-icon svg { width: 19px; height: 19px; }
+.head-right { flex: none; display: inline-flex; align-items: center; gap: 8px; }
 .service-title { font-size: 14px; font-weight: 760; line-height: 1.4; overflow-wrap: anywhere; }
 .service-subtitle { margin-top: 4px; color: var(--muted); font-size: 11px; }
 .status { flex: none; display: inline-flex; align-items: center; gap: 6px; padding: 5px 8px; border-radius: 7px; background: var(--green-dark); border: 1px solid #285241; color: var(--green); font-size: 11px; font-weight: 760; white-space: nowrap; }

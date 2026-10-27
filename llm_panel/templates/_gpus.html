@@ -9,48 +9,36 @@
 {% for g in g_list %}
   {% set mem_pct = g.get('mem_pct') %}
   {% set pill_tone = 'pill-err' if (mem_pct or 0) > 80 else ('pill-warn' if (mem_pct or 0) > 60 else 'pill-ok') %}
+  {% set tone = 't-err' if (mem_pct or 0) > 80 else ('t-warn' if (mem_pct or 0) > 60) %}
   <article class="gpu-card">
     <div class="gpu-card-head">
-      <div class="gpu-ident">
-        <span class="gpu-chip" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><rect x="6" y="6" width="12" height="12" rx="3"/><rect x="10" y="10" width="4" height="4" rx="1"/><path d="M10 2v4M14 2v4M10 18v4M14 18v4M2 10h4M2 14h4M18 10h4M18 14h4"/></svg></span>
-        <div class="gpu-ident-txt">
-          <div class="gpu-label">GPU {{ g.get('index') }}</div>
-          <div class="gpu-name">{{ g.get('name') or 'нет данных' }}</div>
-        </div>
+      <div class="gpu-ident-txt">
+        <div class="gpu-label">GPU {{ g.get('index') }}</div>
+        <div class="gpu-name">{{ g.get('name') or 'нет данных' }}</div>
       </div>
       {% if mem_pct %}<span class="load-pill {{ pill_tone }}">{{ mem_pct }}%</span>{% endif %}
     </div>
     <div class="gpu-body">
-      <div class="memory-row">
-        <span class="memory-label">Видеопамять</span>
-        <span class="memory-val">{% if g.get('mem_used_mb') is not none %}{{ g.mem_used_mb | mem }} / {{ g.get('mem_total_mb') | mem }}{% else %}нет данных{% endif %}</span>
+      <div class="host-row">
+        <span class="host-label">Видеопамять:</span>
+        <span class="host-val">{% if g.get('mem_used_mb') is not none %}{{ g.mem_used_mb | mem }} / {{ g.get('mem_total_mb') | mem }}{% else %}нет данных{% endif %}</span>
+        {% if mem_pct %}<div class="host-track"><div class="mini-track"><span class="{{ tone }}" style="width: {{ mem_pct }}%"></span></div></div>{% endif %}
       </div>
-      <div class="memory-track"><span class="{{ 't-err' if (mem_pct or 0) > 80 else ('t-warn' if (mem_pct or 0) > 60) }}" style="width: {{ mem_pct or 0 }}%"></span></div>
-
-      <div class="gpu-stats">
-        <div class="gpu-stat">
-          <div class="gpu-stat-label">Мощность</div>
-          <div class="gpu-stat-value">{% if g.get('power_w') is not none %}{{ g.power_w }} <small>Вт / {{ g.get('power_limit_w') | int }} Вт</small>{% else %}—{% endif %}</div>
-        </div>
-        <div class="gpu-stat">
-          <div class="gpu-stat-label">Температура</div>
-          <div class="gpu-stat-value">{% if g.get('temp_c') is not none %}{{ g.temp_c }} <small>°C</small>{% else %}—{% endif %}</div>
-        </div>
+      <div class="host-row">
+        <span class="host-label">Мощность:</span>
+        <span class="host-val">{% if g.get('power_w') is not none %}{{ g.power_w }} Вт / {{ g.get('power_limit_w') | int }} Вт{% else %}нет данных{% endif %}</span>
+        {% if g.get('power_pct') %}
+        {% set ppct = g.power_pct %}
+        <div class="host-track"><div class="mini-track"><span class="{{ 't-err' if ppct > 80 else ('t-warn' if ppct > 60) }}" style="width: {{ ppct }}%"></span></div></div>
+        {% endif %}
       </div>
-
-      <div class="gpu-tags">
-        {% if g.get('assigned') %}{% for s in g.assigned %}<span class="tag">{{ s }}</span>{% endfor %}
-        {% else %}<span class="tag">Сервисы не назначены</span>{% endif %}
+      <div class="host-row">
+        <span class="host-label">Температура:</span>
+        <span class="host-val">{% if g.get('temp_c') is not none %}{{ g.temp_c }} °C{% else %}нет данных{% endif %}</span>
       </div>
-
-      {% for p in g.get('procs') or [] %}
-      <div class="gpu-process">
-        <span>PID {{ p.pid }} · {{ p.mem_mb }} МБ{% if p.name %} · {{ p.name }}{% endif %}</span>
-        <span class="process-state">{% if p.owner %}{{ p.owner }}{% else %}Сервис не определён{% endif %}</span>
-      </div>
-      {% endfor %}
-
-      <div class="gpu-process"><span class="muted" title="{{ g.get('uuid') }}">UUID: {{ g.get('uuid') or '—' }}</span></div>
+      {% if g.get('assigned') %}
+      <div class="host-row"><span class="host-label">Сервисы:</span><span class="host-val">{% for s in g.assigned %}<code>{{ s }}</code> {% endfor %}</span></div>
+      {% endif %}
     </div>
   </article>
 {% endfor %}

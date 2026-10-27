@@ -204,6 +204,7 @@ def test_host_cpu_and_units(authed_client):
     page = c.get("/", headers={"host": "localhost"})
     assert ">Диск:</span>" in page.text
     assert "/models: 72.3 ГБ свободно из 457 ГБ · /ling: 61.0 ГБ свободно из 500 ГБ" in page.text
+    assert 'width: 86%' in page.text    # итоговая полоса занятости диска
     # ---- GPU-карточки в стиле макета ----
     gpu = {"index": 0, "uuid": "GPU-9f764cdf-08bd-48a9-c219-a8660a71c1d6", "name": "Tesla V100-SXM2-32GB",
            "mem_total_mb": 32768, "mem_used_mb": 31159, "mem_pct": 95,
@@ -215,8 +216,8 @@ def test_host_cpu_and_units(authed_client):
     assert "31.16 ГБ / 32.77 ГБ" in page.text                             # память GPU в ГБ
     assert "Вт / 150 Вт" in page.text                                     # мощность с единицей у лимита
     assert 'load-pill pill-err">95%' in page.text                         # pill загрузки (красный при >80)
-    assert "PID 777" in page.text and "Сервис не определён" in page.text  # процесс без владельца
-    assert "Сервисы не назначены" not in page.text                        # назначение показано тегом
+    # строки процессов и UUID из карточки GPU убраны
+    assert "PID" not in page.text and "Сервис не определён" not in page.text and "UUID:" not in page.text
 
     # пустые данные не должны падать
     c.app.state.panel.collector.snapshot.gpus = [dict(gpu, mem_pct=None, power_w=None, mem_used_mb=None, temp_c=None, procs=[], assigned=[])]

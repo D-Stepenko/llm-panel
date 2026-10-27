@@ -33,9 +33,17 @@
   </div>
 
   {% if h.get('disks') %}
+  {% set ns = namespace(used=0, total=0) %}
+  {% for d in h.disks %}{% if d[1] %}{% set ns.used = ns.used + (d[1] - d[2]) %}{% set ns.total = ns.total + d[1] %}{% endif %}{% endfor %}
+  {% if ns.total %}
+  {% set disk_pct = (ns.used / ns.total * 100) | round(0, 'common') | int %}
+  {% endif %}
   <div class="host-row">
     <span class="host-label">Диск:</span>
     <span class="host-val">{% for d in h.disks %}{% if d[1] %}{{ d[0] }}: {{ d[2] | round(1) }} ГБ свободно из {{ d[1] | int }} ГБ{% else %}{{ d[0] }}: нет данных{% endif %}{{ ' · ' if not loop.last }}{% endfor %}</span>
+    {% if ns.total %}
+    <div class="host-track"><div class="mini-track"><span class="{{ 't-err' if disk_pct >= 90 else ('t-warn' if disk_pct >= 80) }}" style="width: {{ disk_pct }}%"></span></div></div>
+    {% endif %}
   </div>
   {% endif %}
 
