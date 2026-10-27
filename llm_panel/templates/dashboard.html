@@ -1,0 +1,49 @@
+{% extends "base.html" %}
+{% block title %}Статусы — llm-panel{% endblock %}
+{% block content %}
+<div id="sse-root" sse-connect="/events">
+  <div class="warn-banner" id="sse-warn" {% if sse_available %}hidden{% endif %}>Обновление в реальном времени недоступно (SSE выключен).</div>
+  <div class="frame">
+    <section id="host-init">{{ initial_host | safe }}</section>
+    <section id="gpus-init">{{ initial_gpus | safe }}</section>
+  </div>
+  <h2>Сервисы</h2>
+  <section id="services-init">{{ initial_services | safe }}</section>
+</div>
+
+<script>
+(function () {
+  // Дефолтные контейнеры заменяю на контейнеры с SSE-подписками после первой загрузки.
+  const root = document.getElementById("sse-root");
+  if (!root || typeof EventSource === "undefined") {
+    const w = document.getElementById("sse-warn");
+    if (w) w.hidden = false;
+    return;
+  }
+  const es = new EventSource("/events");
+  const targets = {services: null, gpus: null, host: null};
+  const initialIds = {services: document.getElementById("services-init"),
+                      gpus: document.getElementById("gpus-init"),
+                      host: document.getElementById("host-init")};
+  es.addEventListener("services", e => swap("services", e));
+  es.addEventListener("gpus", e => swap("gpus", e));
+  es.addEventListener("host", e => swap("host", e));
+  function swap(name, e) {
+    let el = targets[name];
+    if (!el) {
+      el = document.createElement("section");
+      el.className = "sse-target";
+      el.id = name + "-live";
+      const ini = initialIds[name];
+      if (ini && ini.parentNode) { ini.replaceWith(el); }
+      else { root.appendChild(el); }
+      targets[name] = el;
+    }
+    el.innerHTML = e.data;
+    const w = document.getElementById("sse-warn");
+    if (w) w.hidden = true;
+  }
+  es.onerror = () => { const w = document.getElementById("sse-warn"); if (w) w.hidden = false; };
+})();
+</script>
+{% endblock %}

@@ -1,0 +1,190 @@
+# Описания сервисов для панели (ТЗ §4.1) — ФАКТИЧЕСКИЕ ДАННЫЕ после read-only
+# обследования станции от 2026-10-26 (scripts/survey.sh, round 1).
+# Файл для станции: /etc/llm-panel/services.yaml (читается панелью, правит администратор ОС).
+#
+# Конвенция адресации CUDA (согласована с владельцем, сохранена как есть):
+#   как vLLM работает по индексам (CUDA_VISIBLE_DEVICES=0,1 в start-vllm.sh),
+#   llama.cpp — по UUID (cuda_addressing: uuid). Поле gpus в любом случае —
+#   плановая привязка по ПОЛНЫМ UUID (ТЗ §2); при генерации CVD для
+#   cuda_addressing: index панель выводит индексы заново на момент запуска из
+#   NVML, проверка missing_gpu всегда по UUID.
+
+services:
+  - id: vllm
+    name: "vLLM — Qwen3.8-27B-FP8 (форк 1Cat 1.5.0)"
+    type: vllm
+    unit: vllm.service                    # подтверждено: enabled, running, User=dispot
+    managed: adopted
+    edit_mode: manage_only
+    port: 8000
+    bind_host: 0.0.0.0                    # фактически --host 0.0.0.0 в start-vllm.sh
+    health:
+      kind: http
+      url: http://127.0.0.1:8000/health   # проверить /health vs /v1/models фактическим curl (survey2)
+      timeout_s: 3
+      interval_s: 10
+    startup_timeout: 900                  # большой контекст/FP8: старт долгий; уточнить фактическое время
+    gpus:
+      - GPU-9f764cdf-08bd-48a9-c219-a8660a71c1d6   # индекс 0 сейчас, 32 ГБ
+      - GPU-ca13b019-b898-2c2b-8c0a-2b92f64e6476   # индекс 1 сейчас, 32 ГБ
+    cuda_addressing: index                # сохранена логика владельца (0,1 — индексы)
+    notes: >-
+      ExecStart=/home/dispot/bin/start-vllm.sh (conda env 1cat-vllm-sm70_v1.5.0,
+      CUDA 12.8, tensor-parallel-size 2, max-model-len 262144, api-key из
+      ~/.vllm_api_key — секрет в панель не переносится). Restart=on-failure,
+      RestartSec=30, Requires=gpu-power-limit.service.
+
+  # Основной running llama.cpp-юнит — порт 8002 подтверждён (0.0.0.0).
+  # llama.cpp 0.4.1-dev (build 11141), GPU 16 ГБ по UUID.
+  - id: llama-qwen38-gguf
+    name: "llama.cpp — llama-qwen38_gguf"
+    type: llamacpp
+    unit: llama-qwen38_gguf.service       # регистр юнита сохранён как есть
+    managed: adopted
+    edit_mode: manage_only
+    port: 8002
+    bind_host: 0.0.0.0                    # фактически слушает 0.0.0.0:8002
+    health:
+      kind: http
+      url: http://127.0.0.1:8002/health   # проверено: HTTP 200 (survey2, секция E)
+      timeout_s: 3
+      interval_s: 10
+    startup_timeout: 600                  # как TimeoutStartSec в юните
+    gpus:
+      - GPU-cfec683a-1069-2f9c-0425-2e26192519e6   # 16 ГБ карта (везде по UUID)
+    cuda_addressing: uuid                 # llama.cpp адресуется по UUID (логика владельца)
+    notes: >-
+      ExecStart: llama-server -m Qwen3.8-27B-GSQ-RCO-IQ3_S.gguf -a qwen38_gguf
+      -ngl 99 -fa on -ctk q8_0 -ctv q8_0 -c 82144 --jinja. ВНИМАНИЕ:
+      systemd Conflicts=Qwen3-TTS.service (та же 16 ГБ карта) и
+      Conflicts=llama-hermes3-8b.service (юнит отсутствует — проверка портит
+      старт, отметить на будущее). EnvironmentFile=/etc/llama/qwen38-flash.env
+
+  # Дополнительные llama.cpp-юниты (disabled) — каталогизация, управление и логи.
+  - id: llama-3-8-gguf
+    name: "llama.cpp — llama-Qwen3.8_GGUF (disabled)"
+    type: llamacpp
+    unit: llama-Qwen3.8_GGUF.service      # точное имя с большими буквами!
+    managed: adopted
+    edit_mode: manage_only
+    port: 8002
+    bind_host: 0.0.0.0
+    gpus:
+      - GPU-cfec683a-1069-2f9c-0425-2e26192519e6
+    cuda_addressing: uuid
+    notes: >-
+      Почти дубль llama-qwen38_gguf (тот же exec, alias qwen38-GGUF, контекст
+      62144). В Description описка (Flash). Conflicts=Qwen3-TTS.service.
+      Порт 8002 общий с другими llama-юнитами.
+
+  - id: llama-qwen38-flash
+    name: "llama.cpp — llama-qwen38-flash (disabled)"
+    type: llamacpp
+    unit: llama-qwen38-flash.service
+    managed: adopted
+    edit_mode: manage_only
+    port: 8002
+    bind_host: 0.0.0.0
+    health:
+      kind: http
+      url: http://127.0.0.1:8002/health
+      timeout_s: 3
+      interval_s: 10
+    gpus:
+      - GPU-9f764cdf-08bd-48a9-c219-a8660a71c1d6   # 32 ГБ
+      - GPU-ca13b019-b898-2c2b-8c0a-2b92f64e6476   # 32 ГБ
+      - GPU-cfec683a-1069-2f9c-0425-2e26192519e6   # 16 ГБ — все три карты
+    cuda_addressing: uuid
+    notes: >-
+      Qwen3.8-Flash-Next-GSQ-RCO-IQ3_XXS, 2 шарда, -lm mmap --lazy-mode on,
+      контекст 262144. systemd Conflicts=vllm.service (все 3 GPU заняты).
+      Порт 8002 общий с llama-qwen38_gguf: юниты взаимоисключающие по порту,
+      но systemd их не конфликтит — предупреждение даст панель (этап 2).
+
+  # speaches.service — STT/TTS на CPU (uvicorn 127.0.0.1:8001), включён/running.
+  - id: speaches
+    name: "Speaches (STT/TTS на CPU)"
+    type: generic
+    unit: speaches.service
+    managed: adopted
+    edit_mode: manage_only
+    port: 8001
+    bind_host: 127.0.0.1
+    health:
+      kind: tcp
+      port: 8001
+      timeout_s: 3
+      interval_s: 15
+    gpus: []                              # CVD='' намеренно: WHISPER__INFERENCE_DEVICE=cpu
+    notes: >-
+      WorkingDirectory=/home/dispot/speaches; uvicorn --factory
+      speaches.main:create_app; health-URL не подтверждён, пока TCP-проверка.
+
+
+  - id: open-webui
+    name: "Open WebUI (miniconda env open-webui_v0.11.3)"
+    type: generic
+    unit: open-webui.service              # enabled, running, User=dispot
+    managed: adopted
+    edit_mode: manage_only
+    port: 8080
+    bind_host: 0.0.0.0                    # РАСХОЖДЕНИЕ с ТЗ (ожидался 127.0.0.1); видно из LAN
+    health:
+      kind: http
+      url: http://127.0.0.1:8080/health
+      timeout_s: 3
+      interval_s: 15
+    notes: >-
+      Занятый порт 8080 — Maya им НЕ пользоваться. Прямой доступ из LAN к 8080
+      не закрыт (см. README «Факты обследования», п.1 расхождений).
+
+  - id: qwen3-tts
+    name: "Qwen3-TTS (qwentts.cpp tts-server)"
+    type: generic
+    unit: Qwen3-TTS.service               # сейчас inactive/disabled
+    managed: adopted
+    edit_mode: manage_only                # drop-in ЗАПРЕЩЁН: в юните нет User= (root) — ТЗ §5.5
+    port: 8003
+    bind_host: 0.0.0.0                    # --host 0.0.0.0 в ExecStart
+    health:
+      kind: tcp
+      port: 8003
+      timeout_s: 3
+      interval_s: 15
+    gpus:
+      - GPU-cfec683a-1069-2f9c-0425-2e26192519e6   # 16 ГБ карта, по UUID
+    cuda_addressing: uuid
+    notes: >-
+      ВНИМАНИЕ: в юните нет User= → при старте выполняется от root. Панель не
+      редактирует такой юнит (ТЗ §5.5), только start/stop/restart/логи.
+
+  - id: tts-proxy
+    name: "TTS proxy (nemo, uvicorn tts_proxy:app)"
+    type: generic
+    unit: tts-proxy.service               # inactive/disabled; User=dispot
+    managed: adopted
+    edit_mode: manage_only
+    port: 8004
+    bind_host: 127.0.0.1
+    health:
+      kind: http
+      url: http://127.0.0.1:8004/         # корневой маршрут; уточнить health-путь
+      timeout_s: 3
+      interval_s: 15
+    gpus: []
+    notes: "Caddy проксирует /tts/* → 127.0.0.1:8004."
+
+  - id: gpu-power-limit
+    name: "GPU power limit (oneshot)"
+    type: generic
+    unit: gpu-power-limit.service
+    managed: adopted
+    edit_mode: manage_only
+    gpus: []                              # действует на ВСЕ карты (nvidia-smi -pm 1 -pl 150, без CVD)
+    notes: >-
+      Только просмотр (allowlist: status+journal). Ограничение потребления
+      сервера на этапе старта: панель показывает, что юнит отработал
+      (ExitCode/Result), не редактирует его (ТЗ §9, решение владельца от 2026-10-27).
+
+  # speaches.service (STT/TTS на CPU; вероятно, это uvicorn 127.0.0.1:8001) —
+  # добавим после survey2, когда подтверждён владелец порта и ExecStart.

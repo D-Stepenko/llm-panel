@@ -1,0 +1,19 @@
+{% extends "base.html" %}
+{% block title %}Аудит — llm-panel{% endblock %}
+{% block content %}
+<h1>Журнал аудита (последние {{ rows | length }} событий)</h1>
+<table class="tbl">
+  <thead><tr><th>Время</th><th>IP</th><th>Пользователь</th><th>Действие</th><th>Объект</th><th>Результат</th><th>Детали</th></tr></thead>
+  <tbody>
+  {% for r in rows %}
+    <tr class="{{ 'row-err' if r.result in ['failed','denied','helper_error'] else '' }}">
+      <td>{{ r.ts_str if r.ts_str is defined else r.ts }}</td>
+      <td>{{ r.ip }}</td><td>{{ r.username }}</td><td>{{ r.action }}</td>
+      <td>{{ r.object }}</td><td>{{ r.result }}</td><td class="muted">{{ r.detail }}</td>
+    </tr>
+  {% else %}
+    <tr><td colspan="7" class="muted">Событий нет.</td></tr>
+  {% endfor %}
+  </tbody>
+</table>
+{% endblock %}

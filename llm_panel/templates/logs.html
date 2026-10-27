@@ -1,0 +1,71 @@
+{% extends "base.html" %}
+{% block title %}Логи {{ svc.unit }} — llm-panel{% endblock %}
+{% block content %}
+<h1>Логи: {{ svc.name }} <code>{{ svc.unit }}</code></h1>
+{% if err %}<div class="alert alert-error">{{ err }}</div>{% endif %}
+
+<div class="logs-controls">
+  <form method="get" action="/services/{{ svc.id }}/logs">
+    <label>Строк:
+      <select name="lines">
+        {% for n in [50, 200, 500, 1000] +%}
+        <option value="{{ n }}" {{ 'selected' if lines == n else '' }}>{{ n }}</option>
+        {% endfor %}
+      </select>
+    </label>
+    <button>Показать</button>
+  </form>
+  <a class="btn" href="/services/{{ svc.id }}/logs/download?lines={{ lines }}">Скачать</a>
+  <button id="follow-btn" type="button" class="btn">Поток</button>
+  <label>Фильтр: <input id="log-filter" type="text" value="{{ filt }}"></label>
+</div>
+
+<pre id="log" class="logview">{{ text }}</pre>
+
+<script>
+(function () {
+  const pre = document.getElementById("log");
+  const filter = document.getElementById("log-filter");
+  let es = null;
+  let paused = false;
+  const btn = document.getElementById("follow-btn");
+
+  function applyFilter() {
+    const f = (filter.value || "").toLowerCase();
+    for (const line of pre.children) {           // при follow строки — <div>
+      line.hidden = f && !line.textContent.toLowerCase().includes(f);
+    }
+  }
+  filter.addEventListener("input", applyFilter);
+
+  btn.addEventListener("click", () => {
+    if (es) { es.close(); es = null; btn.textContent = "Поток"; return; }
+    es = new EventSource("/services/{{ svc.id }}/logs/stream?lines=50");
+    btn.textContent = "Стоп";
+    pre.textContent = "";
+    es.addEventListener("log", e => {
+      const div = document.createElement("div");
+      div.textContent = lastDataLine(e.data);
+      pre.appendChild(div);
+      while (pre.childNodes.length > 2000) pre.removeChild(pre.firstChild);
+      const f = (filter.value || "").toLowerCase();
+      div.hidden = f && !div.textContent.toLowerCase().includes(f);
+      if (!f && !div.hidden) pre.scrollTop = pre.scrollHeight;
+    });
+    es.addEventListener("error", e => {
+      const div = document.createElement("div");
+      div.className = "log-error";
+      div.textContent = "ОШИБКА потока: " + lastDataLine(e.data || "");
+      pre.appendChild(div);
+      es.close(); es = null; btn.textContent = "Поток";
+    });
+    es.addEventListener("end", () => { es.close(); es = null; btn.textContent = "Поток"; });
+  });
+
+  function lastDataLine(raw) {
+    // raw может содержать «\n» системные — экранированы SSE; возвращаем как есть
+    return String(raw);
+  }
+})();
+</script>
+{% endblock %}

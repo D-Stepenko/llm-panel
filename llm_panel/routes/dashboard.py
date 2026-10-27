@@ -1,0 +1,105 @@
+"""Главная страница + SSE-поток статусов/метрик (ТЗ §5.1).
+
+Один общий коллектор питает всех подключённых клиентов (нет опроса на клиента).
+SSE-фрагменты: event «services», «gpus», «host» с отрендеренными HTML-частями.
+"""
+
+from __future__ import annotations
+
+import asyncio
+import datetime as _dt
+import time
+
+from fastapi import APIRouter, Request
+from fastapi.responses import HTMLResponse, StreamingResponse
+
+router = APIRouter()
+
+
+def _version() -> str:
+    from .. import __version__
+    return __version__
+
+
+def _snap_dict(snap) -> dict:
+    return {
+        "ts": snap.ts,
+        "services": snap.services,
+        "gpus": snap.gpus,
+        "host": snap.host,
+        "warnings": snap.warnings,
+    }
+
+
+@router.get("/", response_class=HTMLResponse)
+async def index(request: Request):
+    state = request.app.state.panel
+    snap = state.collector.snapshot
+    initial = {"services": "", "gpus": "", "host": ""}
+    if snap is not None:
+        snap_d = _snap_dict(snap)
+        for name in initial:
+            initial[name] = state.render(
+                f"_{name}.html", request=request, snapshot=snap_d
+            ).body.decode("utf-8")
+    return state.render(
+        "dashboard.html",
+        request=request,
+        username=request.state.session["username"],
+        version=_version(),
+        sse_available=initial["services"] != "",
+        initial_services=initial["services"],
+        initial_gpus=initial["gpus"],
+        initial_host=initial["host"],
+    )
+
+
+@router.get("/audit")
+async def audit_tail(request: Request, limit: int = 30):
+    """Последние события аудита (для обзора). Только GET, только для вошедшего администратора."""
+    state = request.app.state.panel
+    limit = max(1, min(limit, 200))
+    rows = []
+    for r in state.db.audit_tail(limit):
+        d = dict(r)
+        d["ts_str"] = _dt.datetime.fromtimestamp(
+            d["ts"], _dt.timezone.utc
+        ).strftime("%Y-%m-%d %H:%M:%S UTC")
+        rows.append(d)
+    return state.render("audit.html", request=request, rows=rows)
+
+
+@router.get("/events")
+async def events(request: Request):
+    state = request.app.state.panel
+    hub = state.hub
+
+    async def gen():
+        queue = hub.subscribe()
+        try:
+            while True:
+                if await request.is_disconnected():
+                    break
+                try:
+                    snap = await asyncio.wait_for(queue.get(), timeout=30)
+                except asyncio.TimeoutError:
+                    yield ": keepalive\n\n"
+                    continue
+                snap_d = _snap_dict(snap)
+                for name in ("services", "gpus", "host"):
+                    body = state.render(
+                        f"_{name}.html", request=request, snapshot=snap_d
+                    ).body.decode("utf-8")
+                    data_lines = "".join(f"data: {ln}\n" for ln in body.splitlines()) or "data: \n"
+                    yield f"event: {name}\n{data_lines}\n"
+        finally:
+            hub.unsubscribe(queue)
+
+    return StreamingResponse(
+        gen(),
+        media_type="text/event-stream",
+        headers={
+            "Cache-Control": "no-store",
+            "X-Accel-Buffering": "no",   # запрет буферизации через Caddy (readily ignored otherwise)
+        },
+    )

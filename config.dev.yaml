@@ -1,0 +1,31 @@
+# Конфигурация для ЛОКАЛЬНОЙ разработки на машине без systemd/NVML/helper.
+# НЕ для станции. Наружу не публиковать (cookie_secure=false безопасен только на loopback).
+panel:
+  listen_host: "127.0.0.1"
+  listen_port: 8000
+  trusted_hosts: ["localhost", "127.0.0.1"]
+  cookie_secure: false
+  session_minutes: 600
+  dev_mode: true
+
+data:
+  data_dir: dev-data
+  db_path: dev-data/panel.db
+  services_file: deploy/services.yaml.example
+
+systemd:
+  helper_path: deploy/helper/llm-panel-systemd   # заглушка: helper исполняется только на станции (Linux)
+  log_max_lines: 500
+  log_download_max_mb: 1
+
+metrics:
+  interval: 3.0
+  health_interval: 10.0
+  startup_timeout_default: 600
+
+ports:
+  min: 8100
+  max: 8999
+
+models:
+  roots: []   # на Windows нет ~/models — будет показано «нет данных»

@@ -1,0 +1,210 @@
+#!/usr/bin/env python3
+"""llm-panel-systemd — привилегированный helper панели (ТЗ §6.3).
+
+Требования к установке (ПРОВЕРИТЬ перед размещением):
+  * копировать в /usr/local/sbin/llm-panel-systemd,
+    владелец root:root, права 0755; каталоги в пути недоступны dispot на запись;
+  * sudoers даёт dispot право НЕТ кроме: sudo -n /usr/local/sbin/llm-panel-systemd;
+  * allowlist file: /etc/llm-panel/allowlist.json — root:root, 0644 (или 0640).
+Helper сам проверяет действие, точное имя юнита по allowlist, тип операции и
+все входные данные. Проверки только в FastAPI недостаточны (ТЗ §6.3).
+
+Никаких shell=True/eval; все вызовы — argv-списки.
+Коды возврата: 0 ок; 2 ошибка аргументов; 3 отказ (allowlist/валидация); 4 сбой systemd.
+Запускается ТОЛЬКО через sudo. Прямой запуск не от root — отказ (#безопасный дефолт).
+"""
+
+import json
+import os
+import re
+import subprocess
+import sys
+
+# syslog доступен только в Linux (helper предназначен для станции); на других ОС — no-op
+try:
+    import syslog
+except ImportError:  # Windows при тестировании
+    class _NoSyslog:
+        def __getattr__(self, name):
+            return lambda *a, **k: None
+    syslog = _NoSyslog()  # type: ignore
+
+ALLOWLIST_PATH = "/etc/llm-panel/allowlist.json"
+UNIT_RE = re.compile(r"^[A-Za-z0-9_.@-]{1,64}\.service$")
+JOURNAL_MAX_LINES = 5000
+ACTIONS = ("start", "stop", "restart", "enable", "disable", "status", "journal", "journal-follow")
+
+SHOW_PROPS = ("ActiveState", "SubState", "Result", "ExecMainPID",
+              "ExecMainStartTimestamp", "ExecMainExitTimestamp", "NRestarts", "UnitFileState")
+
+
+def die(code: int, msg: str) -> None:
+    syslog.syslog(syslog.LOG_ERR, f"helper: отказ ({msg})")
+    print(f"ОШИБКА: {msg}", file=sys.stderr)
+    raise SystemExit(code)
+
+
+def load_allowlist() -> dict:
+    try:
+        with open(ALLOWLIST_PATH, "r", encoding="utf-8") as f:
+            data = json.load(f)
+    except FileNotFoundError:
+        die(3, "allowlist не найден (безопасный дефолт — отказ)")
+    except (json.JSONDecodeError, OSError) as e:
+        die(3, f"allowlist нечитаем: {type(e).__name__} (безопасный дефолт — отказ)")
+    if not isinstance(data.get("units"), dict):
+        die(3, "allowlist повреждён (отсутствует ключ units)")
+    # Проверка владельца выполняется ВСЕГДА кроме тестового режима (env-переопределение
+    # доступно только при euid != 0, sudo его не пропускает — smuggle невозможен).
+    if not os.environ.get("LLM_PANEL_ALLOWLIST_TEST"):
+        st = os.stat(ALLOWLIST_PATH)
+        if st.st_uid != 0:
+            die(3, "allowlist принадлежит не root — отказ (защита от подмены)")
+    return data["units"]
+
+
+def validate_unit(unit: str) -> str:
+    if not unit or not isinstance(unit, str):
+        die(2, "имя юнита не задано")
+    if not unit.isascii() or any(ord(c) < 32 for c in unit):
+        die(2, "имя юнита содержит недопустимые символы")
+    if "/" in unit or "\\" in unit or ".." in unit or "\x00" in unit:
+        die(2, f"имя юнита содержит путевые элементы: {unit[:40]!r}")
+    if not UNIT_RE.match(unit):
+        die(2, f"имя юнита не соответствует безопасному шаблону: {unit[:40]!r}")
+    if "|" in unit or ";" in unit or " " in unit:
+        die(2, "имя юнита содержит запрещённые символы")
+    return unit
+
+
+def _euid() -> int:
+    """posix geteuid; на не-posix (Windows, для тестов) — -1 (не root)."""
+    return getattr(os, "geteuid", lambda: -1)()
+
+
+def main() -> int:
+    try:
+        syslog.openlog("llm-panel-helper", syslog.LOG_PID)
+    except Exception:  # noqa: BLE001 — логирование не должно ломать работу
+        pass
+
+    argv = sys.argv[1:]
+
+    # Тестовый режим (--dry-run): разрешён ТОЛЬКО не от root (для pytest/разработки).
+    # От root это игнорируется/отклоняется, чтобы через sudo нельзя было попросить dry-run вместо действия.
+    dry_run = "--dry-run" in argv
+    if dry_run:
+        argv.remove("--dry-run")
+        if _euid() == 0:
+            die(2, "dry-run недоступен от root (используется только при тестировании)")
+        if os.environ.get("LLM_PANEL_ALLOWLIST_TEST"):  # ТОЛЬКО не от root (sudo сбрасывает env)
+            global ALLOWLIST_PATH
+            ALLOWLIST_PATH = os.environ["LLM_PANEL_ALLOWLIST_TEST"]
+    elif _euid() != 0:
+        die(3, "запуск возможен только от root (через sudo -n /usr/local/sbin/llm-panel-systemd)")
+
+    if not argv:
+        die(2, "нет аргументов; ожидалось: <action> <unit> [extra]")
+    action = argv[0]
+    if action not in ACTIONS:
+        die(2, "неизвестное действие")
+
+    if len(argv) < 2:
+        die(2, "не задано имя юнита")
+    unit = validate_unit(argv[1])
+
+    allowlist = load_allowlist()
+    entry = allowlist.get(unit)
+    if entry is None:
+        syslog.syslog(syslog.LOG_NOTICE, f"helper: юнит {unit} вне allowlist — отказ")
+        print(f"ОТКАЗ: юнит {unit} не внесён в allowlist", file=sys.stderr)
+        return 3
+
+    actions = entry.get("actions", []) if isinstance(entry, dict) else []
+    if action not in actions:
+        print(f"ОТКАЗ: действие {action} не разрешено для {unit} (allowlist)", file=sys.stderr)
+        syslog.syslog(syslog.LOG_NOTICE, f"helper: действие {action} для {unit} не разрешено — отказ")
+        return 3
+
+    # journal/journal-follow: единственный extra — количество строк (целое, ограничено)
+    if action in ("journal", "journal-follow") and action in actions:
+        extra = argv[2:]
+        if len(extra) != 1 or not extra[0].isdigit() or not (1 <= int(extra[0]) <= JOURNAL_MAX_LINES):
+            die(2, "journal принимает ровно один аргумент — целое 1..5000")
+        lines = int(extra[0])
+
+    if dry_run:
+        plan = {"action": action, "unit": unit, "allowed": True}
+        if action == "journal":
+            plan["argv"] = ["journalctl", "--unit", unit, "--lines", str(lines), "--no-pager"]
+        elif action == "journal-follow":
+            plan["argv"] = ["journalctl", "--unit", unit, "--lines", "50", "--no-pager", "-f"]
+        elif action == "status":
+            plan["argv"] = ["systemctl", "show", "--no-pager", unit]
+        else:
+            plan["argv"] = ["systemctl", action, "--no-ask-password", unit]
+        print(json.dumps(plan, ensure_ascii=False))
+        syslog.syslog(syslog.LOG_INFO, f"helper: DRY-RUN {action} {unit} — валидация пройдена")
+        return 0
+
+    def run(argv_list, timeout: float = 60.0) -> int:
+        try:
+            proc = subprocess.run(argv_list, capture_output=True, text=True, timeout=timeout)
+        except subprocess.TimeoutExpired:
+            die(4, "systemd/journalctl не ответил вовремя")
+        if proc.returncode != 0:
+            syslog.syslog(syslog.LOG_ERR,
+                          f"helper: сбой systemd {action} {unit}: rc={proc.returncode}")
+            sys.stdout.write(proc.stdout or "")
+            print(proc.stderr or "", file=sys.stderr, end="")
+            return 4
+        sys.stdout.write(proc.stdout or "")
+        return 0
+
+    if action == "status":
+        props = []
+        for p in SHOW_PROPS:
+            props.append(f"--property={p}")
+        rc = run(["systemctl", "show", "--no-pager", *props, "--", unit])
+    elif action == "journal":
+        rc = run(["journalctl", "--unit", unit, "--lines", str(lines), "--no-pager"], timeout=30)
+    elif action == "journal-follow":
+        # Поток: stdout helper пробрасывается напрямую (без capture),
+        # чтобы backend мог читать строки журнала в реальном времени через SSE.
+        try:
+            proc = subprocess.Popen(
+                ["journalctl", "--unit", unit, "--lines", "50", "--no-pager", "-f"],
+                stdout=subprocess.PIPE,
+                stderr=subprocess.PIPE,
+                text=True,
+                bufsize=1,
+            )
+        except FileNotFoundError:
+            die(4, "journalctl не найден")
+        try:
+            assert proc.stdout is not None
+            for line in proc.stdout:
+                sys.stdout.write(line)
+                sys.stdout.flush()
+        except BrokenPipeError:
+            rc = 0  # backend закрыл поток (клиент отключился) — нормальное завершение
+        finally:
+            if proc.poll() is None:
+                proc.terminate()
+                try:
+                    proc.wait(timeout=5)
+                except subprocess.TimeoutExpired:
+                    proc.kill()
+            rc = proc.wait() if proc.returncode is None else proc.returncode
+            # отрицательные коды (сигнал терминерации) не считаем сбоем журнала
+            if rc < 0:
+                rc = 0
+    else:
+        rc = run(["systemctl", action, "--no-ask-password", unit])
+
+    syslog.syslog(syslog.LOG_INFO, f"helper: {action} {unit} -> rc={rc}")
+    return rc
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())

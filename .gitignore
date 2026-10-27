@@ -1,0 +1,14 @@
+.venv/
+__pycache__/
+*.pyc
+.pytest_cache/
+dev-data/
+*.db
+*.db-journal
+*.db-wal
+*.db-shm
+secrets/
+*.token
+.cache/
+survey*.out
+*.log

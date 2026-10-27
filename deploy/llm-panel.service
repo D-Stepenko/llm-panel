@@ -1,0 +1,26 @@
+# /etc/systemd/system/llm-panel.service — юнит самой панели.
+# Запуск от dispot (не root). Окружение — .venv в домашнем каталоге
+# (не системный Python — ТЗ §7). Слушает только 127.0.0.1:8443;
+# наружу отдаёт Caddy (отдельный сайт-блок, порт 8444, см. README §4).
+#
+# Sandbox-опции (NoNewPrivileges, ProtectSystem и т.п.) включать по одной
+# после проверки работы NVML и записи в /var/lib/llm-panel.
+
+[Unit]
+Description=LLM Panel — локальная веб-панель управления LLM-станцией
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+User=dispot
+Group=dispot
+WorkingDirectory=/home/dispot/llm-panel
+Environment=LLM_PANEL_CONFIG=/etc/llm-panel/config.yaml
+Environment=PYTHONUNBUFFERED=1
+# Валидация конфига до поднятия сервера: неверный путь/порт — понятная ошибка в journal.
+ExecStart=/home/dispot/llm-panel/.venv/bin/python -m llm_panel --config /etc/llm-panel/config.yaml serve
+Restart=on-failure
+RestartSec=5
+
+[Install]
+WantedBy=multi-user.target

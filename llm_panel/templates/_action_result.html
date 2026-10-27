@@ -1,0 +1,3 @@
+<div class="alert {{ 'alert-ok' if ok else 'alert-error' }}" id="flash">
+  {% if ok %}<b>Готово.</b> {% else %}<b>Ошибка.</b> {% endif %}{{ message }}
+</div>

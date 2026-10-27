@@ -1,0 +1,46 @@
+{%- macro bar(pct) -%}
+  {%- if pct is not none -%}
+  <div class="bar {{ 'b-ok' if pct <= 60 else ('b-warn' if pct <= 80 else 'b-err') }}">
+    <div class="bar-fill" style="width: {{ pct if pct < 100 else 100 }}%"></div>
+  </div>
+  {%- endif -%}
+{%- endmacro -%}
+{% if snapshot.gpus is none %}
+<p class="muted">Нет данных по GPU: NVML недоступен в этом окружении (на станции значение появится).</p>
+{% else %}
+<div class="gpu-grid">
+{% for g in snapshot.gpus %}
+  <div class="card gpu-card">
+    <div class="card-head">
+      <b>{{ g.name or 'нет данных' }}</b>
+      <span class="badge">idx {{ g.index }}</span>
+    </div>
+    <dl class="kv">
+      <dt>UUID</dt><dd><code title="{{ g.uuid }}">{{ (g.uuid or '—')[-16:] }}</code></dd>
+      <dt>Память</dt><dd>{% if g.mem_used_mb is not none %}{{ g.mem_used_mb }} / {{ g.mem_total_mb }} М{% if g.mem_pct is not none %} · {{ g.mem_pct }}%{% endif %}{% else %}нет данных{% endif %} {{ bar(g.mem_pct) }}</dd>
+      <dt>Загрузка</dt><dd>{% if g.util_gpu_pct is not none %}{{ g.util_gpu_pct }} %{% else %}нет данных{% endif %} {{ bar(g.util_gpu_pct) }}</dd>
+      <dt>Мощность</dt><dd>{% if g.power_w is not none %}{{ g.power_w }} В{{ ' (' ~ (g.power_limit_w or '—') ~ ')' if g.power_limit_w else '' }}{% if g.power_pct is not none %} · {{ g.power_pct }}%{% endif %}{% else %}нет данных{% endif %} {{ bar(g.power_pct) }}</dd>
+      <dt>Темп.</dt><dd>{% if g.temp_c is not none %}{{ g.temp_c }} °C{% else %}нет данных{% endif %}</dd>
+      <dt>Конфиг. сервисы</dt><dd>
+        {% if g.assigned %}{% for s in g.assigned %}<code>{{ s }}</code> {% endfor %}{% else %}—{% endif %}
+      </dd>
+    </dl>
+    {% if g.procs %}
+    <table class="mini">
+      <thead><tr><th>PID</th><th>Процесс</th><th>МБ</th><th>Сервис</th></tr></thead>
+      <tbody>
+      {% for p in g.procs %}
+        <tr>
+          <td>{{ p.pid }}</td><td>{{ p.name }}</td><td>{{ p.mem_mb }}</td>
+          <td>{% if p.owner %}<code>{{ p.owner }}</code>{% else %}<span class="unknown-proc" title="Не принадлежит известному управляемому сервису; без подтверждения процессу не приписывается сервис (ТЗ §5.2)">неизвестный</span>{% endif %}</td>
+        </tr>
+      {% endfor %}
+      </tbody>
+    </table>
+    {% else %}
+    <p class="muted">Процессов на карте нет.</p>
+    {% endif %}
+  </div>
+{% endfor %}
+</div>
+{% endif %}

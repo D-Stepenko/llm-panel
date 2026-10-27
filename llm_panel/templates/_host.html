@@ -1,0 +1,10 @@
+<div class="host-line card">
+  <dl class="kv">
+    <dt>RAM</dt><dd>{% if snapshot.host.ram_used_mb is not none %}{{ snapshot.host.ram_used_mb }} / {{ snapshot.host.ram_total_mb }} МБ (доступно {{ snapshot.host.ram_available_mb }}){% else %}нет данных{% endif %}</dd>
+    <dt>Swap</dt><dd>{% if snapshot.host.swap_total_mb is not none %}{{ snapshot.host.swap_used_mb }} / {{ snapshot.host.swap_total_mb }} МБ{% else %}нет данных{% endif %}</dd>
+    <dt>CPU</dt><dd>{% if snapshot.host.cpu_percent is not none %}{{ snapshot.host.cpu_percent }} %{% else %}нет данных{% endif %}</dd>
+    {% for d in snapshot.host.disks %}
+    <dt>Диск {{ d[0] }}</dt><dd>{% if d[1] is not none %}{{ d[2] }} ГБ свободно из {{ d[1] }}{% else %}нет данных{% endif %}</dd>
+    {% endfor %}
+  </dl>
+</div>

@@ -1,0 +1,45 @@
+{% for svc in snapshot.services %}
+<div class="card svc-card state-{{ svc.state }}" id="svc-{{ svc.id }}">
+  <div class="card-head">
+    <span class="dot"></span>
+    <div>
+      <div class="svc-name">{{ svc.name }} <span class="muted">({{ svc.type }})</span></div>
+      <div class="svc-meta">
+        юнит: <code>{{ svc.unit }}</code>
+        {% if svc.port %} · порт: <code>{{ svc.bind_host or '?' }}:{{ svc.port }}</code>{% endif %}
+        {% if svc.autostart %} · автозапуск: <code>{{ svc.autostart }}</code>{% endif %}
+      </div>
+    </div>
+    <span class="badge badge-{{ svc.state }}">{{ svc.state_ru }}</span>
+  </div>
+  <div class="svc-body">
+    <dl class="kv">
+      <dt>Uptime</dt><dd>{{ svc.uptime or '—' }}</dd>
+      <dt>Перезапусков</dt><dd>{{ svc.nrestarts if svc.nrestarts is not none else '—' }}</dd>
+      <dt>systemd</dt><dd><code>{{ svc.system_active }}/{{ svc.system_sub }}</code>{% if svc.system_result and svc.system_result != 'success' %} · result: {{ svc.system_result }}{% endif %}{% if svc.system_active == 'exited' and svc.system_result == 'success' %} · отработал (код 0){% endif %}</dd>
+      <dt>GPU (конфиг)</dt><dd>
+        {% if svc.gpus %}
+          {% for g in svc.gpus %}<code title="{{ g }}">{{ g[-12:] }}</code>{% endfor %}
+        {% else %}—{% endif %}
+      </dd>
+    </dl>
+    {# Примечание состояния показываем только когда есть что пояснить; «готов» — тихо #}
+    {% if svc.note and svc.state not in ('ready', 'stopped') %}
+    <div class="svc-note">{{ svc.note }}</div>
+    {% endif %}
+    {% if svc.ram_exclusive %}<div class="svc-note warn">Внимание: может потреблять почти всю RAM (подтверждение перед запуском).</div>{% endif %}
+  </div>
+  <div class="card-actions">
+    <form method="post" action="/services/{{ svc.id }}/start"><input type="hidden" name="csrf" value="{{ csrf }}"><button {{ 'disabled' if svc.state == 'ready' or svc.state == 'starting' else '' }}>Старт</button></form>
+    <form method="post" action="/services/{{ svc.id }}/stop"><input type="hidden" name="csrf" value="{{ csrf }}"><button {{ 'disabled' if svc.state == 'stopped' else '' }}>Стоп</button></form>
+    <form method="post" action="/services/{{ svc.id }}/restart"><input type="hidden" name="csrf" value="{{ csrf }}"><button>Рестарт</button></form>
+    <a class="btn" href="/services/{{ svc.id }}/logs">Логи</a>
+    <a class="btn" href="/services/{{ svc.id }}/settings">Настройки</a>
+  </div>
+</div>
+{% else %}
+<p class="muted">Сервисов нет: заполните services.yaml (см. deploy/services.yaml.example).</p>
+{% endfor %}
+{% for w in snapshot.warnings %}
+<div class="alert alert-warn">{{ w }}</div>
+{% endfor %}

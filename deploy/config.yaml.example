@@ -1,0 +1,53 @@
+# Конфигурация панели: /etc/llm-panel/config.yaml (ТЗ §8).
+# Секреты (HF token и пр.) в этом файле ХРАНИТЬ ЗАПРЕЩЕНО.
+# Для локальной разработки: файл config.dev.yaml (dev_mode: true, пути относительные).
+
+panel:
+  # ТЗ §6.1: Uvicorn слушает ТОЛЬКО loopback; наружу — через Caddy по HTTPS (tls internal)
+  listen_host: "127.0.0.1"
+  listen_port: 8443
+  # Хосты, принимаемые в заголовке Host (проверка) — имя, которым обращаются через Caddy
+  trusted_hosts:
+    - "10.10.100.44"
+    - "llm-panel.local"        # добавить в Caddy/hosts или убрать, если не используется
+  # Secure-cookie: обязательно true на станции (HTTPS через Caddy); false только для локальной отладки без TLS
+  cookie_secure: true
+  session_minutes: 720          # срок жизни сессии
+  lockout_failures: 5           # ТЗ §6.1: блокировка после 5 ошибок (меньше нельзя)
+  lockout_minutes: 15
+  dev_mode: false
+
+data:
+  # каталог данных панели; владелец dispot, права 0700
+  data_dir: /var/lib/llm-panel
+  db_path: /var/lib/llm-panel/panel.db
+  # описания сервисов; файл читается панелью, правится администратором ОС
+  services_file: /etc/llm-panel/services.yaml
+
+systemd:
+  # root-owned helper; менять из web UI нельзя (только админ ОС, см. README)
+  helper_path: /usr/local/sbin/llm-panel-systemd
+  log_max_lines: 2000           # кап количества строк журнала через helper (helper не даёт >5000)
+  log_download_max_mb: 2
+
+metrics:
+  interval: 3.0                 # частота обновления снапшота и SSE (загруженность GPU обновляется раз в 3 c)
+  health_interval: 5.0          # минимальный период health-проверок
+  startup_timeout_default: 600  # по умолчанию; для Maya задаётся до 900 в services.yaml
+
+ports:
+  min: 8100                     # диапазон для «первый свободный порт» (мастер, этап 3)
+  max: 8999
+
+models:
+  # корни для будущего каталога моделей (этап 3); на этапе 1 используется только для дисковой сводки
+  roots:
+    - /home/dispot/models
+    # - /home/dispot/models/gguf  # НЕ добавлять как отдельный корень: вложен в ~/models (ТЗ §5.7)
+
+# Паттерны маскирования секретов при выводе/скачивании журналов
+redact_patterns:
+  - "hf_[A-Za-z0-9]{20,}"
+  - "eyJ[A-Za-z0-9_.-]{10,}"
+  - "(?i)bearer\\s+[A-Za-z0-9._-]{15,}"
+  - "sk-[A-Za-z0-9]{20,}"

@@ -1,0 +1,33 @@
+{% extends "base.html" %}
+{% block title %}Настройки {{ svc.name }} — llm-panel{% endblock %}
+{% block content %}
+<h1>Настройки: {{ svc.name }}</h1>
+
+<div class="alert alert-warn">
+  Этап 1: режим <b>{{ svc.edit_mode }}</b>. Редактор конфигураций (Environment/ExecStart,
+  версии/diff/rollback, матрица GPU) появится на этапе 2 — по ТЗ §11. Сейчас доступен только просмотр
+  и start/stop/restart.
+</div>
+
+<div class="card">
+  <dl class="kv">
+    <dt>id</dt><dd><code>{{ svc.id }}</code></dd>
+    <dt>Тип</dt><dd>{{ svc.type }}</dd>
+    <dt>Юнит</dt><dd><code>{{ svc.unit }}</code></dd>
+    <dt>managed</dt><dd>{{ svc.managed }}</dd>
+    <dt>edit_mode</dt><dd>{{ svc.edit_mode }}</dd>
+    <dt>Порт</dt><dd>{% if svc.port %}{{ svc.bind_host or '127.0.0.1' }}:{{ svc.port }}{% else %}не задан{% endif %}</dd>
+    <dt>GPU (UUID)</dt><dd>
+      {% if svc.gpus %}{% for g in svc.gpus %}<code>{{ g }}</code> {% endfor %}{% else %}—{% endif %}
+    </dd>
+    <dt>startup_timeout</dt><dd>{{ svc.startup_timeout }} с</dd>
+    <dt>stop_signal</dt><dd>{{ svc.stop_signal }} ({{ svc.stop_timeout }} с)</dd>
+    <dt>ram_exclusive</dt><dd>{{ 'да' if svc.ram_exclusive else 'нет' }}</dd>
+    <dt>health</dt><dd>{% if svc.health %}{{ svc.health.kind }}: {{ svc.health.url or (svc.health.host ~ ':' ~ svc.health.port) }}{% else %}не настроено{% endif %}</dd>
+  </dl>
+  {% if svc.notes %}<p class="muted">{{ svc.notes }}</p>{% endif %}
+</div>
+
+<p><a class="btn" href="/">← К статусам</a></p>
+{% if gpu_short %}<p class="muted">Короткие идентификаторы GPU: {{ gpu_short | join(', ') }}</p>{% endif %}
+{% endblock %}
