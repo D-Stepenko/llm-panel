@@ -241,9 +241,12 @@ def test_autostart_toggle_buttons(authed_client):
     ])
     page = c.get("/", headers={"host": "localhost"})
     assert 'action="/services/vllm/disable"' in page.text
-    assert "Выключить автозапуск" in page.text
+    assert "Отключить автозапуск" in page.text
     assert 'action="/services/llama/enable"' in page.text
     assert "Включить автозапуск" in page.text
+    # «Включить автозапуск» — бледная кнопка (autostart off), «Отключить…» — обычная
+    assert 'class="action-btn btn-muted" title="Автозапуск выключен' in page.text
+    assert 'class="action-btn" title="Автозапуск включён' in page.text
     # кнопка «Логи» убрана из карточки
     assert 'href="/services/vllm/logs"' not in page.text
     # шестерёнка настроек присутствует

@@ -1,28 +1,4 @@
 {% set svcs = snapshot.services %}
-{% set running = svcs | selectattr('state', 'equalto', 'ready') | list | length %}
-{% set stopped = svcs | selectattr('state', 'equalto', 'stopped') | list | length %}
-{% set type_sub = {'vllm': 'Движок генерации vLLM', 'llama-cpp-python': 'Библиотека llama.cpp', 'llama': 'Библиотека llama.cpp'} %}
-
-<div class="section-heading">
-  <div>
-    <div class="section-title">
-      <span class="section-icon" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><rect x="3" y="5" width="18" height="6" rx="2"/><rect x="3" y="13" width="18" height="6" rx="2"/><path d="M7 8h.01M7 16h.01"/></svg></span>
-      Сервисы
-    </div>
-    <div class="section-meta sub">Состояние служб инференса · управление запуском</div>
-  </div>
-  <div class="service-summary">
-    <span><span class="summary-dot"></span>{{ running }} запущено</span>
-    <span><span class="summary-dot off"></span>{{ stopped }} остановлено</span>
-  </div>
-</div>
-
-{% for w in snapshot.warnings %}
-<div class="notice">
-  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><path d="M12 9v4M12 17h.01"/><path d="M10.3 3.9 1.8 18a2 2 0 0 0 1.7 3h17a2 2 0 0 0 1.7-3L13.7 3.9a2 2 0 0 0-3.4 0z"/></svg>
-  <span>{{ w }}</span>
-</div>
-{% endfor %}
 
 <div class="service-grid">
 {% for svc in svcs %}
@@ -31,15 +7,10 @@
     <div class="service-main">
       <div class="service-head">
         <div class="service-title-wrap">
-          <span class="service-icon {{ 'llama' if 'llama' in svc.type else ('generic' if svc.type not in ('vllm',) else '') }}" aria-hidden="true">
-            {%- if 'tts' in svc.type or 'audio' in svc.type or 'voice' in (svc.id or '') %}<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><rect x="9" y="3" width="6" height="12" rx="3"/><path d="M5 11a7 7 0 0 0 14 0M12 18v3"/></svg>
-            {%- elif 'llama' in svc.type %}<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="8" cy="13" r="3"/><circle cx="16.5" cy="11" r="2"/><path d="M3 16v2M13 13v3M20 13v2"/></svg>
-            {%- elif svc.type in ('vllm',) %}<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><rect x="4" y="4" width="16" height="16" rx="4"/><path d="M12 8v8M8 12h8"/></svg>
-            {%- else %}<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M6 4h9l4 4v12a1 1 0 0 1-1 1H6a1 1 0 0 1-1-1V5a1 1 0 0 1 1-1z"/><path d="M9 10h6M9 14h6"/></svg>{% endif %}
-          </span>
+          <span class="service-icon" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><rect x="4" y="4" width="16" height="16" rx="4"/><path d="M12 8v8M8 12h8"/></svg></span>
           <div class="service-title-txt">
             <div class="service-title">{{ svc.name }}</div>
-            <div class="service-subtitle">{{ type_sub.get(svc.type, svc.type) }}{% if svc.unit %} · {{ svc.unit }}{% endif %}</div>
+            <div class="service-subtitle">{{ svc.type }}{% if svc.unit %} · {{ svc.unit }}{% endif %}</div>
           </div>
         </div>
         <span class="status {{ pill }}">{{ svc.state_ru }}</span>
@@ -66,38 +37,22 @@
           <div class="field-label">GPU</div>
           <div class="field-value">{% if svc.gpu_info %}{% for g in svc.gpu_info %}{% if g.name %}<code title="{{ g.uuid }}">{{ g.name }}</code>{% elif g.uuid %}<code title="{{ g.uuid }}">{{ g.uuid[-12:] }}</code>{% endif %}{% endfor %}{% else %}—{% endif %}</div>
         </div>
-        <div class="field">
-          <div class="field-label">Автозапуск</div>
-          <div class="field-value">{% if svc.autostart in ('enabled', 'enabled-runtime') %}включён{% elif svc.autostart == 'disabled' %}выключен{% elif svc.autostart %}{{ svc.autostart }}{% else %}—{% endif %}</div>
-        </div>
       </div>
-      {% if svc.note and svc.state not in ('ready', 'stopped') %}
-      <div class="service-note">{{ svc.note }}</div>
-      {% endif %}
-      {% if svc.ram_exclusive %}<div class="service-note">Внимание: может потреблять почти всю RAM (подтверждение перед запуском).</div>{% endif %}
     </div>
 
     <div class="service-bottom">
-      {% if svc.autostart in ('enabled', 'enabled-runtime') %}
-      <form method="post" action="/services/{{ svc.id }}/disable">
-        <input type="hidden" name="csrf" value="{{ csrf }}">
-        <button type="submit" class="autostart on" title="Текущее состояние: включён. Нажмите, чтобы выключить автозапуск юнита">
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M20 6 9 17l-5-5"/></svg>
-          Выключить автозапуск
-        </button>
-      </form>
-      {% elif svc.autostart == 'disabled' %}
-      <form method="post" action="/services/{{ svc.id }}/enable">
-        <input type="hidden" name="csrf" value="{{ csrf }}">
-        <button type="submit" class="autostart btn-muted" title="Текущее состояние: выключен. Нажмите, чтобы включить автозапуск юнита">
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M18 6 6 18M6 6l12 12"/></svg>
-          Включить автозапуск
-        </button>
-      </form>
-      {% else %}
-      <span class="autostart static-label">Состояние автозапуска: {{ svc.autostart or '—' }}</span>
-      {% endif %}
       <div class="actions">
+        {% if svc.autostart in ('enabled', 'enabled-runtime') %}
+        <form method="post" action="/services/{{ svc.id }}/disable">
+          <input type="hidden" name="csrf" value="{{ csrf }}">
+          <button type="submit" class="action-btn" title="Автозапуск включён — нажмите, чтобы отключить">Отключить автозапуск</button>
+        </form>
+        {% elif svc.autostart == 'disabled' %}
+        <form method="post" action="/services/{{ svc.id }}/enable">
+          <input type="hidden" name="csrf" value="{{ csrf }}">
+          <button type="submit" class="action-btn btn-muted" title="Автозапуск выключен — нажмите, чтобы включить">Включить автозапуск</button>
+        </form>
+        {% endif %}
         <form method="post" action="/services/{{ svc.id }}/start"><input type="hidden" name="csrf" value="{{ csrf }}"><button class="action-btn primary" {{ 'disabled' if svc.state == 'ready' or svc.state == 'starting' else '' }}><svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M7 4.5v15l13-7.5z"/></svg>Старт</button></form>
         <form method="post" action="/services/{{ svc.id }}/stop"><input type="hidden" name="csrf" value="{{ csrf }}"><button class="action-btn" {{ 'disabled' if svc.state == 'stopped' else '' }}><svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><rect x="6" y="6" width="12" height="12" rx="1"/></svg>Стоп</button></form>
         <form method="post" action="/services/{{ svc.id }}/restart"><input type="hidden" name="csrf" value="{{ csrf }}"><button class="action-btn"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M21 12a9 9 0 1 1-2.6-6.4M21 3v6h-6"/></svg>Рестарт</button></form>
