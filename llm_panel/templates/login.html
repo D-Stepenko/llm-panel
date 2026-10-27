@@ -3,9 +3,9 @@
 {% block content %}
 <div class="login-wrap">
   <div class="login-card">
-    <div class="eyebrow" style="margin-bottom:10px">llm-panel · доступ</div>
+    <div class="eyebrow">llm-panel · доступ</div>
     <h1>Вход в панель</h1>
-    {% if error %}<div class="notice err" style="margin:0 0 6px">
+    {% if error %}<div class="notice err">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><path d="M12 9v4M12 17h.01"/><path d="M10.3 3.9 1.8 18a2 2 0 0 0 1.7 3h17a2 2 0 0 0 1.7-3L13.7 3.9a2 2 0 0 0-3.4 0z"/></svg>
       <span>{{ error }}</span></div>{% endif %}
     <form method="post" action="/login?next={{ request.query_params.get('next') or '/' }}">
@@ -16,9 +16,9 @@
       <label>Пароль
         <input type="password" name="password" autocomplete="current-password" required>
       </label>
-      <button type="submit" class="btn btn-primary" style="width:100%;margin-top:16px;padding:9px 10px;font-size:12px">Войти</button>
+      <button type="submit" class="btn btn-primary">Войти</button>
     </form>
-    <p class="muted" style="font-size:11px;line-height:1.5">Доступ к панели эквивалентен доступу к пользовательскому аккаунту станции (ТЗ §6).
+    <p class="muted login-note">Доступ к панели эквивалентен доступу к пользовательскому аккаунту станции (ТЗ §6).
        После 5 неудачных попыток вход временно блокируется (счётчик в БД).</p>
   </div>
 </div>

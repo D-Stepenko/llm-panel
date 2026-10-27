@@ -22,14 +22,14 @@
       <div class="host-row">
         <span class="host-label">Видеопамять:</span>
         <span class="host-val">{% if g.get('mem_used_mb') is not none %}{{ g.mem_used_mb | mem }} / {{ g.get('mem_total_mb') | mem }}{% else %}нет данных{% endif %}</span>
-        {% if mem_pct %}<div class="host-track"><div class="mini-track"><span class="{{ tone }}" style="width: {{ mem_pct }}%"></span></div></div>{% endif %}
+        {% if mem_pct %}<div class="host-track"><div class="mini-track"><span class="{{ tone }} p{{ mem_pct }}"></span></div></div>{% endif %}
       </div>
       <div class="host-row">
         <span class="host-label">Мощность:</span>
         <span class="host-val">{% if g.get('power_w') is not none %}{{ g.power_w }} Вт / {{ g.get('power_limit_w') | int }} Вт{% else %}нет данных{% endif %}</span>
         {% if g.get('power_pct') %}
         {% set ppct = g.power_pct %}
-        <div class="host-track"><div class="mini-track"><span class="{{ 't-err' if ppct > 80 else ('t-warn' if ppct > 60) }}" style="width: {{ ppct }}%"></span></div></div>
+        <div class="host-track"><div class="mini-track"><span class="{{ 't-err' if ppct > 80 else ('t-warn' if ppct > 60) }} p{{ ppct }}"></span></div></div>
         {% endif %}
       </div>
       <div class="host-row">
