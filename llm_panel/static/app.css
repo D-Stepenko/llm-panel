@@ -47,6 +47,7 @@ h1, h2 { font-weight: 600; }
 button, .btn { background: var(--panel2); color: var(--text); border: 1px solid var(--border); border-radius: 6px; padding: 6px 12px; cursor: pointer; font: inherit; }
 button:hover, .btn:hover { border-color: var(--accent); }
 button:disabled { opacity: .45; cursor: default; }
+:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
 .btn-primary { background: var(--accent); border-color: var(--accent); color: #fff; }
 
 .alert { padding: 8px 12px; border-radius: 6px; margin: 10px 0; border: 1px solid; }
@@ -58,8 +59,32 @@ button:disabled { opacity: .45; cursor: default; }
 
 .gpu-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(340px, 1fr)); gap: 12px; margin-top: 10px; }
 .gpu-grid .card { margin: 0; background: var(--panel2); }
-.services-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(430px, 1fr)); gap: 12px; }
-#services-init > .svc-card, .sse-target > .svc-card { display: inline-block; width: min(430px, 100%); vertical-align: top; margin: 6px; }
+
+/* Сетка юнитов: 1 колонка → 2 → максимум 3 (не сжимаются бесконечно) */
+#services-init, #services-live {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: 12px;
+}
+@media (min-width: 780px) {
+  #services-init, #services-live { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}
+@media (min-width: 1220px) {
+  #services-init, #services-live { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+}
+#services-init .svc-card, #services-live .svc-card { margin: 0; min-width: 0; }
+.svc-body .kv dd, .svc-meta { overflow-wrap: anywhere; }
+
+/* Режим «Порядок»: перетаскивание карточек */
+.order-btn.order-active { border-color: var(--ok); color: var(--ok); }
+.order-mode .svc-card { cursor: grab; outline: 1px dashed var(--accent); }
+.order-mode .svc-card.drag-src { opacity: .55; }
+.svc-card { transition: box-shadow .15s; }
+.order-mode .svc-card:hover { box-shadow: 0 0 0 2px rgba(79, 140, 255, .25); }
+
+/* Шестерёнка настроек — справа в нижнем ряду карточки */
+.card-actions .gear { margin-left: auto; font-size: 17px; line-height: 1; padding: 5px 11px; }
+.settings-links { display: flex; gap: 10px; margin: 12px 0 0; }
 
 table.mini, table.tbl { width: 100%; border-collapse: collapse; font-size: 12px; margin-top: 8px; }
 table.mini th, table.tbl th { text-align: left; color: var(--muted); font-weight: 500; padding: 4px 6px; border-bottom: 1px solid var(--border); }

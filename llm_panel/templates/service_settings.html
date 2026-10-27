@@ -17,6 +17,17 @@
     <dt>managed</dt><dd>{{ svc.managed }}</dd>
     <dt>edit_mode</dt><dd>{{ svc.edit_mode }}</dd>
     <dt>Порт</dt><dd>{% if svc.port %}{{ svc.bind_host or '127.0.0.1' }}:{{ svc.port }}{% else %}не задан{% endif %}</dd>
+    <dt>GPU</dt><dd>
+      {% if gpu_info %}
+        {% for g in gpu_info %}
+          {%- if g.name -%}
+          <code title="{{ g.uuid }}">{{ g.name }}</code>
+          {%- elif g.uuid -%}
+          <code title="{{ g.uuid }}">{{ g.uuid[-12:] }}</code>
+          {%- endif %}
+        {% endfor %}
+      {% else %}—{% endif %}
+    </dd>
     <dt>GPU (UUID)</dt><dd>
       {% if svc.gpus %}{% for g in svc.gpus %}<code>{{ g }}</code> {% endfor %}{% else %}—{% endif %}
     </dd>
@@ -26,8 +37,9 @@
     <dt>health</dt><dd>{% if svc.health %}{{ svc.health.kind }}: {{ svc.health.url or (svc.health.host ~ ':' ~ svc.health.port) }}{% else %}не настроено{% endif %}</dd>
   </dl>
   {% if svc.notes %}<p class="muted">{{ svc.notes }}</p>{% endif %}
+  <p class="settings-links">
+    <a class="btn" href="/services/{{ svc.id }}/logs">Логи</a>
+    <a class="btn" href="/">← К статусам</a>
+  </p>
 </div>
-
-<p><a class="btn" href="/">← К статусам</a></p>
-{% if gpu_short %}<p class="muted">Короткие идентификаторы GPU: {{ gpu_short | join(', ') }}</p>{% endif %}
 {% endblock %}

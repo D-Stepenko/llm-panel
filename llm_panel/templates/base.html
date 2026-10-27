@@ -4,15 +4,17 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>{% block title %}llm-panel{% endblock %}</title>
+  <link rel="icon" type="image/svg+xml" href="/favicon.ico">
   <link rel="stylesheet" href="/static/app.css">
   <script src="/static/htmx.min.js" defer></script>
 </head>
-<body>
+<body data-csrf="{{ csrf }}">
 <header class="topbar">
   <div class="brand">llm-panel <span class="ver">v{{ version | default('') }}</span></div>
   <nav>
     <a href="/">Статусы</a>
     <a href="/audit">Аудит</a>
+    {% block header_extra %}{% endblock %}
   </nav>
   {% if username %}
   <form method="post" action="/logout" class="logout">

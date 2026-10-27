@@ -84,9 +84,15 @@ async def settings(request: Request, svc_id: str):
     svc = state.registry.by_id(svc_id)
     if svc is None:
         return PlainTextResponse("Сервис не найден", status_code=404)
+    # Названия карт (как в nvidia-smi) по UUID — из последнего снапшота NVML
+    snap = state.collector.snapshot if state.collector else None
+    uuid_name = {}
+    if snap is not None and snap.gpus:
+        uuid_name = {g["uuid"]: (g.get("name") or "") for g in snap.gpus}
+    gpu_info = [{"uuid": g, "name": uuid_name.get(g, "")} for g in svc.gpus]
     return state.render(
         "service_settings.html",
         request=request,
         svc=svc,
-        gpu_short=[g[-12:] if g else "" for g in svc.gpus],
+        gpu_info=gpu_info,
     )

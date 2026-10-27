@@ -118,6 +118,8 @@ class Collector:
         present_uuids = gpu_rows if gpu_rows is None else [g["uuid"] for g in gpu_rows]
 
         # 4) отображаемые состояния
+        # названия карт (как в nvidia-smi) для отображения вместо UUID-хвостов
+        uuid_name = {g["uuid"]: (g.get("name") or "") for g in gpu_rows} if gpu_rows else {}
         svc_rows = []
         pid_owner: dict[int, str] = {}
         for svc in self.registry:
@@ -152,6 +154,10 @@ class Collector:
                 "port": svc.port,
                 "bind_host": svc.bind_host,
                 "gpus": list(svc.gpus),
+                "gpu_info": [
+                    {"uuid": u, "name": uuid_name.get(u, "")}
+                    for u in svc.gpus
+                ],
                 "state": disp.state.value,
                 "state_ru": STATE_RU[disp.state.value],
                 "note": disp.note,

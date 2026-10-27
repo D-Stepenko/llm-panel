@@ -40,6 +40,11 @@ CREATE TABLE IF NOT EXISTS audit (
     detail  TEXT NOT NULL
 );
 CREATE INDEX IF NOT EXISTS idx_audit_ts ON audit (ts);
+CREATE TABLE IF NOT EXISTS settings (
+    key        TEXT PRIMARY KEY,
+    value      TEXT NOT NULL,
+    updated_at REAL NOT NULL
+);
 """
 
 
@@ -96,3 +101,15 @@ class Database:
         now = utcnow()
         self.execute("DELETE FROM sessions WHERE expires_at < ?", (now,))
         self.execute("DELETE FROM login_attempts WHERE ts < ?", (now - 90 * 86400,))
+
+    # -- settings (ключ-значение: порядок сервисов и пр.) ------------------
+    def get_setting(self, key: str) -> str | None:
+        row = self.query_one("SELECT value FROM settings WHERE key = ?", (key,))
+        return row["value"] if row else None
+
+    def set_setting(self, key: str, value: str) -> None:
+        self.execute(
+            "INSERT INTO settings (key, value, updated_at) VALUES (?,?,?) "
+            "ON CONFLICT(key) DO UPDATE SET value = excluded.value, updated_at = excluded.updated_at",
+            (key, value, utcnow()),
+        )

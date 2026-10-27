@@ -3,11 +3,12 @@
 from __future__ import annotations
 
 import asyncio
+import json
 import secrets
 import time
 
 from fastapi import FastAPI, Request
-from fastapi.responses import RedirectResponse, PlainTextResponse
+from fastapi.responses import RedirectResponse, PlainTextResponse, Response
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 import pathlib
@@ -39,6 +40,8 @@ class AppState:
         self.metrics = metrics
         self.hub = hub
         self.collector: Collector | None = None
+        # Сохранённый пользователем порядок карточек сервисов (settings.services_order)
+        self.services_order: list[str] = []
 
 
 def _get_state(request: Request) -> AppState:
@@ -67,9 +70,26 @@ def create_app(config: PanelConfig) -> FastAPI:
     state.templates = templates
 
     def render(name: str, **ctx):
+        # CSRF доступен во всех шаблонах (base.html: кнопка «Выйти») — устраняет
+        # сломанный logout вне страницы логина: раньше токен не передавался.
+        req = ctx.get("request")
+        if req is not None:
+            ctx.setdefault("csrf", getattr(req.state, "csrf", "") or "")
         return templates.TemplateResponse(name, ctx)
 
     state.render = render
+
+    def _load_services_order() -> list[str]:
+        raw = db.get_setting("services_order")
+        if not raw:
+            return []
+        try:
+            data = json.loads(raw)
+        except ValueError:
+            return []
+        return [str(x) for x in data] if isinstance(data, list) else []
+
+    state.services_order = _load_services_order()
 
     # --- middleware: Host + аутентификация (кроме /login и /static) --------
     @app.middleware("http")
@@ -122,6 +142,18 @@ def create_app(config: PanelConfig) -> FastAPI:
     app.include_router(routes.logs.router)
 
     app.mount("/static", StaticFiles(directory=str(BASE_DIR / "static")), name="static")
+
+    @app.get("/favicon.ico", include_in_schema=False)
+    async def _favicon():
+        svg = (
+            '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32">'
+            '<rect width="32" height="32" rx="6" fill="#171d29"/>'
+            '<path d="M16 5l9.5 5.5v11L16 27l-9.5-5.5v-11z" fill="none" stroke="#4f8cff" stroke-width="2.2"/>'
+            '<circle cx="16" cy="16" r="3.2" fill="#46c78c"/>'
+            "</svg>"
+        )
+        return Response(svg, media_type="image/svg+xml",
+                        headers={"Cache-Control": "public, max-age=86400"})
 
     @app.on_event("startup")
     async def _startup():

@@ -1,3 +1,8 @@
+{% extends "base.html" %}
+{% block title %}Результат действия — llm-panel{% endblock %}
+{% block content %}
 <div class="alert {{ 'alert-ok' if ok else 'alert-error' }}" id="flash">
   {% if ok %}<b>Готово.</b> {% else %}<b>Ошибка.</b> {% endif %}{{ message }}
 </div>
+<p><a class="btn" href="/">← К статусам</a></p>
+{% endblock %}

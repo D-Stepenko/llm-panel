@@ -7,7 +7,6 @@
       <div class="svc-meta">
         юнит: <code>{{ svc.unit }}</code>
         {% if svc.port %} · порт: <code>{{ svc.bind_host or '?' }}:{{ svc.port }}</code>{% endif %}
-        {% if svc.autostart %} · автозапуск: <code>{{ svc.autostart }}</code>{% endif %}
       </div>
     </div>
     <span class="badge badge-{{ svc.state }}">{{ svc.state_ru }}</span>
@@ -17,9 +16,22 @@
       <dt>Uptime</dt><dd>{{ svc.uptime or '—' }}</dd>
       <dt>Перезапусков</dt><dd>{{ svc.nrestarts if svc.nrestarts is not none else '—' }}</dd>
       <dt>systemd</dt><dd><code>{{ svc.system_active }}/{{ svc.system_sub }}</code>{% if svc.system_result and svc.system_result != 'success' %} · result: {{ svc.system_result }}{% endif %}{% if svc.system_active == 'exited' and svc.system_result == 'success' %} · отработал (код 0){% endif %}</dd>
-      <dt>GPU (конфиг)</dt><dd>
-        {% if svc.gpus %}
-          {% for g in svc.gpus %}<code title="{{ g }}">{{ g[-12:] }}</code>{% endfor %}
+      {%- if svc.autostart == 'enabled' or svc.autostart == 'enabled-runtime' -%}
+      <dt>Автозапуск</dt><dd>включён</dd>
+      {%- elif svc.autostart == 'disabled' -%}
+      <dt>Автозапуск</dt><dd>выключен</dd>
+      {%- elif svc.autostart -%}
+      <dt>Автозапуск</dt><dd>{{ svc.autostart }}</dd>
+      {%- endif %}
+      <dt>GPU</dt><dd>
+        {% if svc.gpu_info %}
+          {% for g in svc.gpu_info %}
+            {%- if g.name -%}
+            <code title="{{ g.uuid }}">{{ g.name }}</code>
+            {%- elif g.uuid -%}
+            <code title="{{ g.uuid }}">{{ g.uuid[-12:] }}</code>
+            {%- endif %}
+          {% endfor %}
         {% else %}—{% endif %}
       </dd>
     </dl>
@@ -33,8 +45,12 @@
     <form method="post" action="/services/{{ svc.id }}/start"><input type="hidden" name="csrf" value="{{ csrf }}"><button {{ 'disabled' if svc.state == 'ready' or svc.state == 'starting' else '' }}>Старт</button></form>
     <form method="post" action="/services/{{ svc.id }}/stop"><input type="hidden" name="csrf" value="{{ csrf }}"><button {{ 'disabled' if svc.state == 'stopped' else '' }}>Стоп</button></form>
     <form method="post" action="/services/{{ svc.id }}/restart"><input type="hidden" name="csrf" value="{{ csrf }}"><button>Рестарт</button></form>
-    <a class="btn" href="/services/{{ svc.id }}/logs">Логи</a>
-    <a class="btn" href="/services/{{ svc.id }}/settings">Настройки</a>
+    {%- if svc.autostart == 'enabled' or svc.autostart == 'enabled-runtime' %}
+    <form method="post" action="/services/{{ svc.id }}/disable"><input type="hidden" name="csrf" value="{{ csrf }}"><button>Выключить автозапуск</button></form>
+    {% elif svc.autostart == 'disabled' %}
+    <form method="post" action="/services/{{ svc.id }}/enable"><input type="hidden" name="csrf" value="{{ csrf }}"><button>Включить автозапуск</button></form>
+    {% endif %}
+    <a class="btn gear" href="/services/{{ svc.id }}/settings" title="Настройки" aria-label="Настройки">&#9881;</a>
   </div>
 </div>
 {% else %}
