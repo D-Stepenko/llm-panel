@@ -1,0 +1,34 @@
+{
+  "_note": "Root-owned allowlist helper`a. Файл на станции: /etc/llm-panel/allowlist.json, владелец root:root, права 0644. Имена юнитов — ФАКТИЧЕСКИЕ после обследования 2026-10-26. Действия ограничены явно. Проверка root-владельца выполняется самим helper'ом.",
+  "units": {
+    "vllm.service": {
+      "actions": ["start", "stop", "restart", "enable", "disable", "status", "journal", "journal-follow"]
+    },
+    "llama-qwen38_gguf.service": {
+      "actions": ["start", "stop", "restart", "enable", "disable", "status", "journal", "journal-follow"]
+    },
+    "llama-Qwen3.8_GGUF.service": {
+      "actions": ["start", "stop", "restart", "enable", "disable", "status", "journal", "journal-follow"]
+    },
+    "llama-qwen38-flash.service": {
+      "actions": ["start", "stop", "restart", "enable", "disable", "status", "journal", "journal-follow"]
+    },
+    "open-webui.service": {
+      "actions": ["start", "stop", "restart", "enable", "disable", "status", "journal", "journal-follow"]
+    },
+    "Qwen3-TTS.service": {
+      "actions": ["start", "stop", "restart", "enable", "disable", "status", "journal", "journal-follow"],
+      "note": "юнит без User= (root): drop-in через панель запрещён, только управление/логи"
+    },
+    "tts-proxy.service": {
+      "actions": ["start", "stop", "restart", "enable", "disable", "status", "journal", "journal-follow"]
+    },
+    "speaches.service": {
+      "actions": ["start", "stop", "restart", "enable", "disable", "status", "journal", "journal-follow"]
+    },
+    "gpu-power-limit.service": {
+      "actions": ["status", "journal"],
+      "note": "только просмотр: панель не редактирует его конфиг (ТЗ §9)"
+    }
+  }
+}

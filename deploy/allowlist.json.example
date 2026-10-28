@@ -1,34 +1,18 @@
 {
-  "_note": "Root-owned allowlist helper`a. Файл на станции: /etc/llm-panel/allowlist.json, владелец root:root, права 0644. Имена юнитов — ФАКТИЧЕСКИЕ после обследования 2026-10-26. Действия ограничены явно. Проверка root-владельца выполняется самим helper'ом.",
+  "_note": "Root-owned allowlist helper'а. Файл на сервере: /etc/llm-panel/allowlist.json, владелец root:root, права 0644. УНИВЕРСАЛЬНЫЙ ШАБЛОН: замените имена юнитов на ФАКТИЧЕСКИЕ (systemctl list-unit-files) и ограничьте действия по необходимости. Проверка root-владельца выполняется самим helper'ом. Юнит вне allowlist = полный отказ (безопасный дефолт). Реальный пример — deploy/examples/allowlist.json.station-llm.json.",
   "units": {
-    "vllm.service": {
+    "vllm-example.service": {
       "actions": ["start", "stop", "restart", "enable", "disable", "status", "journal", "journal-follow"]
     },
-    "llama-qwen38_gguf.service": {
+    "llamacpp-example.service": {
       "actions": ["start", "stop", "restart", "enable", "disable", "status", "journal", "journal-follow"]
     },
-    "llama-Qwen3.8_GGUF.service": {
+    "generic-example.service": {
       "actions": ["start", "stop", "restart", "enable", "disable", "status", "journal", "journal-follow"]
     },
-    "llama-qwen38-flash.service": {
-      "actions": ["start", "stop", "restart", "enable", "disable", "status", "journal", "journal-follow"]
-    },
-    "open-webui.service": {
-      "actions": ["start", "stop", "restart", "enable", "disable", "status", "journal", "journal-follow"]
-    },
-    "Qwen3-TTS.service": {
-      "actions": ["start", "stop", "restart", "enable", "disable", "status", "journal", "journal-follow"],
-      "note": "юнит без User= (root): drop-in через панель запрещён, только управление/логи"
-    },
-    "tts-proxy.service": {
-      "actions": ["start", "stop", "restart", "enable", "disable", "status", "journal", "journal-follow"]
-    },
-    "speaches.service": {
-      "actions": ["start", "stop", "restart", "enable", "disable", "status", "journal", "journal-follow"]
-    },
-    "gpu-power-limit.service": {
+    "oneshot-example.service": {
       "actions": ["status", "journal"],
-      "note": "только просмотр: панель не редактирует его конфиг (ТЗ §9)"
+      "note": "пример: только просмотр, управление запрещено (ТЗ §9)"
     }
   }
 }

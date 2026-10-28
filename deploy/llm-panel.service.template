@@ -1,0 +1,37 @@
+# /etc/systemd/system/llm-panel.service — ШАБЛОН.
+# Запуск от непривилегированного пользователя (не root). Окружение — .venv в
+# домашнем каталоге (не системный Python — ТЗ §7). Слушает только 127.0.0.1;
+# наружу отдаёт Caddy (отдельный сайт-блок, см. docs/DEPLOY.md §5).
+#
+# Плейсхолдеры подставляются deploy/install.sh:
+#   @@PANEL_USER@@  — пользователь панели
+#   @@PANEL_GROUP@@ — её группа
+#   @@PANEL_DIR@@   — каталог установки (код + .venv)
+#   @@CONFIG_FILE@@ — путь к config.yaml
+#
+# ВАЖНО про sandbox (урок станции 2026-10-28):
+#   * NoNewPrivileges=yes ЗАПРЕЩЁН: панель вызывает sudo -n <helper>, а этот
+#     флаг делает sudo невозможным (код возврата 1, «Сервисами невозможно
+#     управлять»). Управление сервисами в архитектуре ТЗ §6.3 идёт через sudo.
+#   * ProtectSystem=strict требует явного ReadWritePaths= на каталог данных,
+#     иначе запись БД/аудита будет нарушена. Включайте sandbox-опции ПО ОДНОЙ
+#     с проверкой (nvml, запись БД, sudo -n … status <юнит> от имени пользователя).
+
+[Unit]
+Description=LLM Panel — локальная веб-панель управления LLM-станцией
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+User=@@PANEL_USER@@
+Group=@@PANEL_GROUP@@
+WorkingDirectory=@@PANEL_DIR@@
+Environment=LLM_PANEL_CONFIG=@@CONFIG_FILE@@
+Environment=PYTHONUNBUFFERED=1
+# Валидация конфига до поднятия сервера: неверный путь/порт — понятная ошибка в journal.
+ExecStart=@@PANEL_DIR@@/.venv/bin/python -m llm_panel --config @@CONFIG_FILE@@ serve
+Restart=on-failure
+RestartSec=5
+
+[Install]
+WantedBy=multi-user.target

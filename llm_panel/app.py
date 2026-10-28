@@ -55,6 +55,7 @@ class AppState:
         self.i18n_lang: str = "en"     # язык интерфейса (по умолчанию английский)
         self.temp_unit: str = "C"      # единица температуры: C/F
         self.audit_limit: int = 30     # записей аудита на странице
+        self.model_roots: list[str] = []   # пути для дисковой сводки (Config Panel)
 
 
 def _get_state(request: Request) -> AppState:
@@ -95,6 +96,20 @@ def create_app(config: PanelConfig) -> FastAPI:
             state.collector.interval = float(db.get_setting("refresh_interval") or config.metrics_interval)
         except (TypeError, ValueError):
             state.collector.interval = config.metrics_interval
+        # пути дисковой сводки: settings.model_roots, иначе models.roots из config.yaml
+        raw_roots = db.get_setting("model_roots")
+        roots: list[str] | None = None
+        if raw_roots:
+            try:
+                data = json.loads(raw_roots)
+                if isinstance(data, list):
+                    roots = [str(x) for x in data if str(x).strip()]
+            except ValueError:
+                roots = None
+        if roots is None:
+            roots = list(config.model_roots)
+        state.model_roots = roots
+        state.collector.model_roots = list(roots)
 
     _load_settings()
 

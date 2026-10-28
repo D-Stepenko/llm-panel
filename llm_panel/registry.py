@@ -17,8 +17,8 @@ from typing import Optional
 SLUG_RE = re.compile(r"^[a-z0-9][a-z0-9_-]{0,63}$")
 UNIT_RE = re.compile(r"^[A-Za-z0-9_.@-]+\.service$")
 
-# Согласованная на станции конвенция адресации CUDA (проверена владельцем,
-# см. README «Факты обследования»): vLLM — по индексам, llama.cpp — по UUID.
+# Конвенция адресации CUDA задаётся владельцем сервера в services.yaml
+# (поле cuda_addressing): например, vLLM — по индексам, llama.cpp — по UUID.
 # UUID-привязка (поле gpus) остаётся плановой привязкой панели; при генерации
 # CUDA_VISIBLE_DEVICES для index-адресации индексы выводятся заново на момент
 # запуска из текущего маппинга NVML (проверка missing_gpu — всегда по UUID).
@@ -49,7 +49,7 @@ class ServiceDef:
     port: Optional[int]
     bind_host: Optional[str]
     gpus: tuple
-    cuda_addressing: str      # "uuid" | "index" (конвенция станции; см. README)
+    cuda_addressing: str      # "uuid" | "index" (конвенция владельца сервера)
     health: Optional[HealthDef]
     startup_timeout: int
     ram_exclusive: bool
@@ -139,7 +139,7 @@ def _parse_service(index: int, d: dict, startup_timeout_default: int, ports_min:
 
     startup_timeout = int(d.get("startup_timeout", startup_timeout_default))
     if not (30 <= startup_timeout <= 3600):
-        raise ValueError(f"Сервис «{sid}»: startup_timeout вне диапазона 30..3600 (для Maya может быть до 900)")
+        raise ValueError(f"Сервис «{sid}»: startup_timeout вне диапазона 30..3600")
 
     stop_signal = str(d.get("stop_signal", "SIGTERM"))
     # SIGKILL запрещён: ТЗ §9 требует штатного сигнала остановки (для Maya — SIGINT)

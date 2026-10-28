@@ -123,7 +123,7 @@ def load_config(path: str | pathlib.Path) -> PanelConfig:
     if not (60 <= startup_timeout_default <= 3600):
         raise ConfigError(
             "metrics.startup_timeout_default вне диапазона 60..3600 "
-            "(для Maya задаётся отдельно в services.yaml, до 900 секунд)"
+            "(в services.yaml для отдельных сервисов допускается до 900 секунд)"
         )
 
     ports = _get(raw, "ports", {}, dict)
@@ -179,7 +179,7 @@ def validate_paths(cfg: PanelConfig) -> None:
     if not db_parent.is_dir():
         raise ConfigError(
             f"Каталог для БД не существует: {db_parent}. "
-            "Создайте его и выставьте права (0700, владелец dispot)."
+            "Создайте его и выставьте права (0700, владелец — пользователь, от которого работает панель)."
         )
     if not pathlib.Path(cfg.services_file).is_file():
         raise ConfigError(f"Файл описаний сервисов не найден: {cfg.services_file}")

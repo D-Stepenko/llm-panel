@@ -13,6 +13,10 @@
   <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><path d="M20 6 9 17l-5-5"/></svg>
   <span>{{ t('cfg_saved') }}</span>
 </div>{% endif %}
+{% if roots_error %}<div class="notice err">
+  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><path d="M12 9v4m0 4h.01M10.3 3.9 1.8 18a2 2 0 0 0 1.7 3h17a2 2 0 0 0 1.7-3L13.7 3.9a2 2 0 0 0-3.4 0z"/></svg>
+  <span>{{ t('cfg_roots_err') }}</span>
+</div>{% endif %}
 
 <div class="page-card">
   <form method="post" action="/config" class="config-form">
@@ -48,6 +52,11 @@
           <option value="{{ v }}" {{ 'selected' if audit_value == v else '' }}>{{ v }}</option>
           {% endfor %}
         </select>
+      </dd>
+      <dt><label for="cfg-roots">{{ t('cfg_roots') }}</label></dt>
+      <dd>
+        <textarea id="cfg-roots" name="model_roots" rows="4" spellcheck="false">{{ roots_value }}</textarea>
+        <div class="muted cfg-hint">{{ t('cfg_roots_hint') }}</div>
       </dd>
     </dl>
     <p class="settings-links">

@@ -313,6 +313,77 @@ def test_config_requires_csrf(authed_client):
     assert r.status_code == 403
 
 
+# ----------------------------------------------- Config Panel: диски (model_roots)
+def test_config_model_roots_saved_and_applied(authed_client):
+    """Пути дисковой сводки: сохранение в settings + живое применение в коллекторе."""
+    c = authed_client
+    page = c.get("/config", headers={"host": "localhost"})
+    csrf = re.search(r'name="csrf" value="([^"]+)"', page.text).group(1)
+    r = c.post("/config", data={"lang": "ru", "temp_unit": "C", "refresh_interval": "3",
+                                "audit_limit": "30",
+                                "model_roots": "/data/models\n /data/backup \n", "csrf": csrf},
+               headers={"host": "localhost"}, follow_redirects=False)
+    assert r.status_code == 303 and r.headers["location"] == "/config?saved=1"
+    panel = c.app.state.panel
+    assert panel.model_roots == ["/data/models", "/data/backup"]       # пробелы отрезаны
+    assert panel.collector.model_roots == ["/data/models", "/data/backup"]  # на ходу
+    import json as _json
+    assert _json.loads(panel.db.get_setting("model_roots")) == ["/data/models", "/data/backup"]
+    page = c.get("/config", headers={"host": "localhost"})
+    assert "/data/models" in page.text and "/data/backup" in page.text  # показан в форме
+
+
+def test_config_model_roots_invalid_rejected(authed_client):
+    """Относительные пути/дубликаты — отказ без изменения значений."""
+    c = authed_client
+    panel = c.app.state.panel
+    panel.model_roots = ["/data/models"]
+    panel.collector.model_roots = ["/data/models"]
+    page = c.get("/config", headers={"host": "localhost"})
+    csrf = re.search(r'name="csrf" value="([^"]+)"', page.text).group(1)
+    r = c.post("/config", data={"lang": "ru", "temp_unit": "C", "refresh_interval": "3",
+                                "audit_limit": "30",
+                                "model_roots": "data/models\n/data/models", "csrf": csrf},
+               headers={"host": "localhost"}, follow_redirects=False)
+    assert r.status_code == 303 and r.headers["location"] == "/config?err=roots"
+    assert panel.model_roots == ["/data/models"]            # не изменилось
+    assert panel.collector.model_roots == ["/data/models"]
+    err_page = c.get("/config?err=roots", headers={"host": "localhost"})
+    assert "cfg_roots_err" not in err_page.text             # ключ переведён, а не выведен сырым
+    assert "абсолютный путь" in err_page.text or "absolute path" in err_page.text
+
+
+def test_config_model_roots_absent_keeps_value(authed_client):
+    """Поле отсутствует в форме (старый клиент) — значение не трогается."""
+    c = authed_client
+    panel = c.app.state.panel
+    panel.model_roots = ["/keep/me"]
+    page = c.get("/config", headers={"host": "localhost"})
+    csrf = re.search(r'name="csrf" value="([^"]+)"', page.text).group(1)
+    r = c.post("/config", data={"lang": "ru", "temp_unit": "C", "refresh_interval": "3",
+                                "audit_limit": "30", "csrf": csrf},
+               headers={"host": "localhost"}, follow_redirects=False)
+    assert r.status_code == 303 and r.headers["location"] == "/config?saved=1"
+    assert panel.model_roots == ["/keep/me"]
+
+
+def test_model_roots_default_from_config(tmp_path):
+    """Без settings.model_roots стартовое значение берётся из config.yaml (models.roots)."""
+    from fastapi.testclient import TestClient
+    from llm_panel import security
+
+    cfg = load_config(_make_config(tmp_path))
+    app = create_app(cfg)
+    app.state.panel.db.execute(
+        "INSERT OR REPLACE INTO users (username, password_hash, updated_at) VALUES ('admin', '!', 0)"
+    )
+    security.set_password(app.state.panel.db, "admin", "pw")
+    c = TestClient(app)
+    assert app.state.panel.model_roots == list(cfg.model_roots)
+    assert app.state.panel.collector.model_roots == list(cfg.model_roots)
+    app.state.panel.db.close()
+
+
 def test_default_language_is_en(tmp_path):
     """Язык по умолчанию — английский (без settings.lang)."""
     from fastapi.testclient import TestClient

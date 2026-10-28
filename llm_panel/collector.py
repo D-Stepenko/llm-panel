@@ -17,20 +17,6 @@ from .status import DisplayState, STATE_RU, compute_display
 from .systemd_units import show_unit
 
 
-def _fmt_uptime(seconds: float | None) -> str:
-    if seconds is None:
-        return ""
-    seconds = int(seconds)
-    days, rem = divmod(seconds, 86400)
-    hours, rem = divmod(rem, 3600)
-    mins, secs = divmod(rem, 60)
-    if days:
-        return f"{days}д {hours}ч {mins}м"
-    if hours:
-        return f"{hours}ч {mins}м {secs}с"
-    return f"{mins}м {secs}с"
-
-
 @dataclasses.dataclass
 class Snapshot:
     ts: float
@@ -48,6 +34,9 @@ class Collector:
         self.hub = hub
         self.snapshot: Snapshot | None = None
         self.interval = float(cfg.metrics_interval)   # интервал цикла (меняется через Config Panel)
+        # Пути для дисковой сводки (меняются через Config Panel на ходу;
+        # стартовое значение — models.roots из config.yaml)
+        self.model_roots: list[str] = list(cfg.model_roots)
         self._last_ready: dict[str, float] = {}     # unit -> прошлый успешный health ts
         self._last_health_check = 0.0
         self._health_cache: dict[str, object] = {}   # unit -> HealthResult
@@ -115,7 +104,7 @@ class Collector:
         gpu_rows = await loop.run_in_executor(None, build_gpu_rows, self.metrics)
         if gpu_rows is None:
             warnings.append(self.metrics.nvml_error or "NVML недоступен (нет данных по GPU)")
-        host = await loop.run_in_executor(None, self.metrics.read_host, self.cfg.model_roots)
+        host = await loop.run_in_executor(None, self.metrics.read_host, tuple(self.model_roots))
         present_uuids = gpu_rows if gpu_rows is None else [g["uuid"] for g in gpu_rows]
 
         # 4) отображаемые состояния
@@ -165,7 +154,6 @@ class Collector:
                 "system_active": disp.system_active,
                 "system_sub": disp.system_sub,
                 "system_result": info.result if info else "",
-                "uptime": _fmt_uptime(uptime_s),
                 "uptime_s": uptime_s,
                 "nrestarts": info.nrestarts if info else None,
                 "autostart": info.unit_file_state if info else "",

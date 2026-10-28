@@ -1,0 +1,169 @@
+# llm-panel — описание проекта
+
+Локальная веб-панель управления LLM-станцией: статусы и управление systemd-сервисами
+(vLLM, llama.cpp, TTS/STT, вспомогательные), сводка GPU/RAM/CPU/дисков, журналы,
+аудит действий. Универсальна: устанавливается на любой сервер с systemd и NVIDIA GPU,
+конкретные юниты/карты/диски описываются конфигурацией, а не кодом.
+
+Реализация по ТЗ `llm-panel-tz-reviewed.md` (ред. 1.1). Текущая версия: **0.1.1**,
+реализован **этап 1 (MVP)** из 4.
+
+## 1. Возможности (этап 1)
+
+- Вход по паролю (Argon2), блокировка после 5 неудач, сессии в SQLite, CSRF на всех POST.
+- Дашборд: карточки сервисов (статус systemd, health, автозапуск, uptime, GPU-привязка),
+  единый блок хоста (RAM/swap/CPU/диски), карточки GPU (загрузка, память, температура,
+  питание, процессы).
+- Управление: start/stop/restart, toggle автозапуска (enable/disable) — через
+  ограниченный root-owned helper (см. §3).
+- Журналы юнитов: просмотр и скачивание с маскированием секретов.
+- Ручной порядок карточек («Порядок»: перетаскивание мышью, сохранение в БД,
+  переживает рестарт панели).
+- SSE-обновления: один общий фоновый коллектор питает всех клиентов (интервал
+  настраивается, по умолчанию 3 с).
+- Панель настроек (`/config`): язык (EN/RU), единица температуры (°C/°F), интервал
+  обновления, лимит записей аудита, пути дисковой сводки. Всё применяется на ходу,
+  без рестарта панели.
+- Полосы загрузки: ≤60 % зелёная, ≤80 % жёлтая, выше красная; имена GPU как в
+  `nvidia-smi`; состояния отображаются честно («нет данных», а не выдумки).
+
+## 2. Стек и структура
+
+Python 3.12, FastAPI, Uvicorn (один процесс, только loopback), Jinja2 (без npm/сборки),
+SQLite, NVML (`nvidia-ml-py`) + psutil. CSP без inline script/style.
+
+```
+llm-panel/
+├── llm_panel/                 код панели
+│   ├── cli.py                 init-db | set-password | lockout-reset | check-config | serve
+│   ├── app.py                 FastAPI: Host/CSRF/аутентификация, SSE, панельные настройки
+│   ├── config.py              загрузка/валидация config.yaml
+│   ├── registry.py            загрузка/валидация services.yaml
+│   ├── db.py       security.py   SQLite, сессии, блокировка входа, пароли
+│   ├── systemd_units.py  health.py   read-only статусы systemd; health-проверки
+│   ├── collector.py  sse.py    общий фоновый сборщик; шина событий
+│   ├── metrics.py             NVML + psutil
+│   ├── helper_client.py       вызов helper через sudo -n (argv, без shell)
+│   ├── i18n.py                все строки интерфейса EN/RU
+│   ├── routes/{auth,dashboard,services,logs,config}.py
+│   └── templates/  static/
+├── deploy/
+│   ├── install.sh                  универсальный установщик (см. docs/DEPLOY.md)
+│   ├── llm-panel.service.template  шаблон systemd-юнита панели
+│   ├── helper/llm-panel-systemd    root-owned helper (ставится на сервер)
+│   ├── config.yaml.example         /etc/llm-panel/config.yaml (шаблон)
+│   ├── services.yaml.example       /etc/llm-panel/services.yaml (шаблон)
+│   ├── allowlist.json.example      /etc/llm-panel/allowlist.json (шаблон)
+│   ├── sudoers.llm-panel           предложение sudoers (только строка helper)
+│   └── examples/                   реальные примеры заполнения (станция-LLM)
+├── scripts/survey.sh, survey2.sh   read-only обследование сервера
+├── docs/                           PROJECT.md, DEPLOY.md, STATION-LLM.md
+├── tests/                          pytest
+└── config.dev.yaml                 конфиг машины разработки (без systemd/NVML)
+```
+
+## 3. Безопасность
+
+- **Аутентификация**: пароль Argon2, сессии с httpOnly+Secure cookie (Secure отключается
+  только в dev), блокировка входа после 5 неудач (снимается `llm-panel lockout-reset`).
+- **CSRF**: токен в сессии, проверяется на каждом POST; Host/Origin — только из
+  `trusted_hosts`.
+- **CSP**: `default-src 'self'; script-src 'self'; style-src 'self'; img-src 'self'
+  data:; frame-ancestors 'none'; form-action 'self'` — никаких inline script/style,
+  ширины полос задаются классами `.p0…p100`.
+- **root-операции**: только через helper `/usr/local/sbin/llm-panel-systemd`
+  (root:root 0755). Панель вызывает `sudo -n <helper> <action> <unit>`; в sudoers ровно
+  одна строка на этот путь, NOPASSWD, ничего больше. Helper сам проверяет действие,
+  точное имя юнита по root-owned allowlist и тип операции; коды возврата: 0 — успех,
+  2 — ошибка аргументов, 3 — отказ, 4 — сбой systemd. Юнит вне allowlist = отказ.
+- **Секреты**: не выводятся на веб-слой; журналы и скачивания маскируют
+  `hf_…`/JWT/Bearer/sk-ключи (паттерны настраиваются).
+- **Аудит**: все действия (вход, управление сервисами, настройки) пишутся в SQLite
+  с IP, пользователем, результатом и деталями; просмотр — `/audit`.
+
+## 4. Конфигурация
+
+### 4.1 config.yaml (`/etc/llm-panel/config.yaml`)
+
+| Ключ | Назначение | По умолчанию |
+|---|---|---|
+| `panel.listen_host/port` | слушающий адрес панели (только loopback) | 127.0.0.1:8443 |
+| `panel.trusted_hosts` | допустимые значения заголовка Host | — |
+| `panel.cookie_secure` | Secure-cookie (true на сервере) | true |
+| `panel.session_minutes`, `lockout_*` | сессии и блокировка | 720 / 5 / 15 |
+| `data.data_dir`, `db_path` | каталог и БД данных панели | /var/lib/llm-panel |
+| `data.services_file` | путь к services.yaml | /etc/llm-panel/services.yaml |
+| `systemd.helper_path` | путь к root-owned helper | /usr/local/sbin/llm-panel-systemd |
+| `systemd.log_max_lines`, `log_download_max_mb` | капы журналов | 2000 / 2 |
+| `metrics.interval`, `health_interval` | интервалы сбора (стартовые) | 3.0 / 5.0 с |
+| `metrics.startup_timeout_default` | тайм-аут старта по умолчанию | 600 с |
+| `ports.min/max` | диапазон портов (мастер этапа 3) | 8100–8999 |
+| `models.roots` | стартовые пути дисковой сводки | — |
+| `redact_patterns` | маскирование секретов в журналах | hf_/JWT/Bearer/sk- |
+
+Проверка: `.venv/bin/python -m llm_panel --config <путь> check-config`.
+
+### 4.2 services.yaml (`/etc/llm-panel/services.yaml`)
+
+Описания сервисов — единственное место, где перечислены юниты вашего сервера.
+Поля: `id` (slug), `name`, `type` (vllm/llamacpp/script/generic), `unit` (точное имя
+`.service`, регистр сохраняется), `managed` (adopted/created), `edit_mode`
+(manage_only/dropin/panel), `port`, `bind_host`, `health` (http/tcp), `gpus`
+(полные UUID вида `GPU-…`), `cuda_addressing` (uuid/index), `startup_timeout`,
+`ram_exclusive`, `stop_signal` (SIGTERM/SIGINT; SIGKILL запрещён), `stop_timeout`,
+`notes`. Шаблон — `deploy/services.yaml.example`, реальный пример —
+`deploy/examples/`. Правит администратор ОС; панель читает файл, не пишет.
+
+### 4.3 allowlist.json (`/etc/llm-panel/allowlist.json`)
+
+Root-owned список юнитов и разрешённых действий для helper. Юнит вне списка — полный
+отказ (безопасный дефолт). Проверка владельца root:root выполняется самим helper.
+
+## 5. Панель настроек (что меняется из UI)
+
+Раздел `/config`, права любого вошедшего пользователя, каждое сохранение — в аудит.
+Хранится в БД (settings), действует на всю панель, применяется без рестарта:
+
+| Настройка | Эффект |
+|---|---|
+| Language (EN/RU) | язык интерфейса |
+| Temperature unit (°C/°F) | отображение температуры GPU |
+| Refresh interval (2/3/5/10 с) | частота сбора метрик и SSE |
+| Audit entries shown (30/50/100/200) | лимит записей на странице `/audit` |
+| Disks summary paths | пути для дисковой сводки на главной (по одному абсолютному пути в строке, до 8; несуществующие показывают «нет данных») |
+
+Что НЕ редактируется из UI (намеренно, ТЗ §5.5/§9 и модель безопасности): config.yaml,
+services.yaml, allowlist.json, systemd-юниты, sudoers. Редактор конфигураций сервисов —
+этап 2.
+
+## 6. Универсальность: что определяется автоматически
+
+- **GPU**: количество, имена, UUID, память, температура, питание, процессы — NVML,
+  автоматически. Никаких зашитых карт.
+- **CPU/RAM/swap**: psutil + `/proc/cpuinfo`, автоматически.
+- **Диски**: список путей задаётся в Панели настроек (стартово — `models.roots`).
+- **Юниты сервисов**: `services.yaml` + `allowlist.json` под конкретный сервер;
+  обследование — `scripts/survey.sh` (read-only).
+- **Пользователь/пути установки**: параметры `deploy/install.sh` (`--user`, `--dir`,
+  `--config-dir`, `--data-dir`); systemd-юнит генерируется из шаблона.
+
+## 7. Этапы ТЗ
+
+- **Этап 1 (MVP) — реализован** (версии 0.1.0–0.1.1): вход/защита, статусы, управление
+  через helper, логи, сводка GPU/RAM/CPU/диск, SSE, порядок карточек, i18n EN/RU,
+  Панель настроек, универсальная установка.
+- **Этап 2**: матрица GPU, редактор конфигураций, версии/diff/rollback, конфликты
+  портов/RAM/GPU-режима, CVD-генерация (нужен вывод `./maya.sh --help`).
+- **Этап 3**: каталог моделей, HF-загрузки, мастер «модель → сервис».
+- **Этап 4**: Open WebUI-интеграция.
+
+## 8. Известные ограничения (этап 1)
+
+- Редактора конфигураций нет (этап 2); матрицы GPU/конфликтов нет (показ конфигурации).
+- health-проверка `readiness_timeout` не убивает процесс (по ТЗ).
+- «unhealthy»-история хранится в памяти панели и теряется при рестарте.
+- Тесты на машине разработки проверяют логику, но не systemd/NVML (их там нет) —
+  приёмка только на целевом сервере.
+- Sandbox-опции systemd юнита панели: `NoNewPrivileges` запрещён (ломает sudo до
+  helper), остальные — включать по одной с проверкой (урок станции 2026-10-28,
+  см. `deploy/llm-panel.service.template` и docs/STATION-LLM.md).
