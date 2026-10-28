@@ -7,6 +7,9 @@ Backend запускает sudo -n <helper> с argv-списком, БЕЗ shell
 
 Коды возврата helper:
   0 — успех; 2 — ошибка аргументов; 3 — отказ (allowlist/валидация); 4 — сбой systemd.
+Код 1 helper'у не принадлежит: его обычно возвращает сам sudo при отказе
+(например «a password is required» — sudoers-правило не установлено) либо
+необработанное исключение в helper. Сообщение включает фрагмент stderr.
 """
 
 from __future__ import annotations
@@ -46,6 +49,9 @@ def _map_exit(code: int, stderr: str) -> str:
         return "ошибка аргументов helper"
     if code == HELPER_EXIT_SYSTEMD:
         return f"systemd вернул ошибку: {stderr.strip()[:300] or '--'}"
+    detail = stderr.strip()[:200]
+    if detail:
+        return f"helper завершился с кодом {code}: {detail}"
     return f"helper завершился с кодом {code}"
 
 
