@@ -83,3 +83,31 @@ services:
       Юниты, которые панель не должна даже останавливать (например oneshot
       системной настройки), ограничьте в allowlist.json действиями
       status+journal.
+
+  # --- пример systemd USER-юнита --------------------------------------------
+  # Юниты ~/.config/systemd/user/*.service (менеджер systemctl --user) НЕ видны
+  # системному менеджеру: systemctl list-units/show без --user их не отдаёт,
+  # поэтому они не попадают ни в обследование, ни в «Поиск сервисов» системных
+  # юнитов. Чтобы показать такой сервис, добавьте запись с scope: user.
+  # Панель работает от того же пользователя, что владеет юнитом, и выполняет
+  # чтение/действия/журнал напрямую systemctl --user / journalctl --user —
+  # helper и allowlist.json для user-юнитов НЕ нужны.
+  - id: openclaw-example
+    name: "OpenClaw Gateway (пример user-юнита)"
+    type: generic
+    unit: openclaw-gateway.service
+    scope: user                           # system (по умолчанию) | user
+    managed: adopted
+    edit_mode: manage_only
+    port: 18789
+    bind_host: 127.0.0.1
+    health:
+      kind: tcp
+      port: 18789
+      timeout_s: 3
+      interval_s: 15
+    gpus: []
+    notes: >-
+      Идентификатор user-юнита, найденного «Поиском сервисов» и отмеченного
+      в Config Panel, — ПОЛНОЕ имя юнита (с суффиксом .service) и префиксом
+      user: — защита от коллизии с одноимённым системным юнитом.

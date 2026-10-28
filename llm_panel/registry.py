@@ -38,12 +38,20 @@ class HealthDef:
 
 @dataclasses.dataclass(frozen=True)
 class ServiceDef:
-    """Описание сервиса. GPU — список полных UUID (ТЗ §4.1: привязка по UUID, не индекс)."""
+    """Описание сервиса. GPU — список полных UUID (ТЗ §4.1: привязка по UUID, не индекс).
+
+    scope: "system" — юнит системного менеджера (управление через root-owned
+    helper + allowlist); "user" — юнит user-менеджера того же пользователя,
+    от которого работает панель (~/.config/systemd/user/*.service): чтение,
+    действия и журнал выполняются напрямую systemctl --user / journalctl --user
+    БЕЗ helper (панель и так ограничена правами своего пользователя).
+    """
 
     id: str
     name: str
     type: str                 # vllm | llamacpp | script | generic
     unit: str
+    scope: str                # system | user
     managed: str              # adopted | created
     edit_mode: str            # manage_only | dropin | panel (для created)
     port: Optional[int]
@@ -114,6 +122,11 @@ def _parse_service(index: int, d: dict, startup_timeout_default: int, ports_min:
     stype = d.get("type", "generic")
     if stype not in ("vllm", "llamacpp", "script", "generic"):
         raise ValueError(f"Сервис «{sid}»: type должен быть vllm|llamacpp|script|generic")
+    scope = str(d.get("scope", "system"))
+    if scope not in ("system", "user"):
+        raise ValueError(
+            f"Сервис «{sid}»: scope должен быть system|user "
+            f"(user — юнит user-менеджера пользователя панели; получено: {scope!r})")
     managed = d.get("managed", "adopted")
     if managed not in ("adopted", "created"):
         raise ValueError(f"Сервис «{sid}»: managed должен быть adopted|created")
@@ -162,6 +175,7 @@ def _parse_service(index: int, d: dict, startup_timeout_default: int, ports_min:
         name=str(d["name"]),
         type=stype,
         unit=str(unit),
+        scope=scope,
         managed=managed,
         edit_mode=edit_mode,
         port=port,
@@ -177,21 +191,29 @@ def _parse_service(index: int, d: dict, startup_timeout_default: int, ports_min:
     )
 
 
-def make_display_def(unit: str, name: str = "", notes: str = "") -> "ServiceDef":
+def make_display_def(unit: str, name: str = "", notes: str = "",
+                     scope: str = "system") -> "ServiceDef":
     """Минимальное описание юнита без записи в services.yaml.
 
     Используется для: (а) встроенной карточки самой панели (systemd.panel_unit),
     (б) юнитов, найденных «Поиском сервисов» и отмеченных в Config Panel.
     Карточка показывает состояние systemd/uptime/автостарт; порта, GPU и
     health-check нет (их добавляет редактор конфигураций — этап 2). Действия
-    (start/stop/restart) разрешает только root-owned allowlist helper'а.
+    для system-юнитов разрешает только root-owned allowlist helper'а; user-юниты
+    управляются напрямую systemctl --user (панель работает от того же пользователя).
+    Идентификатор: без суффикса .service для system-юнитов; для user-юнитов —
+    ПОЛНОЕ имя юнита (защита от коллизии id с системным юнитом того же имени).
     """
-    sid = unit[:-len(".service")] if unit.endswith(".service") else unit
+    if scope == "user":
+        sid = unit   # полное имя юнита — защита от коллизии с системным id
+    else:
+        sid = unit[:-len(".service")] if unit.endswith(".service") else unit
     return ServiceDef(
         id=sid,
         name=name or sid,
         type="generic",
         unit=unit,
+        scope=scope,
         managed="adopted",
         edit_mode="manage_only",
         port=None,

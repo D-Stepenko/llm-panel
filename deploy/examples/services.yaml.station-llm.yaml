@@ -186,5 +186,32 @@ services:
       сервера на этапе старта: панель показывает, что юнит отработал
       (ExitCode/Result), не редактирует его (ТЗ §9, решение владельца от 2026-10-27).
 
-  # speaches.service (STT/TTS на CPU; вероятно, это uvicorn 127.0.0.1:8001) —
-  # добавим после survey2, когда подтверждён владелец порта и ExecStart.
+  # OpenClaw Gateway — systemd USER-юнит пользователя dispot
+  # (~/.config/systemd/user/openclaw-gateway.service, менеджер systemctl --user).
+  # НЕ виден системному менеджеру (systemctl list-units/show) — поэтому scope: user.
+  # Чтение/действия/журнал панель выполняет напрямую systemctl --user /
+  # journalctl --user (панель работает от того же dispot) — helper и allowlist
+  # для этого юнита НЕ нужны и в allowlist.json его вносить не надо.
+  - id: openclaw
+    name: "OpenClaw Gateway (node, systemd user-юнит)"
+    type: generic
+    unit: openclaw-gateway.service
+    scope: user                           # юнит user-менеджера dispot, НЕ системный
+    managed: adopted
+    edit_mode: manage_only
+    port: 18789
+    bind_host: 127.0.0.1                  # bind=loopback (только локальные клиенты)
+    health:
+      kind: tcp
+      port: 18789                         # ws-гейтвей; Dashboard http://127.0.0.1:18789/
+      timeout_s: 3
+      interval_s: 15
+    gpus: []
+    notes: >-
+      OpenClaw 2026.9.6 (eb377ac); pid подтверждён, running; Connectivity probe ok.
+      ExecStart: node (nvm v24.21.0) --max-old-space-size=16049 .../openclaw/dist/index.js
+      gateway --port 18789; env OPENCLAW_GATEWAY_PORT=18789; WorkingDirectory=~.
+      Файловые логи: /tmp/openclaw/openclaw-YYYY-MM-DD.log (журнал панели — journalctl --user).
+      Рекомендации openclaw doctor (не блокируют работу, только задокументированы):
+      PATH сервиса включает nvm и Node из version manager — может сломаться при
+      апгрейде Node; владелец решит сам (openclaw doctor интерактивно).

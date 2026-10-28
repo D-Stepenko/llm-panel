@@ -73,7 +73,11 @@ sudo install -m 644 deploy/allowlist.json.example /etc/llm-panel/allowlist.json
   `models.roots` — пути дисковой сводки (дальше меняется из UI);
   `systemd.panel_unit` — юнит самой панели: карточка llm-panel на Статусе наравне
   с сервисами (пустая строка — отключить; действия требуют записи в allowlist).
-- `services.yaml`: юниты ВАШЕГО сервера (см. §6).
+- `services.yaml`: юниты ВАШЕГО сервера (см. §6). systemd **user-юниты**
+  (`~/.config/systemd/user/*.service`) не видны системному менеджеру — для них
+  укажите `scope: user`; чтение/действия/журнал панель выполняет напрямую
+  `systemctl --user` / `journalctl --user` (helper и allowlist не нужны;
+  юнит должен принадлежать тому же пользователю, от которого работает панель).
 - `allowlist.json`: те же юниты + разрешённые действия (включая `llm-panel.service`,
   если нужна карточка самой панели с действиями).
 

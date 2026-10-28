@@ -126,14 +126,20 @@ def create_app(config: PanelConfig) -> FastAPI:
             roots = list(config.model_roots)
         state.model_roots = roots
         state.collector.model_roots = list(roots)
-        # отображение сервисов: скрытые id + найденные («Поиск сервисов») юниты
+        # отображение сервисов: скрытые id + найденные («Поиск сервисов») юниты;
+        # extra_units хранятся с префиксом scope ("user:<unit>" для user-менеджера)
         state.hidden_ids = _load_str_list("hidden_ids")
-        extra_units = [
-            u for u in _load_str_list("extra_units")
-            if UNIT_NAME_RE.match(u) and not registry.by_unit(u)
-        ]
-        state.extra_defs = {u: make_display_def(u) for u in extra_units}
-        state.collector.extra_defs = tuple(state.extra_defs.values())
+        extra_defs: dict = {}
+        for raw in _load_str_list("extra_units"):
+            if raw.startswith("user:"):
+                scope, unit = "user", raw[len("user:"):].strip()
+            else:
+                scope, unit = "system", raw
+            if (UNIT_NAME_RE.match(unit) and unit not in extra_defs
+                    and not registry.by_unit(unit)):
+                extra_defs[unit] = make_display_def(unit, scope=scope)
+        state.extra_defs = extra_defs
+        state.collector.extra_defs = tuple(extra_defs.values())
 
     def _load_str_list(key: str) -> list[str]:
         raw = db.get_setting(key)

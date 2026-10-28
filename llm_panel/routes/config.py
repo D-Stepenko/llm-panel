@@ -56,11 +56,13 @@ async def config_page(request: Request):
     # панели) + фрагмент со списком найденных юнитов (сначала — без поиска).
     svc_display = [
         {"id": s.id, "name": s.name, "unit": s.unit,
+         "scope": getattr(s, "scope", "system"),
          "visible": s.id not in state.hidden_ids}
         for s in state.registry
     ]
     extra_list_html = _render_scan_fragment(state, request, "initial",
-                                            list(state.extra_defs.keys()))
+                                            [{"unit": u, "scope": getattr(d, "scope", "system")}
+                                             for u, d in state.extra_defs.items()])
     return state.render(
         "config.html",
         request=request,
@@ -77,34 +79,46 @@ async def config_page(request: Request):
     )
 
 
+def _saved_units(state) -> list[dict]:
+    """Сохранённые юниты-«надстройки» для фрагмента: unit + scope."""
+    return [{"unit": u, "scope": getattr(d, "scope", "system")}
+            for u, d in state.extra_defs.items()]
+
+
 def _render_scan_fragment(state, request: Request, mode: str,
-                          saved_units: list[str], units_found: list | None = None) -> str:
+                          saved: list[dict], units_found: list | None = None) -> str:
     """Фрагмент списка юнитов-«надстроек» для Config Panel.
 
     mode: initial (поиск ещё не запускался) | unavailable (systemd недоступен)
     | result (units_found — найденные юниты без настроенных и сохранённых).
+    saved — список {"unit", "scope"}; user-юниты кодируются значением "user:unit".
     """
     return state.render(
         "_scan.html",
         request=request,
         mode=mode,
-        saved_units=saved_units,
+        saved=saved,
         units_found=units_found or [],
     ).body.decode("utf-8")
 
 
 @router.get("/config/services-scan", response_class=HTMLResponse)
 async def services_scan(request: Request):
-    """«Поиск сервисов»: read-only systemctl list-units (без sudo, ТЗ §5.3)."""
+    """«Поиск сервисов»: read-only systemctl list-units (без sudo, ТЗ §5.3).
+
+    Выборка объединяет системный и user-менеджер (scope="user" у user-юнитов,
+    в форме они кодируются префиксом "user:").
+    """
     state = request.app.state.panel
     configured = {s.unit for s in state.registry}
     found = list_loaded_services()
-    saved_units = list(state.extra_defs.keys())
+    saved = _saved_units(state)
     if found is None:
-        return HTMLResponse(_render_scan_fragment(state, request, "unavailable", saved_units))
+        return HTMLResponse(_render_scan_fragment(state, request, "unavailable", saved))
+    saved_names = {s["unit"] for s in saved}
     units_found = [f for f in found if f["unit"] not in configured
-                   and f["unit"] not in saved_units]
-    return HTMLResponse(_render_scan_fragment(state, request, "result", saved_units, units_found))
+                   and f["unit"] not in saved_names]
+    return HTMLResponse(_render_scan_fragment(state, request, "result", saved, units_found))
 
 
 @router.post("/config/services-display")
@@ -113,7 +127,9 @@ async def services_display_save(request: Request):
 
     Настроенные сервисы: чекбокс «виден» — непомеченные id уходят в hidden.
     Найденные юниты: помеченные показываются на Статусе простыми карточками
-    (состояние/uptime/действия по allowlist), сохраняются в settings.
+    (состояние/uptime; system-юниты — действия по allowlist, user-юниты —
+    напрямую systemctl --user), сохраняются в settings с префиксом scope
+    ("user:<unit>" для user-менеджера).
     """
     state = request.app.state.panel
     try:
@@ -127,19 +143,25 @@ async def services_display_save(request: Request):
     visible = {str(v).strip() for v in form.getlist("visible")}
     hidden = sorted(configured_ids - visible)
 
-    extra_units: list[str] = []
+    extra_units: list[str] = []       # как хранится в settings (с префиксом scope)
+    extra_defs: dict = {}
     for v in form.getlist("extra_units"):
-        unit = str(v).strip()
-        if (UNIT_RE.match(unit) and unit not in extra_units
+        raw = str(v).strip()
+        if raw.startswith("user:"):
+            scope, unit = "user", raw[len("user:"):].strip()
+        else:
+            scope, unit = "system", raw
+        if (UNIT_RE.match(unit) and unit not in extra_defs
                 and not state.registry.by_unit(unit)):
-            extra_units.append(unit)
+            extra_units.append(f"{scope}:{unit}" if scope == "user" else unit)
+            extra_defs[unit] = make_display_def(unit, scope=scope)
     if len(extra_units) > _EXTRAS_MAX:
         return PlainTextResponse(
             translate(state.i18n_lang, "cfg_too_many_units", max=_EXTRAS_MAX), status_code=400)
 
     state.hidden_ids = hidden
-    state.extra_defs = {u: make_display_def(u) for u in extra_units}
-    state.collector.extra_defs = tuple(state.extra_defs.values())
+    state.extra_defs = extra_defs
+    state.collector.extra_defs = tuple(extra_defs.values())
     state.db.set_setting("hidden_ids", json.dumps(hidden))
     state.db.set_setting("extra_units", json.dumps(extra_units))
 

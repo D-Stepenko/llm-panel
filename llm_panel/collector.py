@@ -83,10 +83,12 @@ class Collector:
         warnings: list[str] = []
         all_defs = tuple(self.registry.services) + tuple(self.extra_defs)
 
-        # 1) состояния юнитов (read-only systemctl show, без sudo)
+        # 1) состояния юнитов (read-only systemctl show, без sudo; user-юниты —
+        # напрямую systemctl --user от имени пользователя панели)
         units = {}
         for svc in all_defs:
-            info = await loop.run_in_executor(None, show_unit, svc.unit)
+            info = await loop.run_in_executor(
+                None, show_unit, svc.unit, 5.0, getattr(svc, "scope", "system"))
             units[svc.unit] = info
 
         # 2) health-проверки (не чаще health_interval)
@@ -144,6 +146,7 @@ class Collector:
                 "name": svc.name,
                 "type": svc.type,
                 "unit": svc.unit,
+                "scope": getattr(svc, "scope", "system"),
                 "managed": svc.managed,
                 "edit_mode": svc.edit_mode,
                 "port": svc.port,

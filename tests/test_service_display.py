@@ -51,7 +51,7 @@ def _make_config(tmp_path, panel_unit="llm-panel.service"):
         "systemd": {"helper_path": str(tmp_path / "no-such-helper"),
                     "panel_unit": panel_unit},
     }
-    (tmp_path / "data").mkdir()
+    (tmp_path / "data").mkdir(exist_ok=True)
     cfg_path = tmp_path / "cfg.yaml"
     cfg_path.write_text(yaml.safe_dump(cfg_data, allow_unicode=True), encoding="utf-8")
     return cfg_path

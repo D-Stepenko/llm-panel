@@ -81,7 +81,7 @@
       {% for s in svc_display %}
       <label class="svc-display-row">
         <input type="checkbox" name="visible" value="{{ s.id }}" {{ 'checked' if s.visible else '' }}>
-        <span><span class="svc-display-name">{{ s.name }}</span> <code>{{ s.unit }}</code></span>
+        <span><span class="svc-display-name">{{ s.name }}</span>{% if s.scope == 'user' %} <span class="svc-scope-badge">{{ t('user_unit') }}</span>{% endif %} <code>{{ s.unit }}</code></span>
       </label>
       {% endfor %}
     </div>

@@ -49,11 +49,19 @@ def _parse_since(raw: str):
     return raw
 
 
-def show_unit(unit: str, timeout: float = 5.0) -> UnitInfo | None:
-    """Состояние одного юнита; None при отсутствии юнита либо недоступности systemd."""
+def show_unit(unit: str, timeout: float = 5.0, scope: str = "system") -> UnitInfo | None:
+    """Состояние одного юнита; None при отсутствии юнита либо недоступности systemd.
+
+    scope="system" — системный менеджер (systemctl show); scope="user" —
+    user-менеджер пользователя панели (systemctl --user show).
+    """
     if not unit or "/" in unit or "\x00" in unit:
         return None
-    argv = ["systemctl", "show", "--no-pager"]
+    argv = ["systemctl"]
+    if scope == "user":
+        argv.append("--user")
+    argv.append("show")
+    argv.append("--no-pager")
     for p in _PROPERTIES:
         argv.append(f"--property={p}")
     argv.append("--")
@@ -86,25 +94,26 @@ def show_unit(unit: str, timeout: float = 5.0) -> UnitInfo | None:
     )
 
 
-def list_loaded_services(timeout: float = 10.0) -> list[dict] | None:
-    """Все загруженные systemd-сервисы сервера (read-only, без sudo).
+def _run_list(argv: list[str], timeout: float):
+    """subprocess.run для list-units (отделено для удобного monkeypatch в тестах).
 
-    ТЗ §5.3: чтение состояния выполняется напрямую без helper. Перечисление
-    юнитов — тоже read-only операция (list-units --all). Юниты с LOAD=not-found
-    не показываются. Возврат None — systemd недоступен (dev на Windows и т.п.).
+    Возврат None — команда недоступна/таймаут (dev на Windows и т.п.).
     """
-    import re
-
-    argv = ["systemctl", "list-units", "--type=service", "--all", "--no-pager",
-            "--no-legend", "--plain"]
     try:
         proc = subprocess.run(argv, capture_output=True, text=True, timeout=timeout)
     except FileNotFoundError:
         return None
     except subprocess.TimeoutExpired:
         return None
+    return proc
+
+
+def _parse_list_output(stdout: str) -> list[dict]:
+    """Разбор вывода `systemctl list-units --type=service --all --no-legend --plain`."""
+    import re
+
     out: list[dict] = []
-    for line in proc.stdout.splitlines():
+    for line in stdout.splitlines():
         parts = re.split(r"\s{2,}", line.strip())
         if len(parts) < 5:
             continue
@@ -113,6 +122,90 @@ def list_loaded_services(timeout: float = 10.0) -> list[dict] | None:
             continue
         out.append({"unit": unit, "active": active, "sub": sub, "desc": desc})
     return out
+
+
+def list_loaded_services(timeout: float = 10.0) -> list[dict] | None:
+    """Все загруженные systemd-сервисы сервера (read-only, без sudo).
+
+    ТЗ §5.3: чтение состояния выполняется напрямую без helper. Перечисление
+    юнитов — тоже read-only операция (list-units --all). Выборка объединяет
+    СИСТЕМНЫЙ менеджер (systemctl list-units) и user-менеджер пользователя
+    панели (systemctl --user list-units): у user-юнитов поле scope="user"
+    (см. §registry — юниты ~/.config/systemd/user не видны системному
+    менеджеру, поэтому openclaw и подобные им не попадают в системный скан).
+    Юниты с LOAD=not-found не показываются. Возврат None — systemctl
+    недоступен вовсе (dev на Windows и т.п.); если user-менеджер недоступен —
+    возвращаются только системные юниты.
+    """
+    argv = ["systemctl", "list-units", "--type=service", "--all", "--no-pager",
+            "--no-legend", "--plain"]
+    proc = _run_list(argv, timeout)
+    if proc is None:
+        return None
+    out = _parse_list_output(proc.stdout)
+    user_argv = ["systemctl", "--user", "list-units", "--type=service", "--all",
+                 "--no-pager", "--no-legend", "--plain"]
+    uproc = _run_list(user_argv, timeout)
+    if uproc is not None and uproc.returncode == 0:
+        seen = {e["unit"] for e in out}
+        for e in _parse_list_output(uproc.stdout):
+            if e["unit"] not in seen:
+                e["scope"] = "user"
+                out.append(e)
+    return out
+
+
+def run_user_action(action: str, unit: str, timeout: float = 90.0) -> tuple[bool, str]:
+    """Изменяющая операция над user-юнитом — НАПРЯМУЮ systemctl --user.
+
+    Обоснование (отличие от system-юнитов, ТЗ §5.3): панель работает от того же
+    пользователя, чей user-менеджер владеет юнитом (~/.config/systemd/user),
+    поэтому helper и root-allowlist не нужны — панель и так ограничена правами
+    своего пользователя и не может тронуть чужие user-менеджеры. Действие
+    валидируется вызывающей стороной (action из _ACTIONS, unit по UNIT_RE),
+    вызов — argv-список без shell.
+    """
+    if action not in ("start", "stop", "restart", "enable", "disable"):
+        return False, "unsupported action"
+    if not unit or "/" in unit or "\x00" in unit:
+        return False, "bad unit"
+    argv = ["systemctl", "--user", action, "--no-ask-password", "--", unit]
+    try:
+        proc = subprocess.run(argv, capture_output=True, text=True, timeout=timeout)
+    except FileNotFoundError:
+        return False, "systemctl --user недоступен (dev-среда?)"
+    except subprocess.TimeoutExpired:
+        return False, "timeout"
+    out = (proc.stdout or "") + (proc.stderr or "")
+    return proc.returncode == 0, out.strip()[:2000]
+
+
+def journal_user_text(unit: str, lines: int, timeout: float = 10.0) -> tuple[int, str]:
+    """Последние строки журнала user-юнита: journalctl --user (read-only, как панель).
+
+    Возврат (код, текст): код 0 — успех; 1 — сбой (текст содержит stderr).
+    """
+    if not unit or "/" in unit or "\x00" in unit:
+        return 1, "bad unit"
+    argv = ["journalctl", "--user", f"--unit={unit}", f"--lines={int(lines)}",
+            "--no-pager", "--no-color"]
+    try:
+        proc = subprocess.run(argv, capture_output=True, text=True, timeout=timeout)
+    except FileNotFoundError:
+        return 1, "journalctl недоступен (dev-среда)"
+    except subprocess.TimeoutExpired:
+        return 1, "timeout"
+    if proc.returncode != 0:
+        return 1, (proc.stderr or "journalctl error").strip()[:2000]
+    return 0, proc.stdout
+
+
+def spawn_user_follow(unit: str, lines: int):
+    """Поток журнала user-юнита: Popen `journalctl --user -f` (для SSE follow)."""
+    argv = ["journalctl", "--user", f"--unit={unit}", f"--lines={int(lines)}",
+            "--no-pager", "--no-color", "-f"]
+    return subprocess.Popen(argv, stdout=subprocess.PIPE,
+                            stderr=subprocess.PIPE, text=True)
 
 
 def list_unit_files(patterns: tuple[str, ...], timeout: float = 5.0) -> dict[str, str]:

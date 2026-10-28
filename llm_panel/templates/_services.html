@@ -8,7 +8,7 @@
       <div class="service-head">
         <div class="service-title-txt">
           <div class="service-title">{{ svc.name }}</div>
-          <div class="service-subtitle">{{ svc.type }}{% if svc.unit %} · {{ svc.unit }}{% endif %}</div>
+          <div class="service-subtitle">{{ svc.type }}{% if svc.scope == 'user' %} · {{ t('user_unit') }}{% endif %}{% if svc.unit %} · {{ svc.unit }}{% endif %}</div>
         </div>
         <span class="head-right">
           <span class="status {{ pill }}">{{ t('state_' ~ svc.state) }}</span>

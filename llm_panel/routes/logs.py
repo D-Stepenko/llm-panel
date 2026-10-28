@@ -18,6 +18,8 @@ from fastapi.responses import HTMLResponse, PlainTextResponse, StreamingResponse
 
 from ..helper_client import HelperError, call_helper, spawn_helper_follow
 from ..i18n import translate
+from ..systemd_units import journal_user_text, spawn_user_follow
+from .services import _find_def
 
 router = APIRouter(prefix="/services")
 
@@ -42,17 +44,23 @@ def _clamp_lines(lines: int, cfg) -> int:
 @router.get("/{svc_id}/logs")
 async def logs_page(request: Request, svc_id: str, lines: int = 200, filter: str = ""):
     state = request.app.state.panel
-    svc = state.registry.by_id(svc_id)
+    svc = _find_def(state, svc_id)
     if svc is None:
         return PlainTextResponse(translate(state.i18n_lang, "svc_not_found"), status_code=404)
     n = _clamp_lines(lines, state.cfg)
-    try:
-        result = call_helper(state.cfg.helper_path, "journal", svc.unit, extra=(str(n),), timeout=30)
-        text = _redact(result.stdout or "(журнал пуст)", state.cfg.redact_patterns)
-        err = ""
-    except HelperError as e:
-        text = ""
-        err = e.message
+    if getattr(svc, "scope", "system") == "user":
+        # журнал user-юнита — напрямую journalctl --user (read-only, без helper)
+        rc, raw = journal_user_text(svc.unit, n)
+        text = _redact(raw or "(журнал пуст)", state.cfg.redact_patterns) if rc == 0 else ""
+        err = raw if rc != 0 else ""
+    else:
+        try:
+            result = call_helper(state.cfg.helper_path, "journal", svc.unit, extra=(str(n),), timeout=30)
+            text = _redact(result.stdout or "(журнал пуст)", state.cfg.redact_patterns)
+            err = ""
+        except HelperError as e:
+            text = ""
+            err = e.message
     return state.render(
         "logs.html",
         request=request,
@@ -68,15 +76,20 @@ async def logs_page(request: Request, svc_id: str, lines: int = 200, filter: str
 async def logs_stream(request: Request, svc_id: str, lines: int = 50):
     """SSE-поток журнала через helper journal-follow (аргументы фиксированы)."""
     state = request.app.state.panel
-    svc = state.registry.by_id(svc_id)
+    svc = _find_def(state, svc_id)
     if svc is None:
         return PlainTextResponse(translate(state.i18n_lang, "svc_not_found"), status_code=404)
     n = _clamp_lines(lines, state.cfg)
 
+    is_user = getattr(svc, "scope", "system") == "user"
+
     async def gen():
         proc = None
         try:
-            proc = spawn_helper_follow(state.cfg.helper_path, svc.unit, min(n, 200))
+            if is_user:
+                proc = spawn_user_follow(svc.unit, min(n, 200))
+            else:
+                proc = spawn_helper_follow(state.cfg.helper_path, svc.unit, min(n, 200))
             # helper либо отдаёт поток journalctl, либо сразу завершается (ошибка)
             assert proc.stdout is not None
             first = True
@@ -122,15 +135,19 @@ async def logs_stream(request: Request, svc_id: str, lines: int = 50):
 async def logs_download(request: Request, svc_id: str, lines: int = 1000):
     """Скачивание журнала (GET — только чтение). Размер и N ограничены."""
     state = request.app.state.panel
-    svc = state.registry.by_id(svc_id)
+    svc = _find_def(state, svc_id)
     if svc is None:
         return PlainTextResponse(translate(state.i18n_lang, "svc_not_found"), status_code=404)
     n = _clamp_lines(lines, state.cfg)
-    try:
-        result = call_helper(state.cfg.helper_path, "journal", svc.unit, extra=(str(n),), timeout=30)
-        text = _redact(result.stdout, state.cfg.redact_patterns)
-    except HelperError as e:
-        text = f"ERROR: {e.message}\n"
+    if getattr(svc, "scope", "system") == "user":
+        rc, raw = journal_user_text(svc.unit, n)
+        text = _redact(raw, state.cfg.redact_patterns) if rc == 0 else f"ERROR: {raw}\n"
+    else:
+        try:
+            result = call_helper(state.cfg.helper_path, "journal", svc.unit, extra=(str(n),), timeout=30)
+            text = _redact(result.stdout, state.cfg.redact_patterns)
+        except HelperError as e:
+            text = f"ERROR: {e.message}\n"
     max_bytes = state.cfg.log_download_max_mb * 1024 * 1024
     payload = text.encode("utf-8", "replace")[:max_bytes]
     return PlainTextResponse(

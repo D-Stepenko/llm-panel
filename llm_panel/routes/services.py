@@ -11,7 +11,7 @@ import asyncio
 from fastapi import APIRouter, Request
 from fastapi.responses import HTMLResponse, PlainTextResponse
 
-from ..systemd_units import show_unit
+from ..systemd_units import run_user_action, show_unit
 from ..helper_client import HelperError, call_helper
 from ..i18n import translate
 
@@ -65,20 +65,33 @@ async def run_action(request: Request, svc_id: str, action: str):
     ip = request.client.host if request.client else ""
     user = request.state.session["username"]
     db = state.db
+    scope = getattr(svc, "scope", "system")
 
-    # Проверки конфликтов — предупреждение (ТЗ §5.2); матрица GPU/RAM добавляется на этапе 2.
-    try:
-        result = call_helper(state.cfg.helper_path, action, svc.unit, timeout=90)
-    except HelperError as e:
-        db.audit(ip, user, action, svc.unit, "helper_error", e.message)
-        body = await _render_action_result(request, svc_id, False, e.message)
-        return HTMLResponse(body, status_code=200)
+    if scope == "user":
+        # user-юнит (~/.config/systemd/user пользователя панели): управление
+        # напрямую systemctl --user, helper/root-allowlist не нужны (панель
+        # работает от того же пользователя; подробнее — systemd_units.py).
+        ok, output = run_user_action(action, svc.unit)
+        db.audit(ip, user, f"{action}:user", svc.unit, "ok" if ok else "failed",
+                 output[:200])
+        if not ok:
+            body = await _render_action_result(request, svc_id, False,
+                                               output or "systemctl --user error")
+            return HTMLResponse(body, status_code=200)
+    else:
+        # Проверки конфликтов — предупреждение (ТЗ §5.2); матрица GPU/RAM добавляется на этапе 2.
+        try:
+            result = call_helper(state.cfg.helper_path, action, svc.unit, timeout=90)
+        except HelperError as e:
+            db.audit(ip, user, action, svc.unit, "helper_error", e.message)
+            body = await _render_action_result(request, svc_id, False, e.message)
+            return HTMLResponse(body, status_code=200)
 
-    db.audit(ip, user, action, svc.unit, "ok" if result.ok else "failed",
-             (result.stderr or result.stdout)[:200])
+        db.audit(ip, user, action, svc.unit, "ok" if result.ok else "failed",
+                 (result.stderr or result.stdout)[:200])
 
     # фактический результат systemd после действия (не сообщать успех заранее)
-    info = await asyncio.to_thread(show_unit, svc.unit)
+    info = await asyncio.to_thread(show_unit, svc.unit, 5.0, scope)
     lang = state.i18n_lang
     actual = f"{info.active}/{info.sub}" if info else translate(lang, "sys_unavailable")
     body = await _render_action_result(
