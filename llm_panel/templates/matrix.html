@@ -1,0 +1,82 @@
+{% extends "base.html" %}
+{% block title %}{{ t('page_matrix_title') }}{% endblock %}
+{% block content %}
+<div class="page-head">
+  <div>
+    <div class="eyebrow"><span class="live-dot blue"></span>GPU</div>
+    <h1>{{ t('matrix_h1') }}</h1>
+    <p class="subtitle">{{ t('matrix_subtitle') }}</p>
+  </div>
+</div>
+
+{% for w in warnings %}
+<div class="notice info">
+  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M12 8h.01M11 12h1v4h1"/></svg>
+  <span>{{ w }}</span>
+</div>
+{% endfor %}
+
+{% if data.conflicts %}
+<div class="matrix-conflicts">
+  {% for c in data.conflicts %}
+  <div class="notice {{ 'err' if c.level == 'err' else 'warn' }}">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><path d="M12 9v4M12 17h.01"/><path d="M10.3 3.9 1.8 18a2 2 0 0 0 1.7 3h17a2 2 0 0 0 1.7-3L13.7 3.9a2 2 0 0 0-3.4 0z"/></svg>
+    <span>{{ c.detail }}</span>
+  </div>
+  {% endfor %}
+</div>
+{% else %}
+<div class="notice">
+  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><path d="M20 6 9 17l-5-5"/></svg>
+  <span>{{ t('matrix_no_conflicts') }}</span>
+</div>
+{% endif %}
+
+{% if data.gpus %}
+<div class="matrix-wrap">
+  <table class="matrix">
+    <thead>
+      <tr>
+        <th>{{ t('matrix_service') }}</th>
+        {% for g in data.gpus %}
+        <th title="{{ g.uuid }}">
+          GPU {{ g.index }}<div class="matrix-gpu-name">{{ g.name }}</div>
+        </th>
+        {% endfor %}
+        <th>{{ t('matrix_binding') }}</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for r in data.rows %}
+      <tr>
+        <td>
+          <div class="matrix-svc">{{ r.name }}</div>
+          <div class="muted matrix-unit">{{ r.unit }} · {{ t('state_' ~ r.state) }}</div>
+        </td>
+        {% for g in data.gpus %}
+        {% set mark = r.cells.get(g.uuid, '') %}
+        <td class="matrix-cell">
+          {% if mark == 'both' %}<span class="mx mx-both" title="{{ t('mx_both') }}">{{ t('mx_plan') }}+{{ t('mx_actual') }}</span>
+          {% elif mark == 'plan' %}<span class="mx mx-plan" title="{{ t('mx_plan_t') }}">{{ t('mx_plan') }}</span>
+          {% elif mark == 'actual' %}<span class="mx mx-actual" title="{{ t('mx_actual_t') }}">{{ t('mx_actual') }}</span>
+          {% else %}<span class="mx-none">·</span>{% endif %}
+        </td>
+        {% endfor %}
+        <td class="matrix-snippet">
+          {% if r.snippet %}<code class="snippet">{{ r.snippet }}</code>{% else %}<span class="muted">—</span>{% endif %}
+        </td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</div>
+{% else %}
+<div class="notice info"><span>{{ t('gpu_no_data') }}</span></div>
+{% endif %}
+
+<div class="legend muted">
+  <span class="mx mx-plan">{{ t('mx_plan') }}</span> — {{ t('legend_plan') }};
+  <span class="mx mx-actual">{{ t('mx_actual') }}</span> — {{ t('legend_actual') }}.
+  {{ t('matrix_legend_note') }}
+</div>
+{% endblock %}

@@ -255,6 +255,8 @@ def create_app(config: PanelConfig) -> FastAPI:
     app.include_router(routes.services.router)
     app.include_router(routes.logs.router)
     app.include_router(routes.config.router)
+    app.include_router(routes.matrix.router)
+    app.include_router(routes.config_files.router)
 
     app.mount("/static", StaticFiles(directory=str(BASE_DIR / "static")), name="static")
 

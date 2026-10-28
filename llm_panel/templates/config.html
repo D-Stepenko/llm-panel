@@ -19,6 +19,12 @@
 </div>{% endif %}
 
 <div class="page-card">
+  <h3 class="cfg-section-title">{{ t('cfgfiles_h1') }}</h3>
+  <p class="muted cfg-hint">{{ t('cfgfiles_subtitle') }}</p>
+  <a class="order-btn" href="/config/files">{{ t('cfgfile_open') }}</a>
+</div>
+
+<div class="page-card">
   <form method="post" action="/config" class="config-form">
     <input type="hidden" name="csrf" value="{{ csrf }}">
     <dl class="kv">

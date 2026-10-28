@@ -1,0 +1,60 @@
+{% extends "base.html" %}
+{% block title %}{{ t('cfgfile_edit_title', label=entry.label) }}{% endblock %}
+{% block content %}
+<div class="page-head">
+  <div>
+    <div class="eyebrow"><span class="live-dot blue"></span>{{ t('cfgfiles_eyebrow') }}</div>
+    <h1>{{ entry.label }}</h1>
+    <p class="subtitle"><code>{{ entry.path }}</code>{% if is_json %} · JSON{% endif %}</p>
+  </div>
+  <div class="topbar-actions"><a class="order-btn" href="/config/files">{{ t('back_to_files') }}</a></div>
+</div>
+
+{% if err %}<div class="notice err">
+  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><path d="M12 9v4M12 17h.01"/><path d="M10.3 3.9 1.8 18a2 2 0 0 0 1.7 3h17a2 2 0 0 0 1.7-3L13.7 3.9a2 2 0 0 0-3.4 0z"/></svg>
+  <span>{{ t(err) }}{% if err_detail is defined and err_detail %} · <code>{{ err_detail }}</code>{% endif %}</span></div>{% endif %}
+{% if ok %}<div class="notice ok">
+  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M20 6 9 17l-5-5"/></svg>
+  <span>{{ t(ok) }}</span></div>{% endif %}
+
+{% if diff_text %}
+<div class="page-card">
+  <h3 class="cfg-section-title">{{ t('cfgfile_diff_title') }}{% if diff_from %} · <code>#{{ diff_from.id }}</code>{% if diff_from.note %} ({{ diff_from.note }}){% endif %}{% endif %}</h3>
+  <pre class="code-block diff"><code>{{ diff_text }}</code></pre>
+</div>
+{% endif %}
+
+<div class="page-card">
+  <form method="post" action="/config/files/{{ entry.id }}/save">
+    <input type="hidden" name="csrf" value="{{ csrf }}">
+    <textarea name="content" rows="{{ [content.count('\n') + 2, 40] | min if content.count('\n') < 60 else 60 }}" class="cfg-editor" spellcheck="false">{{ content }}</textarea>
+    <div class="cfg-save-row">
+      <button class="btn">{{ t('cfgfile_save') }}</button>
+      {% if is_json %}<span class="muted cfg-hint">{{ t('cfgfile_json_validated') }}</span>{% endif %}
+    </div>
+  </form>
+</div>
+
+<div class="page-card">
+  <h3 class="cfg-section-title">{{ t('cfgfile_versions') }}</h3>
+  {% if versions %}
+  <div class="cfgfiles-list">
+    {% for v in versions %}
+    <div class="svc-display-row">
+      <span class="svc-display-name">
+        <a href="/config/files/{{ entry.id }}?diff={{ v.id }}">#{{ v.id }}</a>
+        <span class="muted"> · {{ v.size }} B · {{ v.username or '—' }}{% if v.note %} · {{ v.note }}{% endif %}</span>
+      </span>
+      <form method="post" action="/config/files/{{ entry.id }}/rollback/{{ v.id }}" class="cfgfile-remove">
+        <input type="hidden" name="csrf" value="{{ csrf }}">
+        <button class="action-btn btn-muted" title="{{ t('cfgfile_rollback_t') }}">{{ t('cfgfile_rollback') }}</button>
+      </form>
+    </div>
+    {% endfor %}
+  </div>
+  <div class="muted cfg-hint">{{ t('cfgfile_versions_hint') }}</div>
+  {% else %}
+  <div class="muted cfg-hint">{{ t('cfgfile_no_versions') }}</div>
+  {% endif %}
+</div>
+{% endblock %}

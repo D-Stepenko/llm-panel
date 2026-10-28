@@ -209,6 +209,33 @@ h1 { margin: 0; font-size: clamp(26px,3vw,34px); line-height: 1.14; letter-spaci
 .gpu-body { padding: 14px 18px 15px; display: flex; flex-direction: column; gap: 9px; }
 .gpu-body .host-label { min-width: 104px; }
 .gpu-planned { color: var(--muted); opacity: .75; }
+
+/* ---- матрица GPU (этап 2) ---- */
+.matrix-wrap { overflow-x: auto; border: 1px solid var(--line-soft); border-radius: 12px; background: var(--surface); }
+table.matrix { border-collapse: collapse; width: 100%; min-width: 640px; }
+table.matrix th, table.matrix td { padding: 10px 12px; border-bottom: 1px solid var(--line-soft); text-align: left; font-size: 12px; }
+table.matrix thead th { font-size: 11px; color: var(--muted); font-weight: 700; text-transform: uppercase; letter-spacing: .04em; }
+.matrix-gpu-name { font-size: 10.5px; font-weight: 500; text-transform: none; letter-spacing: 0; }
+.matrix-svc { font-weight: 650; color: var(--text); }
+.matrix-unit { font-size: 11px; }
+.matrix-cell { text-align: center; }
+.mx { display: inline-block; padding: 2px 8px; border-radius: 999px; font-size: 10.5px; font-weight: 700; }
+.mx-plan { background: rgba(79,140,255,.16); color: #6ea3ff; }
+.mx-actual { background: rgba(70,199,140,.16); color: #46c78c; }
+.mx-both { background: rgba(70,199,140,.16); color: #46c78c; box-shadow: inset 0 0 0 1px rgba(79,140,255,.5); }
+.mx-none { color: var(--muted); opacity: .5; }
+.matrix-snippet code.snippet { font-size: 11px; overflow-wrap: anywhere; }
+.matrix-conflicts { display: flex; flex-direction: column; gap: 8px; margin-bottom: 14px; }
+.legend { margin-top: 12px; font-size: 12px; }
+.legend .mx { margin: 0 2px; }
+
+/* ---- редактор конфигураций (этап 2) ---- */
+.topbar-actions { display: flex; gap: 10px; align-items: center; }
+.cfgfiles-list { display: flex; flex-direction: column; gap: 8px; }
+.cfgfile-remove { margin-left: auto; }
+textarea.cfg-editor { width: 100%; min-height: 46vh; background: var(--surface-2); color: var(--text); border: 1px solid var(--line-soft); border-radius: 10px; padding: 12px 14px; font: ui-monospace, "Cascadia Mono", Consolas, monospace; font-size: 12.5px; line-height: 1.5; resize: vertical; tab-size: 2; }
+.cfg-save-row { display: flex; align-items: center; gap: 14px; margin-top: 10px; }
+.code-block.diff { max-height: 46vh; }
 .gpu-tags { display: flex; flex-wrap: wrap; gap: 6px; }
 .tag { max-width: 100%; border-radius: 6px; border: 1px solid var(--tag-border); background: var(--surface-3); padding: 4px 7px; color: var(--tag-fg); font-size: 10px; font-weight: 650; overflow-wrap: anywhere; }
 .notice { display: flex; align-items: flex-start; gap: 12px; padding: 13px 15px; border: 1px solid var(--notice-border); border-radius: 12px; background: var(--notice-bg); margin-top: 14px; color: var(--notice-fg); font-size: 12px; }
@@ -220,6 +247,8 @@ h1 { margin: 0; font-size: clamp(26px,3vw,34px); line-height: 1.14; letter-spaci
 .notice.err svg { color: var(--red); }
 .notice.info { border-color: var(--notice-info-border); background: var(--notice-info-bg); color: var(--notice-info-fg); }
 .notice.info svg { color: var(--blue); }
+.notice.warn { border-color: var(--notice-err-border); background: var(--notice-err-bg); color: var(--notice-err-fg); }
+.notice.warn svg { color: var(--amber); }
 .gpu-grid ~ .notice { margin-top: 14px; }
 
 /* ----------------------------- сервисы --------------------------------- */

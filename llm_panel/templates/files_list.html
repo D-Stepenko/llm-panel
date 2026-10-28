@@ -1,0 +1,54 @@
+{% extends "base.html" %}
+{% block title %}{{ t('cfgfiles_title') }}{% endblock %}
+{% block content %}
+<div class="page-head">
+  <div>
+    <div class="eyebrow"><span class="live-dot blue"></span>{{ t('cfgfiles_eyebrow') }}</div>
+    <h1>{{ t('cfgfiles_h1') }}</h1>
+    <p class="subtitle">{{ t('cfgfiles_subtitle') }}</p>
+  </div>
+  <div class="topbar-actions">
+    <a class="order-btn" href="/config">{{ t('back_to_config') }}</a>
+  </div>
+</div>
+
+{% if err %}<div class="notice err">
+  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><path d="M12 9v4M12 17h.01"/><path d="M10.3 3.9 1.8 18a2 2 0 0 0 1.7 3h17a2 2 0 0 0 1.7-3L13.7 3.9a2 2 0 0 0-3.4 0z"/></svg>
+  <span>{{ t(err) }}{% if err_detail is defined and err_detail %} · <code>{{ err_detail }}</code>{% endif %}</span></div>{% endif %}
+{% if ok %}<div class="notice ok">
+  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M20 6 9 17l-5-5"/></svg>
+  <span>{{ t(ok) }}</span></div>{% endif %}
+
+<div class="page-card">
+  <h3 class="cfg-section-title">{{ t('cfgfiles_registered') }}</h3>
+  {% if files %}
+  <div class="cfgfiles-list">
+    {% for f in files %}
+    <div class="svc-display-row">
+      <span class="svc-display-name">
+        <a href="/config/files/{{ f.id }}">{{ f.label }}</a>
+        <span class="muted"> · <code>{{ f.path }}</code></span>
+      </span>
+      <form method="post" action="/config/files/{{ f.id }}/remove" class="cfgfile-remove">
+        <input type="hidden" name="csrf" value="{{ csrf }}">
+        <button class="action-btn btn-muted" title="{{ t('cfgfile_remove_t') }}">{{ t('cfgfile_remove') }}</button>
+      </form>
+    </div>
+    {% endfor %}
+  </div>
+  {% else %}
+  <div class="muted cfg-hint">{{ t('cfgfiles_empty') }}</div>
+  {% endif %}
+</div>
+
+<div class="page-card">
+  <h3 class="cfg-section-title">{{ t('cfgfiles_add_title') }}</h3>
+  <form method="post" action="/config/files/add" class="cfg-add-unit">
+    <input type="hidden" name="csrf" value="{{ csrf }}">
+    <input type="text" name="path" placeholder="/home/dispot/src/project-maya/maya-maya-m.json" required>
+    <input type="text" name="label" placeholder="{{ t('cfgfiles_label_ph') }}" maxlength="80">
+    <button class="btn">{{ t('cfgfiles_add') }}</button>
+  </form>
+  <div class="muted cfg-hint">{{ t('cfgfiles_add_hint') }}</div>
+</div>
+{% endblock %}

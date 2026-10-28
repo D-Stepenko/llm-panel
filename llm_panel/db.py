@@ -45,6 +45,16 @@ CREATE TABLE IF NOT EXISTS settings (
     value      TEXT NOT NULL,
     updated_at REAL NOT NULL
 );
+CREATE TABLE IF NOT EXISTS config_versions (
+    id       INTEGER PRIMARY KEY AUTOINCREMENT,
+    path     TEXT NOT NULL,
+    ts       REAL NOT NULL,
+    username TEXT NOT NULL,
+    size     INTEGER NOT NULL,
+    note     TEXT NOT NULL,
+    content  TEXT NOT NULL
+);
+CREATE INDEX IF NOT EXISTS idx_config_versions_path_ts ON config_versions (path, ts);
 """
 
 
@@ -113,3 +123,37 @@ class Database:
             "ON CONFLICT(key) DO UPDATE SET value = excluded.value, updated_at = excluded.updated_at",
             (key, value, utcnow()),
         )
+
+    # -- конфиги сервисов: версии/diff/rollback (этап 2) --------------------
+    CONFIG_VERSIONS_KEEP = 50
+
+    def add_config_version(self, path: str, content: str, username: str,
+                           note: str = "") -> int | None:
+        """Снимок содержимого файла. Одинаковый подряд — не дублируем."""
+        with self._lock:
+            last = self._conn.execute(
+                "SELECT content FROM config_versions WHERE path = ? "
+                "ORDER BY id DESC LIMIT 1", (path,)).fetchone()
+        if last is not None and last["content"] == content:
+            return None
+        cur = self.execute(
+            "INSERT INTO config_versions (path, ts, username, size, note, content) "
+            "VALUES (?,?,?,?,?,?)",
+            (path, utcnow(), username or "", len(content.encode("utf-8")), note, content))
+        self.purge_config_versions(path)
+        return cur.lastrowid
+
+    def config_versions(self, path: str, limit: int = 30) -> list[sqlite3.Row]:
+        return self.query_all(
+            "SELECT id, ts, username, size, note FROM config_versions "
+            "WHERE path = ? ORDER BY id DESC LIMIT ?", (path, int(limit)))
+
+    def config_version(self, vid: int) -> sqlite3.Row | None:
+        return self.query_one("SELECT * FROM config_versions WHERE id = ?", (int(vid),))
+
+    def purge_config_versions(self, path: str, keep: int | None = None) -> None:
+        keep = self.CONFIG_VERSIONS_KEEP if keep is None else int(keep)
+        self.execute(
+            "DELETE FROM config_versions WHERE path = ? AND id NOT IN ("
+            "SELECT id FROM config_versions WHERE path = ? ORDER BY id DESC LIMIT ?)",
+            (path, path, keep))
