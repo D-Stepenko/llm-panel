@@ -317,6 +317,37 @@ def test_panel_denied_shows_allowlist_hint(authed_client, monkeypatch):
     assert "allowlist.json" not in r2.text
 
 
+def test_panel_self_restart_survives_sigterm(authed_client, monkeypatch):
+    """Код -15 (helper убит stop-фазой systemd) при самоперезапуске — НЕ сбой:
+    задача принята PID 1, панель отвечает «перезапускается»."""
+    c = authed_client
+    import llm_panel.routes.services as svc_mod
+    from llm_panel.helper_client import HelperError
+
+    calls = {"n": 0}
+
+    def fake_call(helper_path, action, unit, extra=(), timeout=60.0):
+        calls["n"] += 1
+        raise HelperError(kind="systemd_error",
+                          message="helper завершился с кодом -15", code=-15)
+
+    monkeypatch.setattr(svc_mod, "call_helper", fake_call)
+    monkeypatch.setattr(svc_mod, "show_unit",
+                        lambda unit, timeout=5.0, scope="system": None)
+    r = c.post("/services/llm-panel/restart", data={"csrf": _csrf(c)},
+               headers={"host": "localhost"})
+    assert r.status_code == 200
+    assert "reconnect" in r.text or "restarting" in r.text or "восстанов" in r.text.lower()
+    state = c.app.state.panel
+    tail = state.db.audit_tail(5)
+    assert any(a["result"] == "ok" for a in tail)   # не helper_error
+    # -15 для ОБЫЧНОГО сервиса — остаётся ошибкой
+    r2 = c.post("/services/vllm/restart", data={"csrf": _csrf(c)},
+                headers={"host": "localhost"})
+    assert r2.status_code == 200
+    assert "кодом -15" in r2.text
+
+
 # ----------------------------------------------- поиск сервисов --------------
 
 def test_scan_lists_found_units(authed_client, monkeypatch):

@@ -86,19 +86,30 @@ async def run_action(request: Request, svc_id: str, action: str):
         # наблюдение станции 2026-10-28). Задача выполняется systemd всегда.
         no_block = (action in ("restart", "stop")
                     and svc.unit == state.cfg.panel_unit)
+        terminated_by_stop = False
         try:
             result = call_helper(state.cfg.helper_path, action, svc.unit,
                                  extra=("--no-block",) if no_block else (), timeout=90)
         except HelperError as e:
-            db.audit(ip, user, action, svc.unit, "helper_error", e.message)
-            message = e.message
-            if e.kind == "denied" and svc.unit == state.cfg.panel_unit:
-                message += " " + translate(state.i18n_lang, "panel_allowlist_hint")
-            body = await _render_action_result(request, svc_id, False, message)
-            return HTMLResponse(body, status_code=200)
+            if no_block and e.code == -15:
+                # Ожидаемое следствие само-действия: stop-фаза systemd убивает
+                # ВСЁ в cgroup панели, включая только что запущенных sudo/helper
+                # (SIGTERM = -15). Задача к этому моменту принята PID 1 и будет
+                # выполнена — это не сбой (наблюдение станции 2026-10-28).
+                terminated_by_stop = True
+                db.audit(ip, user, action, svc.unit, "ok",
+                         "задача принята systemd; helper завершён stop-фазой (SIGTERM)")
+            else:
+                db.audit(ip, user, action, svc.unit, "helper_error", e.message)
+                message = e.message
+                if e.kind == "denied" and svc.unit == state.cfg.panel_unit:
+                    message += " " + translate(state.i18n_lang, "panel_allowlist_hint")
+                body = await _render_action_result(request, svc_id, False, message)
+                return HTMLResponse(body, status_code=200)
 
-        db.audit(ip, user, action, svc.unit, "ok" if result.ok else "failed",
-                 (result.stderr or result.stdout)[:200])
+        if not terminated_by_stop:
+            db.audit(ip, user, action, svc.unit, "ok" if result.ok else "failed",
+                     (result.stderr or result.stdout)[:200])
 
     # фактический результат systemd после действия (не сообщать успех заранее)
     info = await asyncio.to_thread(show_unit, svc.unit, 5.0, scope)
