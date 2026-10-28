@@ -215,3 +215,39 @@ services:
       Рекомендации openclaw doctor (не блокируют работу, только задокументированы):
       PATH сервиса включает nvm и Node из version manager — может сломаться при
       апгрейде Node; владелец решит сам (openclaw doctor интерактивно).
+
+  # Project Maya (Maya-M) — systemd SYSTEM-юнит /etc/systemd/system/maya-maya-m.service
+  # (User=dispot; ранее был user-юнит, переведён на system 2026-10-28).
+  # Движок с tiering'ом памяти (VRAM→RAM→SSD): пиннует почти всю свободную RAM
+  # (MAYA_GLM_RAM_HEADROOM_GB=10), поэтому systemd-oomd в user-сессиях опасен
+  # (system-юнит по умолчанию oomd не трогает); OOMScoreAdjust=-500 в юните.
+  # Веб-морда (chat) и API — ОДИН порт 8010 (http://127.0.0.1:8010/, OpenAI /v1,
+  # Anthropic /v1/messages). Загрузка ~6–7 минут (контекст 131072, пиннинг RAM).
+  # Конфиг: /home/dispot/src/project-maya/maya-maya-m.json (dispot-owned).
+  - id: maya
+    name: "Project Maya — Maya-M (GLM-5.3-Flash, 128K)"
+    type: generic
+    unit: maya-maya-m.service
+    scope: system                         # system-юнит: действия через root-owned helper
+    managed: adopted
+    edit_mode: manage_only
+    port: 8010
+    bind_host: 127.0.0.1                  # слушает только loopback (LAN — через Caddy)
+    health:
+      kind: tcp
+      port: 8010
+      timeout_s: 3
+      interval_s: 15
+    startup_timeout: 900                  # загрузка ~6,5 мин (см. journal «still starting»)
+    stop_timeout: 180                     # TimeoutStopSec=180: graceful до 150 с (QUIT движку)
+    gpus:
+      - GPU-9f764cdf-08bd-48a9-c219-a8660a71c1d6   # 32 ГБ
+      - GPU-ca13b019-b898-2c2b-8c0a-2b92f64e6476   # 32 ГБ
+      - GPU-cfec683a-1069-2f9c-0425-2e26192519e6   # 16 ГБ — layer split по всем трём
+    cuda_addressing: index                # Maya адресует карты по индексам (ключ "gpu" конфига)
+    ram_exclusive: true                   # пиннинг почти всей RAM: не запускать с vllm одновременно
+    notes: >-
+      ВНИМАНИЕ: конфликт с vllm.service (CUDA_VISIBLE_DEVICES=0,1) — оба претендуют
+      на карты 0 и 1; запуск Maya при работающем vllm кончается
+      «maya generate: pack: out of memory». Политика одновременности (enable/
+      Conflicts=) — этап 2. Детали: docs/UNITS.md § «Пример: Maya».

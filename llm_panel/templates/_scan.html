@@ -30,3 +30,15 @@
   </label>
   {% endfor %}
 {% endif %}
+
+{% if mode != "unavailable" %}
+<div class="cfg-add-unit">
+  <form method="post" action="/config/services-add">
+    <input type="hidden" name="csrf" value="{{ csrf }}">
+    <input type="text" name="unit" required maxlength="100"
+           placeholder="{{ t('cfg_scan_add_ph') }}" aria-label="{{ t('cfg_scan_add') }}">
+    <button type="submit" class="action-btn btn-muted">{{ t('cfg_scan_add') }}</button>
+  </form>
+  <div class="muted cfg-hint">{{ t('cfg_scan_add_hint') }}</div>
+</div>
+{% endif %}

@@ -394,6 +394,99 @@ def test_scan_keeps_saved_units(authed_client, monkeypatch):
     assert "checked" in m.group(1)
 
 
+# ----------------------------------------------- добавление юнита по имени ----
+
+def _fake_show(scope_found: str):
+    """show_unit, существующий только в менеджере scope_found."""
+    import types
+    def fake(unit, timeout=5.0, scope="system"):
+        return types.SimpleNamespace(active="inactive") if scope == scope_found else None
+    return fake
+
+
+def test_add_by_name_user_unit(authed_client, monkeypatch):
+    """Юнит из user-менеджера: сохраняется как user:<unit>, карточка и аудит."""
+    c = authed_client
+    import llm_panel.routes.config as cfg_mod
+    monkeypatch.setattr(cfg_mod, "show_unit", _fake_show("user"))
+    r = c.post("/config/services-add", data={"unit": "my-new.service", "csrf": _csrf(c)},
+               headers={"host": "localhost"}, follow_redirects=False)
+    assert r.status_code == 303
+    assert "/config?saved=1" in r.headers["location"]
+    stored = json.loads(c.app.state.panel.db.get_setting("extra_units"))
+    assert "user:my-new.service" in stored
+    assert "my-new.service" in c.app.state.panel.extra_defs
+    assert c.app.state.panel.extra_defs["my-new.service"].scope == "user"
+    tail = c.app.state.panel.db.audit_tail(5)
+    assert any(a["object"] == "services_add" and "user:my-new.service" in a["detail"]
+               for a in tail)
+    # юнит появляется в скане как сохранённый (checked)
+    monkeypatch.setattr(cfg_mod, "list_loaded_services", lambda: [])
+    page = c.get("/config/services-scan", headers={"host": "localhost"})
+    assert 'value="user:my-new.service"' in page.text
+
+
+def test_add_by_name_system_fallback(authed_client, monkeypatch):
+    """Юнит не в user-менеджере, но есть в системном: scope system, без префикса."""
+    c = authed_client
+    import llm_panel.routes.config as cfg_mod
+    monkeypatch.setattr(cfg_mod, "show_unit", _fake_show("system"))
+    r = c.post("/config/services-add", data={"unit": "maya-maya-m.service", "csrf": _csrf(c)},
+               headers={"host": "localhost"}, follow_redirects=False)
+    assert r.status_code == 303
+    stored = json.loads(c.app.state.panel.db.get_setting("extra_units"))
+    assert "maya-maya-m.service" in stored          # без префикса
+    assert "user:maya-maya-m.service" not in stored
+    assert c.app.state.panel.extra_defs["maya-maya-m.service"].scope == "system"
+
+
+def test_add_by_name_not_found(authed_client, monkeypatch):
+    c = authed_client
+    import llm_panel.routes.config as cfg_mod
+    monkeypatch.setattr(cfg_mod, "show_unit",
+                        lambda unit, timeout=5.0, scope="system": None)
+    r = c.post("/config/services-add", data={"unit": "no-such.service", "csrf": _csrf(c)},
+               headers={"host": "localhost"}, follow_redirects=False)
+    assert r.status_code == 400
+    assert "no-such.service" in r.text
+    assert c.app.state.panel.db.get_setting("extra_units") in ("", None, "[]")
+
+
+def test_add_by_name_bad_name(authed_client):
+    c = authed_client
+    for bad in ("maya", "maya.service extra", "DROP TABLE.service", "майя.service"):
+        r = c.post("/config/services-add", data={"unit": bad, "csrf": _csrf(c)},
+                   headers={"host": "localhost"}, follow_redirects=False)
+        assert r.status_code == 400, bad
+
+
+def test_add_by_name_exists(authed_client):
+    """Повторное добавление сохранённого и юнита из реестра — отказ 400."""
+    c = authed_client
+    # сохранённый юнит (через services-display, как в других тестах)
+    c.post("/config/services-display",
+           data={"visible": ["vllm", "llm-panel"], "extra_units": ["speaches.service"],
+                 "csrf": _csrf(c)},
+           headers={"host": "localhost"}, follow_redirects=False)
+    r = c.post("/config/services-add", data={"unit": "speaches.service", "csrf": _csrf(c)},
+               headers={"host": "localhost"}, follow_redirects=False)
+    assert r.status_code == 400
+    # юнит из services.yaml (реестр)
+    r2 = c.post("/config/services-add", data={"unit": "vllm.service", "csrf": _csrf(c)},
+                headers={"host": "localhost"}, follow_redirects=False)
+    assert r2.status_code == 400
+
+
+def test_add_by_name_csrf_required(authed_client):
+    c = authed_client
+    r = c.post("/config/services-add", data={"unit": "my-new.service", "csrf": "wrong"},
+               headers={"host": "localhost"}, follow_redirects=False)
+    assert r.status_code == 403
+    r2 = c.post("/config/services-add", data={"unit": "my-new.service"},
+                headers={"host": "localhost"}, follow_redirects=False)
+    assert r2.status_code == 403
+
+
 # ----------------------------------------------- действия и порядок ----------
 
 def test_action_for_extra_unit(authed_client):

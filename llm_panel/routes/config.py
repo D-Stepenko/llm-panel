@@ -6,6 +6,7 @@
 
 from __future__ import annotations
 
+import asyncio
 import json
 
 from fastapi import APIRouter, Request
@@ -13,7 +14,7 @@ from fastapi.responses import HTMLResponse, PlainTextResponse, RedirectResponse
 
 from ..i18n import translate
 from ..registry import UNIT_RE, make_display_def
-from ..systemd_units import list_loaded_services
+from ..systemd_units import list_loaded_services, show_unit
 
 router = APIRouter()
 
@@ -119,6 +120,84 @@ async def services_scan(request: Request):
     units_found = [f for f in found if f["unit"] not in configured
                    and f["unit"] not in saved_names]
     return HTMLResponse(_render_scan_fragment(state, request, "result", saved, units_found))
+
+
+def _stored_units(state) -> list[tuple[str, str]]:
+    """Сохранённые юниты-«надстройки» из settings: список (scope, unit).
+
+    Формат в БД — JSON-список строк: "unit" (system) или "user:unit".
+    Дубликаты и невалидные имена отбрасываются (как в app._load_settings).
+    """
+    raw = state.db.get_setting("extra_units") or ""
+    try:
+        data = json.loads(raw)
+    except ValueError:
+        data = []
+    out: list[tuple[str, str]] = []
+    for x in (data if isinstance(data, list) else []):
+        s = str(x).strip()
+        if not s:
+            continue
+        if s.startswith("user:"):
+            scope, unit = "user", s[len("user:"):].strip()
+        else:
+            scope, unit = "system", s
+        if UNIT_RE.match(unit) and (scope, unit) not in out:
+            out.append((scope, unit))
+    return out
+
+
+@router.post("/config/services-add")
+async def services_add(request: Request):
+    """Добавление юнита по имени — БЕЗ правки services.yaml вручную.
+
+    Дополняет «Поиск сервисов»: скан показывает загруженные юниты (list-units),
+    а юнит, который ещё ни разу не стартовал (или остановлен и выгружен
+    systemd'ом), в этот список не попадает. Здесь имя проверяется напрямую
+    `systemctl show` (read-only): юнит должен существовать хотя бы в одном из
+    менеджеров. Сначала проверяется user-менеджер пользователя панели (его
+    собственные юниты), затем системный. Обнаруженный scope сохраняется в
+    settings («extra_units») вместе с уже накопленными юнитами; карточка
+    появляется на Статусе с действиями (system — по allowlist, user — напрямую).
+    """
+    state = request.app.state.panel
+    try:
+        form = await request.form()
+    except Exception:  # noqa: BLE001
+        form = {}
+    if form.get("csrf") != request.state.csrf:
+        return PlainTextResponse(translate(state.i18n_lang, "bad_csrf"), status_code=403)
+    unit = str(form.get("unit", "")).strip()
+    if not UNIT_RE.match(unit):
+        return PlainTextResponse(translate(state.i18n_lang, "cfg_scan_bad_name"), status_code=400)
+    if state.registry.by_unit(unit) or any(u == unit for _, u in _stored_units(state)):
+        return PlainTextResponse(translate(state.i18n_lang, "cfg_scan_exists"), status_code=400)
+
+    scope = None
+    for candidate in ("user", "system"):
+        info = await asyncio.to_thread(show_unit, unit, 5.0, candidate)
+        if info is not None:
+            scope = candidate
+            break
+    if scope is None:
+        return PlainTextResponse(
+            translate(state.i18n_lang, "cfg_scan_not_found", unit=unit), status_code=400)
+
+    stored = _stored_units(state)
+    stored.append((scope, unit))
+    if len(stored) > _EXTRAS_MAX:
+        return PlainTextResponse(
+            translate(state.i18n_lang, "cfg_too_many_units", max=_EXTRAS_MAX), status_code=400)
+    serialized = json.dumps([f"{s}:{u}" if s == "user" else u for s, u in stored])
+    extra_defs: dict = {u: make_display_def(u, scope=s) for s, u in stored}
+    state.extra_defs = extra_defs
+    state.collector.extra_defs = tuple(extra_defs.values())
+    state.db.set_setting("extra_units", serialized)
+
+    ip = request.client.host if request.client else ""
+    state.db.audit(ip, request.state.session["username"], "config", "services_add",
+                   "ok", f"{scope}:{unit}")
+    return RedirectResponse("/config?saved=1", status_code=303)
 
 
 @router.post("/config/services-display")
