@@ -1,0 +1,29 @@
+{# Список юнитов-«надстроек» для секции «Отображение сервисов» в Config Panel.
+
+   Контекст (готовится в routes/config.py):
+     mode        — "initial" | "unavailable" | "result"
+     saved_units — имена юнитов, сохранённых ранее (checkbox отмечен);
+     units_found — найденные при поиске юниты, ещё не сохранённые (для "result"). #}
+{% if mode == "initial" %}
+  <div class="muted cfg-hint">{{ t('cfg_scan_hint') }}</div>
+{% elif mode == "unavailable" %}
+  <div class="muted cfg-hint">{{ t('cfg_scan_unavailable') }}</div>
+{% elif mode == "result" and not units_found and not saved_units %}
+  <div class="muted cfg-hint">{{ t('cfg_scan_empty') }}</div>
+{% endif %}
+
+{% for u in saved_units %}
+<label class="svc-display-row svc-extra">
+  <input type="checkbox" name="extra_units" value="{{ u }}" checked>
+  <span><code>{{ u }}</code></span>
+</label>
+{% endfor %}
+
+{% if mode == "result" %}
+  {% for f in units_found %}
+  <label class="svc-display-row svc-extra">
+    <input type="checkbox" name="extra_units" value="{{ f.unit }}">
+    <span><code>{{ f.unit }}</code> <span class="svc-scan-state">{{ f.active }}/{{ f.sub }}</span>{% if f.desc %} <span class="svc-scan-desc">{{ f.desc }}</span>{% endif %}</span>
+  </label>
+  {% endfor %}
+{% endif %}

@@ -35,13 +35,17 @@ def _snap_dict(snap) -> dict:
 
 
 def _ordered_services(state, rows: list) -> list:
-    """Сортировка карточек сервисов по сохранённому порядку («Порядок» в шапке).
+    """Фильтр скрытых + сортировка карточек по сохранённому порядку.
 
-    Несохранённые/новые сервисы остаются в хвосте в исходном порядке.
+    1) скрытые (Config Panel → «Отображение сервисов», settings.hidden_ids)
+       не показываются;
+    2) сортировка по сохранённому порядку («Порядок» в шапке);
+    3) несохранённые/новые сервисы остаются в хвосте в исходном порядке.
     """
+    rows = [r for r in rows if r.get("id") not in set(state.hidden_ids)]
     order = state.services_order or []
     if not order:
-        return list(rows)
+        return rows
     pos = {sid: i for i, sid in enumerate(order)}
     return [r for _, r in sorted(
         enumerate(rows),
@@ -106,9 +110,11 @@ async def save_services_order(request: Request):
         return PlainTextResponse(translate(state.i18n_lang, "bad_csrf"), status_code=403)
 
     ids: list[str] = []
+    extra_ids = {d.id for d in state.extra_defs.values()}
     for piece in str(form.get("order", "")).split(","):
         piece = piece.strip()
-        if piece and piece not in ids and state.registry.by_id(piece) is not None:
+        if piece and piece not in ids and (
+                state.registry.by_id(piece) is not None or piece in extra_ids):
             ids.append(piece)
 
     state.services_order = ids

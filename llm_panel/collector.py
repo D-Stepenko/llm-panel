@@ -40,6 +40,10 @@ class Collector:
         self._last_ready: dict[str, float] = {}     # unit -> прошлый успешный health ts
         self._last_health_check = 0.0
         self._health_cache: dict[str, object] = {}   # unit -> HealthResult
+        # Дополнительные юниты (Config Panel → «Настройка отображения сервисов»,
+        # найденные «Поиском сервисов»): минимальные описания без services.yaml.
+        # Меняется на ходу при сохранении настроек отображения.
+        self.extra_defs: tuple = ()
         self._task: asyncio.Task | None = None
 
     async def start(self) -> None:
@@ -77,10 +81,11 @@ class Collector:
     async def _collect(self) -> Snapshot:
         loop = asyncio.get_running_loop()
         warnings: list[str] = []
+        all_defs = tuple(self.registry.services) + tuple(self.extra_defs)
 
         # 1) состояния юнитов (read-only systemctl show, без sudo)
         units = {}
-        for svc in self.registry:
+        for svc in all_defs:
             info = await loop.run_in_executor(None, show_unit, svc.unit)
             units[svc.unit] = info
 
@@ -90,7 +95,7 @@ class Collector:
             self._last_health_check = now
             import llm_panel.health as health_mod
 
-            for svc in self.registry:
+            for svc in all_defs:
                 if svc.health is None:
                     continue
                 result = await health_mod.run_health(svc.health)
@@ -112,7 +117,7 @@ class Collector:
         uuid_name = {g["uuid"]: (g.get("name") or "") for g in gpu_rows} if gpu_rows else {}
         svc_rows = []
         pid_owner: dict[int, str] = {}
-        for svc in self.registry:
+        for svc in all_defs:
             info = units.get(svc.unit)
             health = self._health_cache.get(svc.unit)
             if info is not None and info.pid:
@@ -167,7 +172,7 @@ class Collector:
         if gpu_rows is not None:
             for g in gpu_rows:
                 g["assigned"] = [
-                    s.id for s in self.registry if g["uuid"] in s.gpus
+                    s.id for s in all_defs if g["uuid"] in s.gpus
                 ]
                 for proc in g["procs"]:
                     owned = pid_owner.get(proc["pid"])

@@ -228,6 +228,17 @@ h1 { margin: 0; font-size: clamp(26px,3vw,34px); line-height: 1.14; letter-spaci
 .config-form select { background: var(--surface-2); color: var(--text); border: 1px solid var(--line-soft); border-radius: 8px; padding: 7px 10px; font-size: 13px; }
 .config-form textarea { background: var(--surface-2); color: var(--text); border: 1px solid var(--line-soft); border-radius: 8px; padding: 8px 10px; font: ui-monospace, "Cascadia Mono", Consolas, monospace; font-size: 12.5px; width: min(420px, 100%); resize: vertical; }
 .config-form textarea:focus { outline: 2px solid var(--accent); outline-offset: 1px; border-color: var(--focus-border); }
+/* Config Panel: секция «Отображение сервисов» */
+.cfg-section-title { margin: 4px 0 12px; font-size: 15px; font-weight: 700; color: var(--text); }
+.svc-display-list { display: flex; flex-direction: column; gap: 6px; margin: 4px 0 10px; }
+.svc-display-row { display: flex; align-items: center; gap: 9px; padding: 8px 11px; border: 1px solid var(--line-soft); border-radius: 9px; background: var(--surface-2); cursor: pointer; }
+.svc-display-row:hover { border-color: var(--line); }
+.svc-display-row input[type="checkbox"] { width: 15px; height: 15px; accent-color: var(--accent); flex: none; }
+.svc-display-name { color: var(--text); font-weight: 650; font-size: 12.5px; }
+.svc-display-row code { flex: none; }
+.svc-extra-list { max-height: 260px; overflow: auto; }
+.svc-scan-state { color: var(--muted); font-size: 11px; font-weight: 650; white-space: nowrap; }
+.svc-scan-desc { color: var(--muted); font-size: 11px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 420px; display: inline-block; vertical-align: bottom; }
 .cfg-hint { font-size: 11px; margin-top: 4px; }
 body.order-dragging { cursor: grabbing; user-select: none; -webkit-user-select: none; }
 .service-grid { display: grid; grid-template-columns: repeat(2, minmax(0,1fr)); gap: 14px; }

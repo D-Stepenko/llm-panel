@@ -29,6 +29,10 @@
     "gpu-power-limit.service": {
       "actions": ["status", "journal"],
       "note": "только просмотр: панель не редактирует его конфиг (ТЗ §9)"
+    },
+    "llm-panel.service": {
+      "actions": ["start", "stop", "restart", "enable", "disable", "status", "journal", "journal-follow"],
+      "note": "карточка самой панели (systemd.panel_unit из config.yaml): restart панели через саму панель"
     }
   }
 }

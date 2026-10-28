@@ -31,6 +31,11 @@ data:
 systemd:
   # root-owned helper; менять из web UI нельзя (только админ ОС, см. docs/DEPLOY.md)
   helper_path: /usr/local/sbin/llm-panel-systemd
+  # Юнит самой панели: карточка llm-panel на странице Статус наравне с другими
+  # сервисами. Статус читается напрямую (allowlist не нужен); действия (restart
+  # и т.п.) требуют внесения юнита в root-owned allowlist.json. Пустая строка
+  # отключает карточку.
+  panel_unit: llm-panel.service
   log_max_lines: 2000           # кап количества строк журнала через helper (helper не даёт >5000)
   log_download_max_mb: 2
 

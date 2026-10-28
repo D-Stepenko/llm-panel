@@ -14,11 +14,11 @@ from fastapi.templating import Jinja2Templates
 import pathlib
 
 from .collector import Collector
-from .config import PanelConfig, load_config
+from .config import PanelConfig, UNIT_NAME_RE, load_config
 from .db import Database
 from .i18n import translate
 from .metrics import MetricsCollector, fmt_mem_mb, fmt_uptime
-from .registry import load_services
+from .registry import ServiceRegistry, load_services, make_display_def
 from .sse import Hub
 from .security import (
     SESSION_COOKIE,
@@ -51,6 +51,11 @@ class AppState:
         self.collector: Collector | None = None
         # Сохранённый пользователем порядок карточек сервисов (settings.services_order)
         self.services_order: list[str] = []
+        # Настройка отображения сервисов (Config Panel, settings):
+        # hidden_ids — скрытые на Статусе id настроенных сервисов (реестр + панель);
+        # extra_defs — найденные «Поиском сервисов» юниты, показанные как карточки.
+        self.hidden_ids: list[str] = []
+        self.extra_defs: dict[str, object] = {}   # unit -> ServiceDef
         # Панельные настройки (Config Panel, хранятся в settings)
         self.i18n_lang: str = "en"     # язык интерфейса (по умолчанию английский)
         self.temp_unit: str = "C"      # единица температуры: C/F
@@ -73,6 +78,14 @@ def create_app(config: PanelConfig) -> FastAPI:
         ports_min=config.ports_min,
         ports_max=config.ports_max,
     )
+    # Встроенная карточка самой панели (systemd.panel_unit, пусто — отключить):
+    # статус читается напрямую, действия — только при внесении юнита в allowlist.
+    if config.panel_unit and not registry.by_unit(config.panel_unit):
+        panel_def = make_display_def(
+            config.panel_unit, name="llm-panel",
+            notes="Карточка самой панели (systemd.panel_unit из config.yaml).",
+        )
+        registry = ServiceRegistry(registry.services + (panel_def,))
     metrics = MetricsCollector()
     hub = Hub()
     state = AppState(cfg=config, db=db, registry=registry, keys=None, metrics=metrics, hub=hub)
@@ -113,6 +126,31 @@ def create_app(config: PanelConfig) -> FastAPI:
             roots = list(config.model_roots)
         state.model_roots = roots
         state.collector.model_roots = list(roots)
+        # отображение сервисов: скрытые id + найденные («Поиск сервисов») юниты
+        state.hidden_ids = _load_str_list("hidden_ids")
+        extra_units = [
+            u for u in _load_str_list("extra_units")
+            if UNIT_NAME_RE.match(u) and not registry.by_unit(u)
+        ]
+        state.extra_defs = {u: make_display_def(u) for u in extra_units}
+        state.collector.extra_defs = tuple(state.extra_defs.values())
+
+    def _load_str_list(key: str) -> list[str]:
+        raw = db.get_setting(key)
+        if not raw:
+            return []
+        try:
+            data = json.loads(raw)
+        except ValueError:
+            return []
+        if not isinstance(data, list):
+            return []
+        seen: list[str] = []
+        for x in data:
+            s = str(x).strip()
+            if s and s not in seen:
+                seen.append(s)
+        return seen
 
     _load_settings()
 

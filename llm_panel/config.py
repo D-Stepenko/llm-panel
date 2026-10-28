@@ -8,8 +8,12 @@ from __future__ import annotations
 
 import dataclasses
 import pathlib
+import re
 
 import yaml
+
+# Форма имени systemd-юнита (та же, что для services.yaml/allowlist)
+UNIT_NAME_RE = re.compile(r"^[A-Za-z0-9_.@-]+\.service$")
 
 DEFAULT_REDACT_PATTERNS = (
     r"hf_[A-Za-z0-9]{20,}",                # HF-токены
@@ -46,6 +50,7 @@ class PanelConfig:
     db_path: str
     services_file: str
     helper_path: str
+    panel_unit: str
     log_max_lines: int
     log_download_max_mb: int
     metrics_interval: float
@@ -105,6 +110,15 @@ def load_config(path: str | pathlib.Path) -> PanelConfig:
 
     systemd = _get(raw, "systemd", {}, dict)
     helper_path = str(_get(systemd, "helper_path", "/usr/local/sbin/llm-panel-systemd", str))
+    # Карточка самой панели: юнит, под которым работает llm-panel на станции.
+    # Пустая строка отключает карточку. Статус читается напрямую (без allowlist),
+    # действия (restart и т.п.) требуют внесения юнита в root-owned allowlist.
+    panel_unit = str(_get(systemd, "panel_unit", "llm-panel.service", str)).strip()
+    if panel_unit and not UNIT_NAME_RE.match(panel_unit):
+        raise ConfigError(
+            f"systemd.panel_unit должен быть именем юнита вида <name>.service "
+            f"(пустая строка — отключить карточку панели); получено: {panel_unit!r}"
+        )
     log_max_lines = int(_get(systemd, "log_max_lines", 2000, int))
     if not (10 <= log_max_lines <= 5000):
         raise ConfigError("systemd.log_max_lines вне диапазона 10..5000")
@@ -150,6 +164,7 @@ def load_config(path: str | pathlib.Path) -> PanelConfig:
         db_path=db_path,
         services_file=services_file,
         helper_path=helper_path,
+        panel_unit=panel_unit,
         log_max_lines=log_max_lines,
         log_download_max_mb=log_download_max_mb,
         metrics_interval=metrics_interval,

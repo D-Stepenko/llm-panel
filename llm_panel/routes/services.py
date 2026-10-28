@@ -20,9 +20,20 @@ router = APIRouter(prefix="/services")
 _ACTIONS = ("start", "stop", "restart", "enable", "disable")
 
 
+def _find_def(state, svc_id: str):
+    """Описание сервиса: реестр (services.yaml + карточка панели) или найденный юнит."""
+    svc = state.registry.by_id(svc_id)
+    if svc is not None:
+        return svc
+    for d in state.extra_defs.values():
+        if d.id == svc_id:
+            return d
+    return None
+
+
 async def _render_action_result(request: Request, svc_id: str, ok: bool, message: str, status=""):
     state = request.app.state.panel
-    svc = state.registry.by_id(svc_id)
+    svc = _find_def(state, svc_id)
     return state.render(
         "_action_result.html",
         request=request,
@@ -37,7 +48,7 @@ async def _render_action_result(request: Request, svc_id: str, ok: bool, message
 @router.post("/{svc_id}/{action}")
 async def run_action(request: Request, svc_id: str, action: str):
     state = request.app.state.panel
-    svc = state.registry.by_id(svc_id)
+    svc = _find_def(state, svc_id)
     if svc is None:
         return PlainTextResponse(translate(state.i18n_lang, "svc_not_found"), status_code=404)
     if action not in _ACTIONS:
@@ -82,7 +93,7 @@ async def run_action(request: Request, svc_id: str, action: str):
 async def settings(request: Request, svc_id: str):
     """Этап 1: только просмотр описания (manage_only). Редактор — этап 2 по ТЗ §11."""
     state = request.app.state.panel
-    svc = state.registry.by_id(svc_id)
+    svc = _find_def(state, svc_id)
     if svc is None:
         return PlainTextResponse(translate(state.i18n_lang, "svc_not_found"), status_code=404)
     # Названия карт (как в nvidia-smi) по UUID — из последнего снапшота NVML

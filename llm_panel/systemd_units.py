@@ -86,6 +86,35 @@ def show_unit(unit: str, timeout: float = 5.0) -> UnitInfo | None:
     )
 
 
+def list_loaded_services(timeout: float = 10.0) -> list[dict] | None:
+    """Все загруженные systemd-сервисы сервера (read-only, без sudo).
+
+    ТЗ §5.3: чтение состояния выполняется напрямую без helper. Перечисление
+    юнитов — тоже read-only операция (list-units --all). Юниты с LOAD=not-found
+    не показываются. Возврат None — systemd недоступен (dev на Windows и т.п.).
+    """
+    import re
+
+    argv = ["systemctl", "list-units", "--type=service", "--all", "--no-pager",
+            "--no-legend", "--plain"]
+    try:
+        proc = subprocess.run(argv, capture_output=True, text=True, timeout=timeout)
+    except FileNotFoundError:
+        return None
+    except subprocess.TimeoutExpired:
+        return None
+    out: list[dict] = []
+    for line in proc.stdout.splitlines():
+        parts = re.split(r"\s{2,}", line.strip())
+        if len(parts) < 5:
+            continue
+        unit, load, active, sub, desc = parts[0], parts[1], parts[2], parts[3], parts[4]
+        if not unit.endswith(".service") or load == "not-found":
+            continue
+        out.append({"unit": unit, "active": active, "sub": sub, "desc": desc})
+    return out
+
+
 def list_unit_files(patterns: tuple[str, ...], timeout: float = 5.0) -> dict[str, str]:
     """unit -> UnitFileState. Для отображения факта autostart (ТЗ §4.1)."""
     argv = ["systemctl", "list-unit-files", "--no-pager", "--quiet"]

@@ -72,4 +72,27 @@
     </p>
   </form>
 </div>
+
+<div class="page-card">
+  <form method="post" action="/config/services-display" class="config-form">
+    <input type="hidden" name="csrf" value="{{ csrf }}">
+    <h2 class="cfg-section-title">{{ t('cfg_display') }}</h2>
+    <div class="svc-display-list">
+      {% for s in svc_display %}
+      <label class="svc-display-row">
+        <input type="checkbox" name="visible" value="{{ s.id }}" {{ 'checked' if s.visible else '' }}>
+        <span><span class="svc-display-name">{{ s.name }}</span> <code>{{ s.unit }}</code></span>
+      </label>
+      {% endfor %}
+    </div>
+    <div class="muted cfg-hint">{{ t('cfg_display_hint') }}</div>
+    <div id="extra-list" class="svc-display-list svc-extra-list">{{ extra_list_html | safe }}</div>
+    <div class="muted cfg-hint">{{ t('cfg_extra_hint') }}</div>
+    <p class="settings-links">
+      <button type="button" class="btn" hx-get="/config/services-scan" hx-target="#extra-list" hx-swap="innerHTML">{{ t('cfg_scan') }}</button>
+      <button type="submit" class="btn btn-primary">{{ t('cfg_save') }}</button>
+      <a class="btn" href="/">{{ t('back_status') }}</a>
+    </p>
+  </form>
+</div>
 {% endblock %}

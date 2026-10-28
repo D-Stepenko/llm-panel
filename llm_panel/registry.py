@@ -177,6 +177,36 @@ def _parse_service(index: int, d: dict, startup_timeout_default: int, ports_min:
     )
 
 
+def make_display_def(unit: str, name: str = "", notes: str = "") -> "ServiceDef":
+    """Минимальное описание юнита без записи в services.yaml.
+
+    Используется для: (а) встроенной карточки самой панели (systemd.panel_unit),
+    (б) юнитов, найденных «Поиском сервисов» и отмеченных в Config Panel.
+    Карточка показывает состояние systemd/uptime/автостарт; порта, GPU и
+    health-check нет (их добавляет редактор конфигураций — этап 2). Действия
+    (start/stop/restart) разрешает только root-owned allowlist helper'а.
+    """
+    sid = unit[:-len(".service")] if unit.endswith(".service") else unit
+    return ServiceDef(
+        id=sid,
+        name=name or sid,
+        type="generic",
+        unit=unit,
+        managed="adopted",
+        edit_mode="manage_only",
+        port=None,
+        bind_host=None,
+        gpus=(),
+        cuda_addressing="uuid",
+        health=None,
+        startup_timeout=600,
+        ram_exclusive=False,
+        stop_signal="SIGTERM",
+        stop_timeout=30,
+        notes=notes,
+    )
+
+
 @dataclasses.dataclass(frozen=True)
 class ServiceRegistry:
     services: tuple
