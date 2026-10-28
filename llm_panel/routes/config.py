@@ -8,6 +8,7 @@ from __future__ import annotations
 
 import asyncio
 import json
+from urllib.parse import quote
 
 from fastapi import APIRouter, Request
 from fastapi.responses import HTMLResponse, PlainTextResponse, RedirectResponse
@@ -26,6 +27,8 @@ _AUDIT_LIMITS = ("30", "50", "100", "200")  # записей аудита на �
 _ROOTS_MAX = 8                            # максимум путей дисковой сводки
 _ROOT_MAX_LEN = 200                       # длина одного пути
 _EXTRAS_MAX = 64                          # максимум найденных юнитов на Статусе
+_ADD_ERRORS = ("cfg_scan_bad_name", "cfg_scan_not_found",
+               "cfg_scan_exists", "cfg_too_many_units")
 
 
 def _parse_model_roots(raw: str) -> list[str] | None:
@@ -64,11 +67,17 @@ async def config_page(request: Request):
     extra_list_html = _render_scan_fragment(state, request, "initial",
                                             [{"unit": u, "scope": getattr(d, "scope", "system")}
                                              for u, d in state.extra_defs.items()])
+    # Ошибка добавления юнита по имени (?add_err=<i18n-key>&unit=<имя>):
+    # ключ проверяется по белому списку, чтобы из query не подставить произвольный.
+    add_err = request.query_params.get("add_err") or ""
+    add_err = add_err if add_err in _ADD_ERRORS else ""
     return state.render(
         "config.html",
         request=request,
         saved=request.query_params.get("saved") == "1",
         roots_error=request.query_params.get("err") == "roots",
+        add_err=add_err,
+        add_unit=request.query_params.get("unit", ""),
         lang_value=state.i18n_lang,
         temp_value=state.temp_unit,
         theme_value=state.theme,
@@ -168,10 +177,16 @@ async def services_add(request: Request):
     if form.get("csrf") != request.state.csrf:
         return PlainTextResponse(translate(state.i18n_lang, "bad_csrf"), status_code=403)
     unit = str(form.get("unit", "")).strip()
+
+    def reject(key: str) -> RedirectResponse:
+        """Ошибка добавления: баннер на /config (строка не теряется при вводе)."""
+        return RedirectResponse(
+            f"/config?add_err={key}&unit={quote(unit, safe='')}", status_code=303)
+
     if not UNIT_RE.match(unit):
-        return PlainTextResponse(translate(state.i18n_lang, "cfg_scan_bad_name"), status_code=400)
+        return reject("cfg_scan_bad_name")
     if state.registry.by_unit(unit) or any(u == unit for _, u in _stored_units(state)):
-        return PlainTextResponse(translate(state.i18n_lang, "cfg_scan_exists"), status_code=400)
+        return reject("cfg_scan_exists")
 
     scope = None
     for candidate in ("user", "system"):
@@ -180,14 +195,12 @@ async def services_add(request: Request):
             scope = candidate
             break
     if scope is None:
-        return PlainTextResponse(
-            translate(state.i18n_lang, "cfg_scan_not_found", unit=unit), status_code=400)
+        return reject("cfg_scan_not_found")
 
     stored = _stored_units(state)
     stored.append((scope, unit))
     if len(stored) > _EXTRAS_MAX:
-        return PlainTextResponse(
-            translate(state.i18n_lang, "cfg_too_many_units", max=_EXTRAS_MAX), status_code=400)
+        return reject("cfg_too_many_units")
     serialized = json.dumps([f"{s}:{u}" if s == "user" else u for s, u in stored])
     extra_defs: dict = {u: make_display_def(u, scope=s) for s, u in stored}
     state.extra_defs = extra_defs

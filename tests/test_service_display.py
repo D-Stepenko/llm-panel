@@ -447,8 +447,13 @@ def test_add_by_name_not_found(authed_client, monkeypatch):
                         lambda unit, timeout=5.0, scope="system": None)
     r = c.post("/config/services-add", data={"unit": "no-such.service", "csrf": _csrf(c)},
                headers={"host": "localhost"}, follow_redirects=False)
-    assert r.status_code == 400
-    assert "no-such.service" in r.text
+    assert r.status_code == 303
+    assert "add_err=cfg_scan_not_found" in r.headers["location"]
+    assert "no-such.service" in r.headers["location"]
+    # баннер с ошибкой на странице
+    page = c.get(r.headers["location"], headers={"host": "localhost"})
+    assert page.status_code == 200
+    assert "no-such.service" in page.text
     assert c.app.state.panel.db.get_setting("extra_units") in ("", None, "[]")
 
 
@@ -457,11 +462,12 @@ def test_add_by_name_bad_name(authed_client):
     for bad in ("maya", "maya.service extra", "DROP TABLE.service", "майя.service"):
         r = c.post("/config/services-add", data={"unit": bad, "csrf": _csrf(c)},
                    headers={"host": "localhost"}, follow_redirects=False)
-        assert r.status_code == 400, bad
+        assert r.status_code == 303, bad
+        assert "add_err=cfg_scan_bad_name" in r.headers["location"]
 
 
 def test_add_by_name_exists(authed_client):
-    """Повторное добавление сохранённого и юнита из реестра — отказ 400."""
+    """Повторное добавление сохранённого и юнита из реестра — отказ."""
     c = authed_client
     # сохранённый юнит (через services-display, как в других тестах)
     c.post("/config/services-display",
@@ -470,11 +476,13 @@ def test_add_by_name_exists(authed_client):
            headers={"host": "localhost"}, follow_redirects=False)
     r = c.post("/config/services-add", data={"unit": "speaches.service", "csrf": _csrf(c)},
                headers={"host": "localhost"}, follow_redirects=False)
-    assert r.status_code == 400
+    assert r.status_code == 303
+    assert "add_err=cfg_scan_exists" in r.headers["location"]
     # юнит из services.yaml (реестр)
     r2 = c.post("/config/services-add", data={"unit": "vllm.service", "csrf": _csrf(c)},
                 headers={"host": "localhost"}, follow_redirects=False)
-    assert r2.status_code == 400
+    assert r2.status_code == 303
+    assert "add_err=cfg_scan_exists" in r2.headers["location"]
 
 
 def test_add_by_name_csrf_required(authed_client):
@@ -485,6 +493,20 @@ def test_add_by_name_csrf_required(authed_client):
     r2 = c.post("/config/services-add", data={"unit": "my-new.service"},
                 headers={"host": "localhost"}, follow_redirects=False)
     assert r2.status_code == 403
+
+
+def test_add_form_outside_display_form(authed_client):
+    """Регрессия (баг 2026-10-28): форма добавления НЕ вложена в форму
+    services-display — вложенные <form> невалидны, браузер выбрасывает тег,
+    и submit «Добавить юнит по имени» уходил во внешнюю форму."""
+    c = authed_client
+    page = c.get("/config", headers={"host": "localhost"})
+    assert page.status_code == 200
+    html = page.text
+    outer = html.index('action="/config/services-display"')
+    outer_close = html.index("</form>", outer)
+    add_form = html.index('action="/config/services-add"')
+    assert add_form > outer_close
 
 
 # ----------------------------------------------- действия и порядок ----------
