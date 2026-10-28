@@ -1,22 +1,25 @@
 {% extends "base.html" %}
-{% block title %}Статусы — llm-panel{% endblock %}
-{% block topbar_actions %}
-<button id="order-btn" type="button" class="order-btn" title="Изменить порядок карточек сервисов">
-  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><path d="M4 5h16M4 10h10M4 15h16M4 20h10"/></svg>
-  Порядок
-</button>
-{% endblock %}
+{% block title %}{{ t('page_status_title') }}{% endblock %}
 {% block content %}
 <div id="sse-root">
   <div class="notice err hidden" id="sse-warn" {% if sse_available %}hidden{% endif %}>
     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><path d="M12 9v4M12 17h.01"/><path d="M10.3 3.9 1.8 18a2 2 0 0 0 1.7 3h17a2 2 0 0 0 1.7-3L13.7 3.9a2 2 0 0 0-3.4 0z"/></svg>
-    <span>Обновление в реальном времени недоступно (SSE выключен). Показан последний снимок состояния.</span>
+    <span>{{ t('sse_warn') }}</span>
   </div>
 
   <section id="host-init">{{ initial_host | safe }}</section>
   <section id="gpus-init">{{ initial_gpus | safe }}</section>
 
-  <div class="grid-title">Сервисы:</div>
+  <div class="services-head">
+    <div class="grid-title">{{ t('services') }}</div>
+    <button id="order-btn" type="button" class="order-btn" title="{{ t('sort_title') }}"
+            data-label="{{ t('sort') }}" data-label-save="{{ t('save_order') }}"
+            data-toast-ok="{{ t('order_saved') }}" data-toast-err="{{ t('order_save_err') }}"
+            data-toast-nocards="{{ t('order_no_cards') }}">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><path d="M4 5h16M4 10h10M4 15h16M4 20h10"/></svg>
+      <span id="order-btn-label">{{ t('sort') }}</span>
+    </button>
+  </div>
   <section id="services-init">{{ initial_services | safe }}</section>
 </div>
 {% endblock %}

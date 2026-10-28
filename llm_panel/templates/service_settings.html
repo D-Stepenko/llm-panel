@@ -1,29 +1,28 @@
 {% extends "base.html" %}
-{% block title %}Параметры {{ svc.name }} — llm-panel{% endblock %}
+{% block title %}{{ t('page_settings_title', name=svc.name) }}{% endblock %}
 {% block content %}
 <div class="page-head">
   <div>
-    <div class="eyebrow"><span class="live-dot tur"></span>Конфигурация</div>
-    <h1>Параметры: {{ svc.name }}</h1>
-    <p class="subtitle"><code>{{ svc.unit }}</code> — описание, статус и настройки</p>
+    <div class="eyebrow"><span class="live-dot tur"></span>{{ t('settings_eyebrow') }}</div>
+    <h1>{{ t('settings_h1', name=svc.name) }}</h1>
+    <p class="subtitle">{{ t('set_subtitle', unit=svc.unit) }}</p>
   </div>
 </div>
 
 <div class="notice">
   <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><path d="M12 9v4M12 17h.01"/><path d="M10.3 3.9 1.8 18a2 2 0 0 0 1.7 3h17a2 2 0 0 0 1.7-3L13.7 3.9a2 2 0 0 0-3.4 0z"/></svg>
-  <span>Этап 1: режим <b>{{ svc.edit_mode }}</b>. Тонкое редактирование (Environment/ExecStart, версия конфига/diff/rollback,
-    переразметка GPU) — этап 2 ТЗ-§11. Сейчас доступны просмотр и операции Start/Stop/Restart.</span>
+  <span>{{ t('stage1_notice', mode=svc.edit_mode) }}</span>
 </div>
 
 <div class="page-card">
   <dl class="kv">
     <dt>id</dt><dd><code>{{ svc.id }}</code></dd>
-    <dt>Тип</dt><dd>{{ svc.type }}</dd>
-    <dt>Юнит</dt><dd><code>{{ svc.unit }}</code></dd>
+    <dt>{{ t('k_type') }}</dt><dd>{{ svc.type }}</dd>
+    <dt>{{ t('k_unit') }}</dt><dd><code>{{ svc.unit }}</code></dd>
     <dt>managed</dt><dd>{{ svc.managed }}</dd>
     <dt>edit_mode</dt><dd>{{ svc.edit_mode }}</dd>
-    <dt>Порт</dt><dd>{% if svc.port %}{{ svc.bind_host or '127.0.0.1' }}:{{ svc.port }}{% else %}без порта{% endif %}</dd>
-    <dt>GPU</dt><dd>
+    <dt>{{ t('f_port') }}</dt><dd>{% if svc.port %}{{ svc.bind_host or '127.0.0.1' }}:{{ svc.port }}{% else %}{{ t('no_port') }}{% endif %}</dd>
+    <dt>{{ t('f_gpu') }}</dt><dd>
       {% if gpu_info %}
         {% for g in gpu_info %}
           {%- if g.name -%}
@@ -34,18 +33,18 @@
         {% endfor %}
       {% else %}—{% endif %}
     </dd>
-    <dt>GPU (UUID)</dt><dd>
+    <dt>{{ t('k_gpu_uuid') }}</dt><dd>
       {% if svc.gpus %}{% for g in svc.gpus %}<code>{{ g }}</code> {% endfor %}{% else %}—{% endif %}
     </dd>
-    <dt>startup_timeout</dt><dd>{{ svc.startup_timeout }} сек</dd>
-    <dt>stop_signal</dt><dd>{{ svc.stop_signal }} ({{ svc.stop_timeout }} сек)</dd>
-    <dt>ram_exclusive</dt><dd>{{ 'да' if svc.ram_exclusive else 'нет' }}</dd>
-    <dt>health</dt><dd>{% if svc.health %}{{ svc.health.kind }}: {{ svc.health.url or (svc.health.host ~ ':' ~ svc.health.port) }}{% else %}бинд? добавьте healthcheck{% endif %}</dd>
+    <dt>startup_timeout</dt><dd>{{ svc.startup_timeout }} {{ t('unit_s') }}</dd>
+    <dt>stop_signal</dt><dd>{{ svc.stop_signal }} ({{ svc.stop_timeout }} {{ t('unit_s') }})</dd>
+    <dt>ram_exclusive</dt><dd>{{ t('yes') if svc.ram_exclusive else t('no') }}</dd>
+    <dt>health</dt><dd>{% if svc.health %}{{ svc.health.kind }}: {{ svc.health.url or (svc.health.host ~ ':' ~ svc.health.port) }}{% else %}{{ t('health_none') }}{% endif %}</dd>
   </dl>
   {% if svc.notes %}<p class="muted">{{ svc.notes }}</p>{% endif %}
   <p class="settings-links">
-    <a class="btn" href="/services/{{ svc.id }}/logs">Логи</a>
-    <a class="btn" href="/">← К статусам</a>
+    <a class="btn" href="/services/{{ svc.id }}/logs">{{ t('btn_logs') }}</a>
+    <a class="btn" href="/">{{ t('back_status') }}</a>
   </p>
 </div>
 {% endblock %}

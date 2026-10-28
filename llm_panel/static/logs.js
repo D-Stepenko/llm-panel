@@ -6,6 +6,9 @@
   const filter = document.getElementById("log-filter");
   const btn = document.getElementById("follow-btn");
   const streamURL = pre.dataset.stream;
+  const followLabel = (btn && btn.dataset.follow) || "Follow";
+  const stopLabel = (btn && btn.dataset.stop) || "Stop";
+  const errPrefix = pre.dataset.err || "Stream error: ";
   let es = null;
 
   function applyFilter() {
@@ -18,12 +21,12 @@
 
   if (!btn || !streamURL) return;
 
-  function stop() { if (es) { es.close(); es = null; } btn.textContent = "Поток"; }
+  function stop() { if (es) { es.close(); es = null; } btn.textContent = followLabel; }
 
   btn.addEventListener("click", () => {
     if (es) { stop(); return; }
     es = new EventSource(streamURL);
-    btn.textContent = "Стоп";
+    btn.textContent = stopLabel;
     pre.textContent = "";
     es.addEventListener("log", e => {
       const div = document.createElement("div");
@@ -37,7 +40,7 @@
     es.addEventListener("error", e => {
       const div = document.createElement("div");
       div.className = "log-error";
-      div.textContent = "ОШИБКА потока: " + String(e.data || "");
+      div.textContent = errPrefix + String(e.data || "");
       pre.appendChild(div);
       stop();
     });

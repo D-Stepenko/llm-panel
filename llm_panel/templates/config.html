@@ -1,0 +1,59 @@
+{% extends "base.html" %}
+{% block title %}{{ t('page_config_title') }}{% endblock %}
+{% block content %}
+<div class="page-head">
+  <div>
+    <div class="eyebrow"><span class="live-dot tur"></span>{{ t('config_eyebrow') }}</div>
+    <h1>{{ t('config_h1') }}</h1>
+    <p class="subtitle">{{ t('config_subtitle') }}</p>
+  </div>
+</div>
+
+{% if saved %}<div class="notice ok">
+  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><path d="M20 6 9 17l-5-5"/></svg>
+  <span>{{ t('cfg_saved') }}</span>
+</div>{% endif %}
+
+<div class="page-card">
+  <form method="post" action="/config" class="config-form">
+    <input type="hidden" name="csrf" value="{{ csrf }}">
+    <dl class="kv">
+      <dt><label for="cfg-lang">{{ t('cfg_language') }}</label></dt>
+      <dd>
+        <select id="cfg-lang" name="lang">
+          <option value="en" {{ 'selected' if lang_value == 'en' else '' }}>English</option>
+          <option value="ru" {{ 'selected' if lang_value == 'ru' else '' }}>Русский</option>
+        </select>
+      </dd>
+      <dt><label for="cfg-temp">{{ t('cfg_temp') }}</label></dt>
+      <dd>
+        <select id="cfg-temp" name="temp_unit">
+          <option value="C" {{ 'selected' if temp_value == 'C' else '' }}>°C</option>
+          <option value="F" {{ 'selected' if temp_value == 'F' else '' }}>°F</option>
+        </select>
+      </dd>
+      <dt><label for="cfg-interval">{{ t('cfg_interval') }}</label></dt>
+      <dd>
+        <select id="cfg-interval" name="refresh_interval">
+          {% for v in ['2', '3', '5', '10'] %}
+          <option value="{{ v }}" {{ 'selected' if interval_value == v else '' }}>{{ v }} {{ t('unit_seconds') }}</option>
+          {% endfor %}
+        </select>
+        <div class="muted cfg-hint">{{ t('cfg_interval_hint') }}</div>
+      </dd>
+      <dt><label for="cfg-audit">{{ t('cfg_audit_limit') }}</label></dt>
+      <dd>
+        <select id="cfg-audit" name="audit_limit">
+          {% for v in ['30', '50', '100', '200'] %}
+          <option value="{{ v }}" {{ 'selected' if audit_value == v else '' }}>{{ v }}</option>
+          {% endfor %}
+        </select>
+      </dd>
+    </dl>
+    <p class="settings-links">
+      <button type="submit" class="btn btn-primary">{{ t('cfg_save') }}</button>
+      <a class="btn" href="/">{{ t('back_status') }}</a>
+    </p>
+  </form>
+</div>
+{% endblock %}

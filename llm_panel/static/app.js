@@ -1,13 +1,14 @@
 // Внешний скрипт панели (CSP script-src 'self': inline-скрипты запрещены).
-// SSE-подписка + режим «Порядок» карточек сервисов.
+// SSE-подписка + режим «sort» (перетаскивание карточек сервисов мышью).
 (function () {
   "use strict";
   if (!document.body) return;
   var root = document.getElementById("sse-root");
   var sseWarn = document.getElementById("sse-warn");
   var orderBtn = document.getElementById("order-btn");
+  var orderLabel = document.getElementById("order-btn-label");
   var csrf = document.body.dataset.csrf || "";
-  var order = { active: false, dragEl: null };   // состояние режима «Порядок»
+  var order = { active: false };   // состояние режима «sort»
 
   function servicesContainer() {
     return document.getElementById("services-live") || document.getElementById("services-init");
@@ -33,7 +34,7 @@
     es.onerror = function () { if (sseWarn) sseWarn.hidden = false; };
 
     function swap(name, e) {
-      if (order.active) return;   // в режиме «Порядок» SSE не перерисовывает карточки
+      if (order.active) return;   // в режиме «sort» SSE не перерисовывает карточки
       var el = targets[name];
       if (!el) {
         el = document.createElement("section");
@@ -51,70 +52,82 @@
     sseWarn.hidden = false;
   }
 
-  // ------------------- Порядок карточек сервисов --------------------------
+  // ------------------- sort: порядок карточек сервисов --------------------
+  // Перетаскивание на mouse-событиях: надёжно для всех карточек с кнопками
+  // и текстом (HTML5 drag & drop в таких картах работает нестабильно).
   if (!orderBtn) return;
+
+  var drag = null;   // { card, x, y, moved } — текущее перетаскивание
 
   function cards(c) { return Array.prototype.slice.call(c.querySelectorAll(".service-card")); }
 
+  function setLabel(saveMode) {
+    if (orderLabel) orderLabel.textContent = saveMode ? (orderBtn.dataset.labelSave || "save") : (orderBtn.dataset.label || "sort");
+  }
+
   function enterOrder() {
     var c = servicesContainer();
-    if (!c) { toast("Карточки сервисов не найдены", "err"); return; }
+    if (!c) { toast(orderBtn.dataset.toastNocards || "", "err"); return; }
     order.active = true;
-    orderBtn.textContent = "Запомнить порядок";
+    setLabel(true);
     orderBtn.classList.add("order-active");
     c.classList.add("order-mode");
     if (!c.dataset.orderBound) {
       c.dataset.orderBound = "1";
-      c.addEventListener("dragover", function (e) { e.preventDefault(); });
-      c.addEventListener("drop", onDrop);
+      c.addEventListener("mousedown", onDown);
     }
-    cards(c).forEach(function (card) {
-      card.draggable = true;
-      card.addEventListener("dragstart", onDragStart);
-      card.addEventListener("dragend", onDragEnd);
-    });
   }
 
   function exitOrder(msgAndKind) {
     order.active = false;
-    order.dragEl = null;
-    orderBtn.textContent = "Порядок";
     orderBtn.classList.remove("order-active");
+    setLabel(false);
     var c = servicesContainer();
-    if (c) {
-      c.classList.remove("order-mode");
-      cards(c).forEach(function (card) {
-        card.draggable = false;
-        card.classList.remove("drag-src");
-      });
-    }
+    if (c) c.classList.remove("order-mode");
+    if (drag) { drag.card.classList.remove("drag-src"); drag = null; }
+    document.body.classList.remove("order-dragging");
     if (msgAndKind) toast(msgAndKind[0], msgAndKind[1]);
   }
 
-  function onDragStart(e) {
-    order.dragEl = e.currentTarget;
-    e.currentTarget.classList.add("drag-src");
-    if (e.dataTransfer) {
-      e.dataTransfer.effectAllowed = "move";
-      try { e.dataTransfer.setData("text/plain", ""); } catch (err) {}
+  function onDown(e) {
+    if (e.button !== 0 || !order.active) return;
+    var t = e.target;
+    var card = null;
+    while (t && t !== document.body) {
+      if (t.classList && t.classList.contains("service-card")) { card = t; break; }
+      t = t.parentElement;
+    }
+    if (!card) return;
+    drag = { card: card, x: e.clientX, y: e.clientY, moved: false };
+    document.addEventListener("mousemove", onMove);
+    document.addEventListener("mouseup", onUp);
+  }
+
+  function onMove(e) {
+    if (!drag) return;
+    if (!drag.moved) {
+      if (Math.abs(e.clientX - drag.x) < 5 && Math.abs(e.clientY - drag.y) < 5) return;
+      drag.moved = true;
+      drag.card.classList.add("drag-src");
+      document.body.classList.add("order-dragging");
+    }
+    e.preventDefault();
+    var under = document.elementFromPoint(e.clientX, e.clientY);
+    while (under && !(under.classList && under.classList.contains("service-card"))) under = under.parentElement;
+    if (under && under !== drag.card && under.parentNode) {
+      // карточки — дети .service-grid внутри секции: вставляем в их реального родителя
+      var rect = under.getBoundingClientRect();
+      var before = (e.clientY - rect.top) / rect.height < 0.5;
+      under.parentNode.insertBefore(drag.card, before ? under : under.nextSibling);
     }
   }
 
-  function onDragEnd() {
-    if (order.dragEl) order.dragEl.classList.remove("drag-src");
-    order.dragEl = null;
-  }
-
-  function onDrop(e) {
-    e.preventDefault();
-    if (!order.active || !order.dragEl) return;
-    var card = e.target;
-    while (card && !card.classList.contains("service-card")) card = card.parentElement;
-    if (!card || card === order.dragEl) return;
-    var rect = card.getBoundingClientRect();
-    var before = (e.clientY - rect.top) / rect.height < 0.5;
-    var c = servicesContainer();
-    if (c) c.insertBefore(order.dragEl, before ? card : card.nextSibling);
+  function onUp() {
+    document.removeEventListener("mousemove", onMove);
+    document.removeEventListener("mouseup", onUp);
+    document.body.classList.remove("order-dragging");
+    if (drag) { drag.card.classList.remove("drag-src"); drag = null; }
+    // остаёмся в режиме «sort»: сохранение — повторным нажатием кнопки
   }
 
   function saveOrder() {
@@ -127,10 +140,10 @@
     fetch("/ui/order", { method: "POST", body: fd, credentials: "same-origin" })
       .then(function (r) {
         if (!r.ok) return r.text().then(function (t) { throw new Error(t || ("HTTP " + r.status)); });
-        exitOrder(["Порядок сохранён", "ok"]);
+        exitOrder([orderBtn.dataset.toastOk || "", "ok"]);
       })
       .catch(function (e) {
-        exitOrder(["Не удалось сохранить порядок: " + (e && e.message || e), "err"]);
+        exitOrder([(orderBtn.dataset.toastErr || "") + (e && e.message || e), "err"]);
       });
   }
 

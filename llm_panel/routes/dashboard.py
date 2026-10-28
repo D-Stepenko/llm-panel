@@ -14,6 +14,8 @@ import time
 from fastapi import APIRouter, Request
 from fastapi.responses import HTMLResponse, PlainTextResponse, StreamingResponse
 
+from ..i18n import translate
+
 router = APIRouter()
 
 
@@ -73,10 +75,12 @@ async def index(request: Request):
 
 
 @router.get("/audit")
-async def audit_tail(request: Request, limit: int = 30):
+async def audit_tail(request: Request, limit: int | None = None):
     """Последние события аудита (для обзора). Только GET, только для вошедшего администратора."""
     state = request.app.state.panel
-    limit = max(1, min(limit, 200))
+    if limit is None:
+        limit = state.audit_limit            # по умолчанию — из Config Panel
+    limit = max(1, min(int(limit), 200))
     rows = []
     for r in state.db.audit_tail(limit):
         d = dict(r)
@@ -99,7 +103,7 @@ async def save_services_order(request: Request):
     except Exception:  # noqa: BLE001
         form = {}
     if form.get("csrf") != request.state.csrf:
-        return PlainTextResponse("Недопустимый CSRF-токен", status_code=403)
+        return PlainTextResponse(translate(state.i18n_lang, "bad_csrf"), status_code=403)
 
     ids: list[str] = []
     for piece in str(form.get("order", "")).split(","):
@@ -112,7 +116,7 @@ async def save_services_order(request: Request):
     ip = request.client.host if request.client else ""
     state.db.audit(ip, request.state.session["username"],
                    "ui_order", "services", "ok", "порядок: " + ",".join(ids))
-    return PlainTextResponse("Порядок сохранён")
+    return PlainTextResponse(translate(state.i18n_lang, "order_saved"))
 
 
 @router.get("/events")

@@ -47,6 +47,7 @@ class Collector:
         self.metrics = metrics
         self.hub = hub
         self.snapshot: Snapshot | None = None
+        self.interval = float(cfg.metrics_interval)   # интервал цикла (меняется через Config Panel)
         self._last_ready: dict[str, float] = {}     # unit -> прошлый успешный health ts
         self._last_health_check = 0.0
         self._health_cache: dict[str, object] = {}   # unit -> HealthResult
@@ -82,7 +83,7 @@ class Collector:
                                              host={}, warnings=[err])
                 else:
                     self.snapshot.warnings = (self.snapshot.warnings + [err])[:5]
-            await asyncio.sleep(self.cfg.metrics_interval)
+            await asyncio.sleep(self.interval)
 
     async def _collect(self) -> Snapshot:
         loop = asyncio.get_running_loop()

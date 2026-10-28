@@ -67,6 +67,10 @@ def client(tmp_path):
     )
     llm_panel_db = app.state.panel.db
     assert llm_panel_db.get_setting("services_order") is None
+    # язык интерфейса по умолчанию — en (ТЗ); для этих тестов включаем ru,
+    # отдельные тесты проверяют en-дефолт и переключение через Config Panel
+    app.state.panel.db.set_setting("lang", "ru")
+    app.state.panel.i18n_lang = "ru"
     return c
 
 
@@ -257,3 +261,71 @@ def test_autostart_toggle_buttons(authed_client):
     assert 'href="/services/vllm/settings"' in page.text
     logs_page = c.get("/services/vllm/settings", headers={"host": "localhost"})
     assert 'href="/services/vllm/logs"' in logs_page.text   # логи — в настройках
+
+# ------------------------------------------------------------ Config Panel
+def test_config_panel_requires_auth(client):
+    r = client.get("/config", headers={"host": "localhost"}, follow_redirects=False)
+    assert r.status_code == 302 and r.headers["location"].startswith("/login")
+
+
+def test_config_panel_get(authed_client):
+    page = authed_client.get("/config", headers={"host": "localhost"})
+    assert page.status_code == 200
+    assert 'name="lang"' in page.text and 'name="refresh_interval"' in page.text
+    assert 'name="temp_unit"' in page.text and 'name="audit_limit"' in page.text
+    assert 'value="ru" selected' in page.text      # текущее значение из settings
+
+
+def test_config_save_switches_language(authed_client):
+    c = authed_client
+    page = c.get("/config", headers={"host": "localhost"})
+    csrf = re.search(r'name="csrf" value="([^"]+)"', page.text).group(1)
+    r = c.post("/config", data={"lang": "en", "temp_unit": "F", "refresh_interval": "5",
+                                "audit_limit": "50", "csrf": csrf},
+               headers={"host": "localhost"}, follow_redirects=False)
+    assert r.status_code == 303 and r.headers["location"] == "/config?saved=1"
+    panel = c.app.state.panel
+    assert panel.i18n_lang == "en" and panel.temp_unit == "F"
+    assert panel.collector.interval == 5.0 and panel.audit_limit == 50
+    assert panel.db.get_setting("lang") == "en"                      # persist в settings
+    assert any(x["action"] == "config" for x in panel.db.audit_tail(10))  # аудит
+    _set_snapshot(c, [_row("vllm")])
+    page = c.get("/", headers={"host": "localhost"})
+    assert ">Services:</div>" in page.text and ">Start</button>" in page.text
+    # сохранённый лимит аудита применяется по умолчанию
+    audit = c.get("/audit", headers={"host": "localhost"})
+    assert audit.status_code == 200
+
+
+def test_config_invalid_values_rejected(authed_client):
+    c = authed_client
+    page = c.get("/config", headers={"host": "localhost"})
+    csrf = re.search(r'name="csrf" value="([^"]+)"', page.text).group(1)
+    r = c.post("/config", data={"lang": "de", "temp_unit": "C", "refresh_interval": "3",
+                                "audit_limit": "30", "csrf": csrf},
+               headers={"host": "localhost"}, follow_redirects=False)
+    assert r.status_code == 303 and r.headers["location"] == "/config"
+    assert c.app.state.panel.i18n_lang == "ru"     # неизвестный язык не применился
+
+
+def test_config_requires_csrf(authed_client):
+    r = authed_client.post("/config", data={"lang": "en"}, headers={"host": "localhost"})
+    assert r.status_code == 403
+
+
+def test_default_language_is_en(tmp_path):
+    """Язык по умолчанию — английский (без settings.lang)."""
+    from fastapi.testclient import TestClient
+    from llm_panel import security
+
+    cfg = load_config(_make_config(tmp_path))
+    app = create_app(cfg)
+    app.state.panel.db.execute(
+        "INSERT OR REPLACE INTO users (username, password_hash, updated_at) VALUES ('admin', '!', 0)"
+    )
+    security.set_password(app.state.panel.db, "admin", "pw")
+    c = TestClient(app)
+    assert app.state.panel.i18n_lang == "en"
+    page = c.get("/login", headers={"host": "localhost"})
+    assert "Sign in" in page.text and "Username" in page.text
+    app.state.panel.db.close()

@@ -96,10 +96,10 @@ def test_login_rate_limit(authed_client):
     for _ in range(5):
         r = login(client, "wrong-password")
         assert r.status_code == 200
-        assert "Осталось попыток" in r.text or "Неверный логин" in r.text
+        assert "Attempts left" in r.text or "Wrong username or password" in r.text
     # 6-я попытка — блокировка, даже с верным паролем (ТЗ §10 п.11)
     r = login(client, "correct-password")
-    assert "Слишком много неудачных попыток" in r.text
+    assert "Too many failed attempts" in r.text
 
 
 def test_login_success_and_data_access(authed_client):

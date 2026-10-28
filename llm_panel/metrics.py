@@ -52,25 +52,53 @@ class HostMetrics:
     disks: tuple = ()            # ((path, total_gb, free_gb), ...)
 
 
-def fmt_mem_mb(mb) -> str:
-    """Единицы памяти по-человечески: 13784 → «13.78 ГБ», 64197 → «64.2 ГБ»
+_MEM_UNITS = {
+    "ru": ("ГБ", "МБ", "КБ", "нет данных"),
+    "en": ("GB", "MB", "KB", "n/a"),
+}
+
+
+def fmt_mem_mb(mb, units: str = "ru") -> str:
+    """Единицы памяти по-человечески: 13784 → «13.78 ГБ» (ru) / «13.78 GB» (en)
 
     Десятичные гигабайты (1 ГБ = 1000 МБ), 1–2 знака без лишних нулей;
     ниже 0.95 ГБ — МБ, ниже 1 МБ — КБ. None → «нет данных».
     """
+    gb_lbl, mb_lbl, kb_lbl, nd = _MEM_UNITS.get(units, _MEM_UNITS["ru"])
     if mb is None:
-        return "нет данных"
+        return nd
     try:
         mb = float(mb)
     except (TypeError, ValueError):
-        return "нет данных"
+        return nd
     if mb >= 950:
         gb = mb / 1000.0
         s = f"{gb:.2f}" if gb < 40 else f"{gb:.1f}"   # 13.78 ГБ, 32.77 ГБ; 50.4 ГБ, 64.2 ГБ
-        return f"{s.rstrip('0').rstrip('.')} ГБ"
+        return f"{s.rstrip('0').rstrip('.')} {gb_lbl}"
     if mb >= 1:
-        return f"{int(round(mb))} МБ"
-    return f"{mb * 1000:.0f} КБ"
+        return f"{int(round(mb))} {mb_lbl}"
+    return f"{mb * 1000:.0f} {kb_lbl}"
+
+
+def fmt_uptime(seconds: float | None, lang: str = "ru") -> str:
+    """Время работы: «5ч 12м» (ru) / «5h 12m» (en)."""
+    if seconds is None:
+        return ""
+    seconds = int(seconds)
+    days, rem = divmod(seconds, 86400)
+    hours, rem = divmod(rem, 3600)
+    mins, secs = divmod(rem, 60)
+    if lang == "ru":
+        if days:
+            return f"{days}д {hours}ч {mins}м"
+        if hours:
+            return f"{hours}ч {mins}м {secs}с"
+        return f"{mins}м {secs}с"
+    if days:
+        return f"{days}d {hours}h {mins}m"
+    if hours:
+        return f"{hours}h {mins}m {secs}s"
+    return f"{mins}m {secs}s"
 
 
 def _clean_cpu_model(raw: str) -> str:

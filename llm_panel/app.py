@@ -16,7 +16,8 @@ import pathlib
 from .collector import Collector
 from .config import PanelConfig, load_config
 from .db import Database
-from .metrics import MetricsCollector, fmt_mem_mb
+from .i18n import translate
+from .metrics import MetricsCollector, fmt_mem_mb, fmt_uptime
 from .registry import load_services
 from .sse import Hub
 from .security import (
@@ -50,6 +51,10 @@ class AppState:
         self.collector: Collector | None = None
         # Сохранённый пользователем порядок карточек сервисов (settings.services_order)
         self.services_order: list[str] = []
+        # Панельные настройки (Config Panel, хранятся в settings)
+        self.i18n_lang: str = "en"     # язык интерфейса (по умолчанию английский)
+        self.temp_unit: str = "C"      # единица температуры: C/F
+        self.audit_limit: int = 30     # записей аудита на странице
 
 
 def _get_state(request: Request) -> AppState:
@@ -75,9 +80,28 @@ def create_app(config: PanelConfig) -> FastAPI:
     app.state.panel = state
 
     templates = Jinja2Templates(directory=str(BASE_DIR / "templates"))
-    templates.env.filters["mem"] = fmt_mem_mb   # человекочитаемые ГБ/МБ/КБ
-    templates.env.filters["hms"] = _hms         # время снимка: HH:MM:SS
     state.templates = templates
+
+    def _load_settings() -> None:
+        """Панельные настройки из settings (Config Panel persist)."""
+        state.i18n_lang = db.get_setting("lang") if db.get_setting("lang") in ("en", "ru") else "en"
+        temp_unit = (db.get_setting("temp_unit") or "C").strip().upper()[:1]
+        state.temp_unit = temp_unit if temp_unit in ("C", "F") else "C"
+        try:
+            state.audit_limit = max(1, min(200, int(db.get_setting("audit_limit") or 30)))
+        except (TypeError, ValueError):
+            state.audit_limit = 30
+        try:   # интервал SSE-коллектора можно менять на ходу
+            state.collector.interval = float(db.get_setting("refresh_interval") or config.metrics_interval)
+        except (TypeError, ValueError):
+            state.collector.interval = config.metrics_interval
+
+    _load_settings()
+
+    # фильтры зависят от текущего языка панели (меняется через Config Panel)
+    templates.env.filters["mem"] = lambda v: fmt_mem_mb(v, state.i18n_lang)   # человекочитаемые ГБ/МБ/КБ
+    templates.env.filters["dur"] = lambda v: fmt_uptime(v, state.i18n_lang)   # время работы: 5ч 12м / 5h 12m
+    templates.env.filters["hms"] = _hms                                       # время снимка: HH:MM:SS
 
     def render(name: str, **ctx):
         # CSRF доступен во всех шаблонах (base.html: кнопка «Выйти») — устраняет
@@ -85,6 +109,23 @@ def create_app(config: PanelConfig) -> FastAPI:
         req = ctx.get("request")
         if req is not None:
             ctx.setdefault("csrf", getattr(req.state, "csrf", "") or "")
+        lang = state.i18n_lang
+        ctx.setdefault("lang", lang)
+
+        def t(key: str, **kw):
+            return translate(lang, key, **kw)
+
+        ctx.setdefault("t", t)
+
+        def temp(c):
+            """Температура GPU с учётом единицы из Config Panel (°C/°F)."""
+            if c is None:
+                return translate(lang, "no_data")
+            if state.temp_unit == "F":
+                return f"{c * 9 / 5 + 32:.0f} °F"
+            return f"{c} °C"
+
+        ctx.setdefault("temp", temp)
         return templates.TemplateResponse(name, ctx)
 
     state.render = render
@@ -114,14 +155,14 @@ def create_app(config: PanelConfig) -> FastAPI:
         raw_host = request.headers.get("host") or ""
         host = raw_host.split(":")[0].lower()   # "host:port" → host; IPv6 без скобок не поддерживаем в hosts
         if host and host not in state.cfg.trusted_hosts:
-            return PlainTextResponse("Недопустимый Host", status_code=403)
+            return PlainTextResponse(translate(state.i18n_lang, "bad_host"), status_code=403)
 
         # Origin (если передан) не должен чужим источником
         origin = request.headers.get("origin")
         if origin:
             o_host = origin.partition("://")[2].rpartition(":")[0].lower()
             if o_host and o_host not in state.cfg.trusted_hosts:
-                return PlainTextResponse("Недопустимый Origin", status_code=403)
+                return PlainTextResponse(translate(state.i18n_lang, "bad_origin"), status_code=403)
 
         session = None
         token = request.cookies.get(SESSION_COOKIE)
@@ -135,7 +176,7 @@ def create_app(config: PanelConfig) -> FastAPI:
             if request.method == "GET" and path != "/events":
                 nxt = request.url.path or "/"
                 return RedirectResponse(f"/login?next={nxt}", status_code=302)
-            return PlainTextResponse("Требуется авторизация", status_code=401)
+            return PlainTextResponse(translate(state.i18n_lang, "auth_required"), status_code=401)
 
         resp = await call_next(request)
         resp.headers.setdefault("Cache-Control", "no-store")
@@ -150,6 +191,7 @@ def create_app(config: PanelConfig) -> FastAPI:
     app.include_router(routes.dashboard.router)
     app.include_router(routes.services.router)
     app.include_router(routes.logs.router)
+    app.include_router(routes.config.router)
 
     app.mount("/static", StaticFiles(directory=str(BASE_DIR / "static")), name="static")
 

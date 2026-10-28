@@ -1,25 +1,24 @@
 {% extends "base.html" %}
-{% block title %}Вход — llm-panel{% endblock %}
+{% block title %}{{ t('page_login_title') }}{% endblock %}
 {% block content %}
 <div class="login-wrap">
   <div class="login-card">
-    <div class="eyebrow">llm-panel · доступ</div>
-    <h1>Вход в панель</h1>
+    <div class="eyebrow">{{ t('login_eyebrow') }}</div>
+    <h1>{{ t('login_h1') }}</h1>
     {% if error %}<div class="notice err">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><path d="M12 9v4M12 17h.01"/><path d="M10.3 3.9 1.8 18a2 2 0 0 0 1.7 3h17a2 2 0 0 0 1.7-3L13.7 3.9a2 2 0 0 0-3.4 0z"/></svg>
       <span>{{ error }}</span></div>{% endif %}
     <form method="post" action="/login?next={{ request.query_params.get('next') or '/' }}">
       <input type="hidden" name="login_token" value="{{ login_token }}">
-      <label>Логин
+      <label>{{ t('login_user') }}
         <input type="text" name="username" autofocus autocomplete="username" required>
       </label>
-      <label>Пароль
+      <label>{{ t('login_pass') }}
         <input type="password" name="password" autocomplete="current-password" required>
       </label>
-      <button type="submit" class="btn btn-primary">Войти</button>
+      <button type="submit" class="btn btn-primary">{{ t('login_btn') }}</button>
     </form>
-    <p class="muted login-note">Доступ к панели эквивалентен доступу к пользовательскому аккаунту станции (ТЗ §6).
-       После 5 неудачных попыток вход временно блокируется (счётчик в БД).</p>
+    <p class="muted login-note">{{ t('login_note') }}</p>
   </div>
 </div>
 {% endblock %}

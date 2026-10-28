@@ -13,6 +13,7 @@ from fastapi.responses import HTMLResponse, PlainTextResponse
 
 from ..systemd_units import show_unit
 from ..helper_client import HelperError, call_helper
+from ..i18n import translate
 
 router = APIRouter(prefix="/services")
 
@@ -38,9 +39,9 @@ async def run_action(request: Request, svc_id: str, action: str):
     state = request.app.state.panel
     svc = state.registry.by_id(svc_id)
     if svc is None:
-        return PlainTextResponse("Сервис не найден", status_code=404)
+        return PlainTextResponse(translate(state.i18n_lang, "svc_not_found"), status_code=404)
     if action not in _ACTIONS:
-        return PlainTextResponse("Недопустимое действие", status_code=400)
+        return PlainTextResponse(translate(state.i18n_lang, "bad_action"), status_code=400)
 
     # CSRF: токен формы должен совпасть с токеном сессии (ТЗ §6.1)
     try:
@@ -48,7 +49,7 @@ async def run_action(request: Request, svc_id: str, action: str):
     except Exception:  # noqa: BLE001
         form = {}
     if form.get("csrf") != request.state.csrf:
-        return PlainTextResponse("Недопустимый CSRF-токен", status_code=403)
+        return PlainTextResponse(translate(state.i18n_lang, "bad_csrf"), status_code=403)
 
     ip = request.client.host if request.client else ""
     user = request.state.session["username"]
@@ -67,11 +68,11 @@ async def run_action(request: Request, svc_id: str, action: str):
 
     # фактический результат systemd после действия (не сообщать успех заранее)
     info = await asyncio.to_thread(show_unit, svc.unit)
-    actual = f"{info.active}/{info.sub}" if info else "состояние недоступно"
+    lang = state.i18n_lang
+    actual = f"{info.active}/{info.sub}" if info else translate(lang, "sys_unavailable")
     body = await _render_action_result(
         request, svc_id, True,
-        f"systemd: действие «{action}» выполнено (код 0). Фактическое состояние юнита: {actual}. " \
-        f"Отображение статуса обновится в течение пары секунд (SSE).",
+        translate(lang, "action_done", action=action, actual=actual),
         status=actual,
     )
     return HTMLResponse(body, status_code=200)
@@ -83,7 +84,7 @@ async def settings(request: Request, svc_id: str):
     state = request.app.state.panel
     svc = state.registry.by_id(svc_id)
     if svc is None:
-        return PlainTextResponse("Сервис не найден", status_code=404)
+        return PlainTextResponse(translate(state.i18n_lang, "svc_not_found"), status_code=404)
     # Названия карт (как в nvidia-smi) по UUID — из последнего снапшота NVML
     snap = state.collector.snapshot if state.collector else None
     uuid_name = {}

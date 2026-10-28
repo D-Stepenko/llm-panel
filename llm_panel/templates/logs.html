@@ -1,11 +1,11 @@
 {% extends "base.html" %}
-{% block title %}Логи {{ svc.unit }} — llm-panel{% endblock %}
+{% block title %}{{ t('page_logs_title', unit=svc.unit) }}{% endblock %}
 {% block content %}
 <div class="page-head">
   <div>
     <div class="eyebrow"><span class="live-dot amber"></span>Journald</div>
-    <h1>Логи: {{ svc.name }}</h1>
-    <p class="subtitle"><code>{{ svc.unit }}</code> — последние {{ lines }} строк журнала.</p>
+    <h1>{{ t('logs_h1', name=svc.name) }}</h1>
+    <p class="subtitle"><code>{{ svc.unit }}</code> — {{ t('logs_subtitle', unit='', n=lines) }}</p>
   </div>
 </div>
 {% if err %}<div class="notice err">
@@ -14,20 +14,20 @@
 
 <div class="logs-controls">
   <form method="get" action="/services/{{ svc.id }}/logs">
-    <label>Строк:
+    <label>{{ t('logs_lines') }}
       <select name="lines">
         {% for n in [50, 200, 500, 1000] +%}
         <option value="{{ n }}" {{ 'selected' if lines == n else '' }}>{{ n }}</option>
         {% endfor %}
       </select>
     </label>
-    <button class="btn">Показать</button>
+    <button class="btn">{{ t('btn_show') }}</button>
   </form>
-  <a class="btn" href="/services/{{ svc.id }}/logs/download?lines={{ lines }}">Скачать</a>
-  <button id="follow-btn" type="button" class="btn">Поток</button>
-  <label>Фильтр: <input id="log-filter" type="text" value="{{ filt }}"></label>
+  <a class="btn" href="/services/{{ svc.id }}/logs/download?lines={{ lines }}">{{ t('btn_download') }}</a>
+  <button id="follow-btn" type="button" class="btn" data-follow="{{ t('logs_follow') }}" data-stop="{{ t('logs_following') }}">{{ t('logs_follow') }}</button>
+  <label>{{ t('logs_filter') }} <input id="log-filter" type="text" value="{{ filt }}"></label>
 </div>
 
-<pre id="log" class="logview" data-stream="/services/{{ svc.id }}/logs/stream?lines=50">{{ text }}</pre>
+<pre id="log" class="logview" data-stream="/services/{{ svc.id }}/logs/stream?lines=50" data-err="{{ t('logs_stream_err') }}">{{ text }}</pre>
 <script src="/static/logs.js" defer></script>
 {% endblock %}

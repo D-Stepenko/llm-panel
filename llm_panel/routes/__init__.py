@@ -1,5 +1,5 @@
 """Маршруты панели."""
 
-from . import auth, dashboard, services, logs  # noqa: F401
+from . import auth, dashboard, services, logs, config  # noqa: F401
 
-__all__ = ["auth", "dashboard", "services", "logs"]
+__all__ = ["auth", "dashboard", "services", "logs", "config"]

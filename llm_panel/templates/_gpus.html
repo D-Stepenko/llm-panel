@@ -2,7 +2,7 @@
 {% if g_list is none %}
 <div class="notice info">
   <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M12 8h.01M11 12h1v4h1"/></svg>
-  <span>Нет данных по GPU: NVML недоступен в этом окружении (на станции появятся значения).</span>
+  <span>{{ t('gpu_no_data') }}</span>
 </div>
 {% else %}
 <div class="gpu-grid">
@@ -14,30 +14,30 @@
     <div class="gpu-card-head">
       <div class="gpu-ident-txt">
         <div class="gpu-label">GPU {{ g.get('index') }}</div>
-        <div class="gpu-name">{{ g.get('name') or 'нет данных' }}</div>
+        <div class="gpu-name">{{ g.get('name') or t('no_data') }}</div>
       </div>
       {% if mem_pct %}<span class="load-pill {{ pill_tone }}">{{ mem_pct }}%</span>{% endif %}
     </div>
     <div class="gpu-body">
       <div class="host-row">
-        <span class="host-label">Видеопамять:</span>
-        <span class="host-val">{% if g.get('mem_used_mb') is not none %}{{ g.mem_used_mb | mem }} / {{ g.get('mem_total_mb') | mem }}{% else %}нет данных{% endif %}</span>
+        <span class="host-label">{{ t('gpu_mem') }}</span>
+        <span class="host-val">{% if g.get('mem_used_mb') is not none %}{{ g.mem_used_mb | mem }} / {{ g.get('mem_total_mb') | mem }}{% else %}{{ t('no_data') }}{% endif %}</span>
         {% if mem_pct %}<div class="host-track"><div class="mini-track"><span class="{{ tone }} p{{ mem_pct }}"></span></div></div>{% endif %}
       </div>
       <div class="host-row">
-        <span class="host-label">Мощность:</span>
-        <span class="host-val">{% if g.get('power_w') is not none %}{{ g.power_w }} Вт / {{ g.get('power_limit_w') | int }} Вт{% else %}нет данных{% endif %}</span>
+        <span class="host-label">{{ t('gpu_power') }}</span>
+        <span class="host-val">{% if g.get('power_w') is not none %}{{ g.power_w }} {{ t('unit_w') }} / {{ g.get('power_limit_w') | int }} {{ t('unit_w') }}{% else %}{{ t('no_data') }}{% endif %}</span>
         {% if g.get('power_pct') %}
         {% set ppct = g.power_pct %}
         <div class="host-track"><div class="mini-track"><span class="{{ 't-err' if ppct > 80 else ('t-warn' if ppct > 60) }} p{{ ppct }}"></span></div></div>
         {% endif %}
       </div>
       <div class="host-row">
-        <span class="host-label">Температура:</span>
-        <span class="host-val">{% if g.get('temp_c') is not none %}{{ g.temp_c }} °C{% else %}нет данных{% endif %}</span>
+        <span class="host-label">{{ t('gpu_temp') }}</span>
+        <span class="host-val">{% if g.get('temp_c') is not none %}{{ temp(g.temp_c) }}{% else %}{{ t('no_data') }}{% endif %}</span>
       </div>
       {% if g.get('assigned') %}
-      <div class="host-row"><span class="host-label">Сервисы:</span><span class="host-val">{% for s in g.assigned %}<code>{{ s }}</code> {% endfor %}</span></div>
+      <div class="host-row"><span class="host-label">{{ t('services') }}</span><span class="host-val">{% for s in g.assigned %}<code>{{ s }}</code> {% endfor %}</span></div>
       {% endif %}
     </div>
   </article>

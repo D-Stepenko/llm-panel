@@ -1,0 +1,298 @@
+"""Все локализуемые строки панели — в одном файле (ТЗ: единая точка локализации).
+
+Язык по умолчанию — английский. Добавление языка: новая секция в STRINGS
+с тем же набором ключей. Параметры подставляются через str.format: "{n}".
+"""
+
+from __future__ import annotations
+
+FALLBACK = "en"
+LANGS = ("en", "ru")
+
+STRINGS: dict[str, dict[str, str]] = {
+    "en": {
+        # --- навигация / шапка ---
+        "nav_status": "Statuses",
+        "nav_audit": "Audit",
+        "nav_aria": "Main navigation",
+        "role_admin": "Administrator",
+        "logout": "Sign out",
+        "config_panel": "Config Panel",
+        # --- статусы (главная) ---
+        "page_status_title": "Statuses — llm-panel",
+        "sse_warn": "Real-time updates unavailable (SSE is off). Showing the last snapshot.",
+        "services": "Services:",
+        "sort": "sort",
+        "sort_title": "Reorder service cards",
+        "save_order": "save",
+        "order_saved": "Order saved",
+        "order_save_err": "Failed to save order: ",
+        "order_no_cards": "Service cards not found",
+        # --- блок системы ---
+        "label_ram": "RAM:",
+        "label_swap": "Swap:",
+        "label_cpu": "CPU:",
+        "label_disk": "Disk:",
+        "available": "available",
+        "no_data": "n/a",
+        "cores_threads": "{n} cores / {m} threads",
+        "unit_ghz": "GHz",
+        "disk_free_of": "{free} GB free of {total} GB",
+        # --- GPU ---
+        "gpu_no_data": "No GPU data: NVML is unavailable in this environment (values will appear on the station).",
+        "gpu_mem": "Video memory:",
+        "gpu_power": "Power:",
+        "gpu_temp": "Temperature:",
+        "unit_w": "W",
+        # --- карточка сервиса ---
+        "state_stopped": "stopped",
+        "state_starting": "starting",
+        "state_ready": "running",
+        "state_stopping": "stopping",
+        "state_unhealthy": "unhealthy (was ready)",
+        "state_readiness_timeout": "not ready (timeout)",
+        "state_failed": "failed",
+        "state_missing_gpu": "missing GPU",
+        "state_unknown": "unknown",
+        "settings": "Settings",
+        "f_port": "Port",
+        "f_uptime": "Uptime",
+        "f_restarts": "Restarts",
+        "f_systemd": "Systemd",
+        "exited_ok": "exited (code 0)",
+        "f_gpu": "GPU",
+        "autostart_disable": "Disable autostart",
+        "autostart_disable_title": "Autostart is enabled — click to disable",
+        "autostart_enable": "Enable autostart",
+        "autostart_enable_title": "Autostart is disabled — click to enable",
+        "btn_start": "Start",
+        "btn_stop": "Stop",
+        "btn_restart": "Restart",
+        "no_services": "No services: fill in services.yaml (see deploy/services.yaml.example).",
+        # --- аудит ---
+        "page_audit_title": "Audit — llm-panel",
+        "audit_eyebrow": "Journal",
+        "audit_h1": "Audit log",
+        "audit_subtitle": "Last {n} events: logins, service actions and order changes.",
+        "audit_side": "Stored in the local panel DB · {n} entries",
+        "audit_empty": "No events.",
+        # --- вход ---
+        "page_login_title": "Sign in — llm-panel",
+        "login_eyebrow": "llm-panel · access",
+        "login_h1": "Sign in to the panel",
+        "login_user": "Username",
+        "login_pass": "Password",
+        "login_btn": "Sign in",
+        "login_note": ("Access to the panel is equivalent to access to the station user account (TZ §6). "
+                       "After 5 failed attempts, sign-in is temporarily blocked (counter kept in the DB)."),
+        "login_bad": "Wrong username or password.",
+        "login_attempts_left": " Attempts left: {n}.",
+        "login_locked": "Too many failed attempts. Try again in {m} min.",
+        "login_stale": "Form expired, please refresh the page.",
+        # --- логи ---
+        "page_logs_title": "Logs {unit} — llm-panel",
+        "logs_h1": "Logs: {name}",
+        "logs_subtitle": "{unit} — last {n} journal lines.",
+        "logs_lines": "Lines:",
+        "btn_show": "Show",
+        "btn_download": "Download",
+        "logs_follow": "Follow",
+        "logs_following": "Stop",
+        "logs_filter": "Filter:",
+        "logs_stream_err": "Stream error: ",
+        "svc_not_found": "Service not found",
+        # --- настройки сервиса ---
+        "page_settings_title": "Settings {name} — llm-panel",
+        "settings_eyebrow": "Configuration",
+        "settings_h1": "Settings: {name}",
+        "set_subtitle": "{unit} — description, status and settings",
+        "stage1_notice": ("Stage 1: mode {mode}. Fine-grained editing (Environment/ExecStart, config "
+                          "version/diff/rollback, GPU remapping) is stage 2 (TZ §11). "
+                          "Currently available: view and Start/Stop/Restart."),
+        "k_unit": "Unit",
+        "k_type": "Type",
+        "no_port": "no port",
+        "k_gpu_uuid": "GPU (UUID)",
+        "yes": "yes",
+        "no": "no",
+        "unit_s": "s",
+        "health_none": "no bind? add a healthcheck",
+        "btn_logs": "Logs",
+        "back_status": "← Back to statuses",
+        # --- результат действия ---
+        "res_success": "Success",
+        "res_error": "Error",
+        "res_done": "Done",
+        "action_done": ("systemd: action \"{action}\" completed (code 0). Actual unit state: {actual}. "
+                        "The status display will update within a few seconds (SSE)."),
+        "sys_unavailable": "state unavailable",
+        # --- служебные ответы ---
+        "bad_csrf": "Invalid CSRF token",
+        "bad_action": "Invalid action",
+        "auth_required": "Authorization required",
+        "bad_host": "Invalid Host",
+        "bad_origin": "Invalid Origin",
+        # --- Config Panel ---
+        "page_config_title": "Config Panel — llm-panel",
+        "config_eyebrow": "Configuration",
+        "config_h1": "Panel settings",
+        "config_subtitle": "Panel-wide settings. They apply to everyone using this panel.",
+        "cfg_language": "Language",
+        "cfg_temp": "Temperature unit",
+        "cfg_interval": "Refresh interval",
+        "cfg_interval_hint": "How often the panel collects metrics (SSE push)",
+        "cfg_audit_limit": "Audit entries shown",
+        "cfg_save": "Save",
+        "cfg_saved": "Settings saved.",
+        "unit_seconds": "s",
+    },
+    "ru": {
+        # --- навигация / шапка ---
+        "nav_status": "Статусы",
+        "nav_audit": "Аудит",
+        "nav_aria": "Основная навигация",
+        "role_admin": "Администратор",
+        "logout": "Выйти",
+        "config_panel": "Панель настроек",
+        # --- статусы (главная) ---
+        "page_status_title": "Статусы — llm-panel",
+        "sse_warn": "Обновление в реальном времени недоступно (SSE выключен). Показан последний снимок состояния.",
+        "services": "Сервисы:",
+        "sort": "sort",
+        "sort_title": "Изменить порядок карточек сервисов",
+        "save_order": "запомнить",
+        "order_saved": "Порядок сохранён",
+        "order_save_err": "Не удалось сохранить порядок: ",
+        "order_no_cards": "Карточки сервисов не найдены",
+        # --- блок системы ---
+        "label_ram": "RAM:",
+        "label_swap": "Swap:",
+        "label_cpu": "CPU:",
+        "label_disk": "Диск:",
+        "available": "доступно",
+        "no_data": "нет данных",
+        "cores_threads": "{n} ядер / {m} потоков",
+        "unit_ghz": "ГГц",
+        "disk_free_of": "{free} ГБ свободно из {total} ГБ",
+        # --- GPU ---
+        "gpu_no_data": "Нет данных по GPU: NVML недоступен в этом окружении (на станции появятся значения).",
+        "gpu_mem": "Видеопамять:",
+        "gpu_power": "Мощность:",
+        "gpu_temp": "Температура:",
+        "unit_w": "Вт",
+        # --- карточка сервиса ---
+        "state_stopped": "остановлен",
+        "state_starting": "запускается",
+        "state_ready": "запущен",
+        "state_stopping": "останавливается",
+        "state_unhealthy": "неисправен (был готов)",
+        "state_readiness_timeout": "не стал готов (тайм-аут)",
+        "state_failed": "сбой",
+        "state_missing_gpu": "отсутствует GPU",
+        "state_unknown": "неизвестно",
+        "settings": "Настройки",
+        "f_port": "Порт",
+        "f_uptime": "Время работы",
+        "f_restarts": "Перезапусков",
+        "f_systemd": "Systemd",
+        "exited_ok": "отработал (код 0)",
+        "f_gpu": "GPU",
+        "autostart_disable": "Отключить автозапуск",
+        "autostart_disable_title": "Автозапуск включён — нажмите, чтобы отключить",
+        "autostart_enable": "Включить автозапуск",
+        "autostart_enable_title": "Автозапуск выключен — нажмите, чтобы включить",
+        "btn_start": "Старт",
+        "btn_stop": "Стоп",
+        "btn_restart": "Рестарт",
+        "no_services": "Сервисов нет: заполните services.yaml (см. deploy/services.yaml.example).",
+        # --- аудит ---
+        "page_audit_title": "Аудит — llm-panel",
+        "audit_eyebrow": "Журнал",
+        "audit_h1": "Журнал аудита",
+        "audit_subtitle": "Последние {n} событий: входы, действия с сервисами и изменения порядка.",
+        "audit_side": "Записывается в локальную БД панели · {n} шт.",
+        "audit_empty": "Событий нет.",
+        # --- вход ---
+        "page_login_title": "Вход — llm-panel",
+        "login_eyebrow": "llm-panel · доступ",
+        "login_h1": "Вход в панель",
+        "login_user": "Логин",
+        "login_pass": "Пароль",
+        "login_btn": "Войти",
+        "login_note": ("Доступ к панели эквивалентен доступу к пользовательскому аккаунту станции (ТЗ §6). "
+                       "После 5 неудачных попыток вход временно блокируется (счётчик в БД)."),
+        "login_bad": "Неверный логин или пароль.",
+        "login_attempts_left": " Осталось попыток: {n}.",
+        "login_locked": "Слишком много неудачных попыток. Повторите через {m} мин.",
+        "login_stale": "Форма устарела, обновите страницу.",
+        # --- логи ---
+        "page_logs_title": "Логи {unit} — llm-panel",
+        "logs_h1": "Логи: {name}",
+        "logs_subtitle": "{unit} — последние {n} строк журнала.",
+        "logs_lines": "Строк:",
+        "btn_show": "Показать",
+        "btn_download": "Скачать",
+        "logs_follow": "Поток",
+        "logs_following": "Стоп",
+        "logs_filter": "Фильтр:",
+        "logs_stream_err": "Ошибка потока: ",
+        "svc_not_found": "Сервис не найден",
+        # --- настройки сервиса ---
+        "page_settings_title": "Параметры {name} — llm-panel",
+        "settings_eyebrow": "Конфигурация",
+        "settings_h1": "Параметры: {name}",
+        "set_subtitle": "{unit} — описание, статус и настройки",
+        "stage1_notice": ("Этап 1: режим {mode}. Тонкое редактирование (Environment/ExecStart, версия "
+                          "конфига/diff/rollback, переразметка GPU) — этап 2 ТЗ §11. "
+                          "Сейчас доступны просмотр и операции Start/Stop/Restart."),
+        "k_unit": "Юнит",
+        "k_type": "Тип",
+        "no_port": "без порта",
+        "k_gpu_uuid": "GPU (UUID)",
+        "yes": "да",
+        "no": "нет",
+        "unit_s": "сек",
+        "health_none": "бинд? добавьте healthcheck",
+        "btn_logs": "Логи",
+        "back_status": "← К статусам",
+        # --- результат действия ---
+        "res_success": "Успех",
+        "res_error": "Ошибка",
+        "res_done": "Готово",
+        "action_done": ("systemd: действие «{action}» выполнено (код 0). Фактическое состояние юнита: {actual}. "
+                        "Отображение статуса обновится в течение пары секунд (SSE)."),
+        "sys_unavailable": "состояние недоступно",
+        # --- служебные ответы ---
+        "bad_csrf": "Недопустимый CSRF-токен",
+        "bad_action": "Недопустимое действие",
+        "auth_required": "Требуется авторизация",
+        "bad_host": "Недопустимый Host",
+        "bad_origin": "Недопустимый Origin",
+        # --- Config Panel ---
+        "page_config_title": "Панель настроек — llm-panel",
+        "config_eyebrow": "Конфигурация",
+        "config_h1": "Настройки панели",
+        "config_subtitle": "Общие настройки панели. Действуют для всех, кто пользуется этой панелью.",
+        "cfg_language": "Язык",
+        "cfg_temp": "Единица температуры",
+        "cfg_interval": "Интервал обновления",
+        "cfg_interval_hint": "Как часто панель собирает метрики (SSE-толчок)",
+        "cfg_audit_limit": "Записей аудита на странице",
+        "cfg_save": "Сохранить",
+        "cfg_saved": "Настройки сохранены.",
+        "unit_seconds": "с",
+    },
+}
+
+
+def translate(lang: str, key: str, **params) -> str:
+    """Перевод ключа на язык lang (fallback — английский, затем сам ключ)."""
+    text = STRINGS.get(lang, {}).get(key)
+    if text is None:
+        text = STRINGS[FALLBACK].get(key, key)
+    if params:
+        try:
+            return text.format(**params)
+        except (KeyError, IndexError, ValueError):
+            return text
+    return text

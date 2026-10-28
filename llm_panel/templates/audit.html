@@ -1,13 +1,13 @@
 {% extends "base.html" %}
-{% block title %}Аудит — llm-panel{% endblock %}
+{% block title %}{{ t('page_audit_title') }}{% endblock %}
 {% block content %}
 <div class="page-head">
   <div>
-    <div class="eyebrow"><span class="live-dot blue"></span>Journal</div>
-    <h1>Журнал аудита</h1>
-    <p class="subtitle">Последние {{ rows | length }} событий: входы, действия с сервисами и изменения порядка.</p>
+    <div class="eyebrow"><span class="live-dot blue"></span>{{ t('audit_eyebrow') }}</div>
+    <h1>{{ t('audit_h1') }}</h1>
+    <p class="subtitle">{{ t('audit_subtitle', n=rows | length) }}</p>
   </div>
-  <div class="snapshot">Записывается в локальную БД панели · {{ rows | length }} шт.</div>
+  <div class="snapshot">{{ t('audit_side', n=rows | length) }}</div>
 </div>
 
 <div class="audit-card">
@@ -22,7 +22,7 @@
     </div>
   </div>
   {% else %}
-  <div class="audit-row"><div class="audit-msg muted">Событий нет.</div></div>
+  <div class="audit-row"><div class="audit-msg muted">{{ t('audit_empty') }}</div></div>
   {% endfor %}
 </div>
 {% endblock %}

@@ -8,6 +8,7 @@ from fastapi import APIRouter, Form, Request
 from fastapi.responses import HTMLResponse, RedirectResponse, PlainTextResponse
 
 from ..db import utcnow
+from ..i18n import translate
 from ..security import (
     SESSION_COOKIE,
     create_session,
@@ -60,7 +61,7 @@ async def login_submit(request: Request, username: str = Form(default=""),
 
     if not _consume_login_token(login_token):
         return state.render("login.html", request=request,
-                            error="Форма устарела, обновите страницу.",
+                            error=translate(state.i18n_lang, "login_stale"),
                             login_token=_issue_login_token())
 
     # ТЗ §6.1: ограничение попыток, счётчик в БД (переживает рестарт панели)
@@ -70,7 +71,8 @@ async def login_submit(request: Request, username: str = Form(default=""),
                  f"блокировка активна ещё {remain_s} c")
         return state.render(
             "login.html", request=request,
-            error=f"Слишком много неудачных попыток. Повторите через {max(1, remain_s // 60 + 1)} мин.",
+            error=translate(state.i18n_lang, "login_locked",
+                            m=max(1, remain_s // 60 + 1)),
             login_token=_issue_login_token(),
         )
 
@@ -82,9 +84,9 @@ async def login_submit(request: Request, username: str = Form(default=""),
         from ..security import _consecutive_failures
         n = _consecutive_failures(db, username)
         remaining = max(0, cfg.lockout_failures - n) if not locked else 0
-        err = "Неверный логин или пароль."
+        err = translate(state.i18n_lang, "login_bad")
         if remaining and remaining <= cfg.lockout_failures:
-            err += f" Осталось попыток: {remaining}."
+            err += translate(state.i18n_lang, "login_attempts_left", n=remaining)
         return state.render("login.html", request=request, error=err,
                             login_token=_issue_login_token())
 
@@ -115,7 +117,7 @@ async def logout(request: Request):
     form = await request.form()
     csrf_ok = bool(request.state.session) and form.get("csrf") == request.state.csrf
     if not csrf_ok:
-        return PlainTextResponse("Недопустимый CSRF-токен", status_code=403)
+        return PlainTextResponse(translate(state.i18n_lang, "bad_csrf"), status_code=403)
     delete_session(state.db, token)
     state.db.audit(request.client.host if request.client else "", user,
                    "logout", "panel", "ok", "")

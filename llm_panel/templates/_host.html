@@ -5,8 +5,8 @@
 <div class="host-card">
 
   <div class="host-row">
-    <span class="host-label">RAM:</span>
-    <span class="host-val">{% if ram_u is not none and ram_t %}{{ ram_u | mem }} / {{ ram_t | mem }} (доступно {{ ram_a | mem }}){% else %}нет данных{% endif %}</span>
+    <span class="host-label">{{ t('label_ram') }}</span>
+    <span class="host-val">{% if ram_u is not none and ram_t %}{{ ram_u | mem }} / {{ ram_t | mem }} ({{ t('available') }} {{ ram_a | mem }}){% else %}{{ t('no_data') }}{% endif %}</span>
     {% if ram_u is not none and ram_t %}
     {% set ram_pct = (ram_u / ram_t * 100) | round(0, 'common') | int %}
     <div class="host-track"><div class="mini-track"><span class="{{ 't-err' if ram_pct > 80 else ('t-warn' if ram_pct > 60) }} p{{ ram_pct }}"></span></div></div>
@@ -14,8 +14,8 @@
   </div>
 
   <div class="host-row">
-    <span class="host-label">Swap:</span>
-    <span class="host-val">{% if swp_t %}{{ swp_u | mem }} / {{ swp_t | mem }}{% else %}нет данных{% endif %}</span>
+    <span class="host-label">{{ t('label_swap') }}</span>
+    <span class="host-val">{% if swp_t %}{{ swp_u | mem }} / {{ swp_t | mem }}{% else %}{{ t('no_data') }}{% endif %}</span>
     {% if swp_t %}
     {% set swp_pct = (swp_u / swp_t * 100) | round(0, 'common') | int %}
     <div class="host-track"><div class="mini-track"><span class="{{ 't-err' if swp_pct > 80 }} p{{ swp_pct }}"></span></div></div>
@@ -23,9 +23,9 @@
   </div>
 
   <div class="host-row">
-    <span class="host-label">CPU:</span>
-    <span class="host-val">{% if h.get('cpu_model') or h.get('cpu_cores') %}{% if h.get('cpu_model') %}{{ h.cpu_model }}{% if h.get('cpu_cores') %} · {{ h.cpu_cores }} ядер / {{ h.get('cpu_threads') or '?' }} потоков{% endif %}{% if h.get('cpu_ghz') %} · {{ h.cpu_ghz }} ГГц{% endif %}{% if cpu_p is not none %} — {{ cpu_p | round(0, 'common') | int }} %{% endif %}{% else %}нет данных{% endif %}
-    {% else %}{% if cpu_p is not none %}{{ cpu_p | round(0, 'common') | int }} %{% else %}нет данных{% endif %}{% endif %}</span>
+    <span class="host-label">{{ t('label_cpu') }}</span>
+    <span class="host-val">{% if h.get('cpu_model') or h.get('cpu_cores') %}{% if h.get('cpu_model') %}{{ h.cpu_model }}{% if h.get('cpu_cores') %} · {{ t('cores_threads', n=h.cpu_cores, m=h.get('cpu_threads') or '?') }}{% endif %}{% if h.get('cpu_ghz') %} · {{ h.cpu_ghz }} {{ t('unit_ghz') }}{% endif %}{% if cpu_p is not none %} — {{ cpu_p | round(0, 'common') | int }} %{% endif %}{% else %}{{ t('no_data') }}{% endif %}
+    {% else %}{% if cpu_p is not none %}{{ cpu_p | round(0, 'common') | int }} %{% else %}{{ t('no_data') }}{% endif %}{% endif %}</span>
     {% if cpu_p is not none %}
     {% set cpu_pct = cpu_p | round(0, 'common') | int %}
     <div class="host-track"><div class="mini-track"><span class="{{ 't-err' if cpu_pct > 80 else ('t-warn' if cpu_pct > 60) }} p{{ cpu_pct }}"></span></div></div>
@@ -39,8 +39,8 @@
   {% set disk_pct = (ns.used / ns.total * 100) | round(0, 'common') | int %}
   {% endif %}
   <div class="host-row">
-    <span class="host-label">Диск:</span>
-    <span class="host-val">{% for d in h.disks %}{% if d[1] %}{{ d[0] }}: {{ d[2] | round(1) }} ГБ свободно из {{ d[1] | int }} ГБ{% else %}{{ d[0] }}: нет данных{% endif %}{{ ' · ' if not loop.last }}{% endfor %}</span>
+    <span class="host-label">{{ t('label_disk') }}</span>
+    <span class="host-val">{% for d in h.disks %}{% if d[1] %}{{ d[0] }}: {{ t('disk_free_of', free=d[2] | round(1), total=d[1] | int) }}{% else %}{{ d[0] }}: {{ t('no_data') }}{% endif %}{{ ' · ' if not loop.last }}{% endfor %}</span>
     {% if ns.total %}
     <div class="host-track"><div class="mini-track"><span class="{{ 't-err' if disk_pct >= 90 else ('t-warn' if disk_pct >= 80) }} p{{ disk_pct }}"></span></div></div>
     {% endif %}

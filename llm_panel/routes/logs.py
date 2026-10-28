@@ -17,6 +17,7 @@ from fastapi import APIRouter, Request
 from fastapi.responses import HTMLResponse, PlainTextResponse, StreamingResponse
 
 from ..helper_client import HelperError, call_helper, spawn_helper_follow
+from ..i18n import translate
 
 router = APIRouter(prefix="/services")
 
@@ -43,7 +44,7 @@ async def logs_page(request: Request, svc_id: str, lines: int = 200, filter: str
     state = request.app.state.panel
     svc = state.registry.by_id(svc_id)
     if svc is None:
-        return PlainTextResponse("Сервис не найден", status_code=404)
+        return PlainTextResponse(translate(state.i18n_lang, "svc_not_found"), status_code=404)
     n = _clamp_lines(lines, state.cfg)
     try:
         result = call_helper(state.cfg.helper_path, "journal", svc.unit, extra=(str(n),), timeout=30)
@@ -69,7 +70,7 @@ async def logs_stream(request: Request, svc_id: str, lines: int = 50):
     state = request.app.state.panel
     svc = state.registry.by_id(svc_id)
     if svc is None:
-        return PlainTextResponse("Сервис не найден", status_code=404)
+        return PlainTextResponse(translate(state.i18n_lang, "svc_not_found"), status_code=404)
     n = _clamp_lines(lines, state.cfg)
 
     async def gen():
@@ -123,13 +124,13 @@ async def logs_download(request: Request, svc_id: str, lines: int = 1000):
     state = request.app.state.panel
     svc = state.registry.by_id(svc_id)
     if svc is None:
-        return PlainTextResponse("Сервис не найден", status_code=404)
+        return PlainTextResponse(translate(state.i18n_lang, "svc_not_found"), status_code=404)
     n = _clamp_lines(lines, state.cfg)
     try:
         result = call_helper(state.cfg.helper_path, "journal", svc.unit, extra=(str(n),), timeout=30)
         text = _redact(result.stdout, state.cfg.redact_patterns)
     except HelperError as e:
-        text = f"ОШИБКА: {e.message}\n"
+        text = f"ERROR: {e.message}\n"
     max_bytes = state.cfg.log_download_max_mb * 1024 * 1024
     payload = text.encode("utf-8", "replace")[:max_bytes]
     return PlainTextResponse(
