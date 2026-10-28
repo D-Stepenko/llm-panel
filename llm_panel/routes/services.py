@@ -80,11 +80,21 @@ async def run_action(request: Request, svc_id: str, action: str):
             return HTMLResponse(body, status_code=200)
     else:
         # Проверки конфликтов — предупреждение (ТЗ §5.2); матрица GPU/RAM добавляется на этапе 2.
+        # Перезапуск/остановка ПАНЕЛИ «самой себя»: helper получает --no-block —
+        # systemd принимает задачу, панель успевает ответить браузеру до
+        # фактического stop (иначе HTTP-ответ рвётся посреди перезапуска,
+        # наблюдение станции 2026-10-28). Задача выполняется systemd всегда.
+        no_block = (action in ("restart", "stop")
+                    and svc.unit == state.cfg.panel_unit)
         try:
-            result = call_helper(state.cfg.helper_path, action, svc.unit, timeout=90)
+            result = call_helper(state.cfg.helper_path, action, svc.unit,
+                                 extra=("--no-block",) if no_block else (), timeout=90)
         except HelperError as e:
             db.audit(ip, user, action, svc.unit, "helper_error", e.message)
-            body = await _render_action_result(request, svc_id, False, e.message)
+            message = e.message
+            if e.kind == "denied" and svc.unit == state.cfg.panel_unit:
+                message += " " + translate(state.i18n_lang, "panel_allowlist_hint")
+            body = await _render_action_result(request, svc_id, False, message)
             return HTMLResponse(body, status_code=200)
 
         db.audit(ip, user, action, svc.unit, "ok" if result.ok else "failed",
@@ -94,9 +104,15 @@ async def run_action(request: Request, svc_id: str, action: str):
     info = await asyncio.to_thread(show_unit, svc.unit, 5.0, scope)
     lang = state.i18n_lang
     actual = f"{info.active}/{info.sub}" if info else translate(lang, "sys_unavailable")
+    message = translate(lang, "action_done", action=action, actual=actual)
+    # самоперезапуск/самоостановка панели: задача принята systemd (--no-block),
+    # подсказываем, что страница восстановится после рестарта сервиса
+    if (action in ("restart", "stop") and scope == "system"
+            and svc.unit == state.cfg.panel_unit):
+        message += " " + translate(lang, "panel_self_restart")
     body = await _render_action_result(
         request, svc_id, True,
-        translate(lang, "action_done", action=action, actual=actual),
+        message,
         status=actual,
     )
     return HTMLResponse(body, status_code=200)

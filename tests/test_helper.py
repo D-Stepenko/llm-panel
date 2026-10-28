@@ -101,6 +101,38 @@ def test_unknown_action_rejected():
     assert r.returncode == 2
 
 
+# ------------------------------- --no-block (самоперезапуск панели, 0.1.6) ----
+
+def test_no_block_accepted_for_restart():
+    r = run_helper(["restart", "vllm.service", "--no-block"])
+    assert r.returncode == 0
+    plan = json.loads(r.stdout)
+    assert plan["argv"] == ["systemctl", "restart", "--no-ask-password",
+                            "--no-block", "vllm.service"]
+
+
+def test_no_block_without_flag_unchanged():
+    r = run_helper(["restart", "vllm.service"])
+    assert r.returncode == 0
+    plan = json.loads(r.stdout)
+    assert plan["argv"] == ["systemctl", "restart", "--no-ask-password", "vllm.service"]
+
+
+def test_no_block_double_extra_rejected():
+    r = run_helper(["start", "vllm.service", "--no-block", "--something"])
+    assert r.returncode == 2
+
+
+def test_no_block_not_allowed_for_status():
+    r = run_helper(["status", "vllm.service", "--no-block"])
+    assert r.returncode == 2
+
+
+def test_status_with_extra_rejected():
+    r = run_helper(["status", "vllm.service", "anything"])
+    assert r.returncode == 2
+
+
 def test_broken_allowlist_is_refused():
     import tempfile
     tmp = tempfile.NamedTemporaryFile("w", suffix=".json", delete=False, encoding="utf-8")

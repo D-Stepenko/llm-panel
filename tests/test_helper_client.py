@@ -28,3 +28,10 @@ def test_known_codes_unchanged():
     assert _map_exit(3, "") == "отказано: юнит или операция вне allowlist (проверено самим helper)"
     assert _map_exit(2, "") == "ошибка аргументов helper"
     assert _map_exit(4, "Failed to stop vllm.service").startswith("systemd вернул ошибку:")
+
+
+def test_denied_includes_helper_reason():
+    """0.1.6: при отказе в сообщение включается точная причина от helper."""
+    msg = _map_exit(3, "ОТКАЗ: юнит llm-panel.service не внесён в allowlist\n")
+    assert msg.startswith("отказано: юнит или операция вне allowlist")
+    assert "llm-panel.service не внесён" in msg

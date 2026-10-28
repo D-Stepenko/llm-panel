@@ -126,12 +126,26 @@ def main() -> int:
         syslog.syslog(syslog.LOG_NOTICE, f"helper: действие {action} для {unit} не разрешено — отказ")
         return 3
 
-    # journal/journal-follow: единственный extra — количество строк (целое, ограничено)
-    if action in ("journal", "journal-follow") and action in actions:
-        extra = argv[2:]
+    # extra-аргументы: строгий белый список.
+    #  * journal/journal-follow — ровно один аргумент: число строк 1..5000;
+    #  * изменяющие действия — опционально ровно один флаг --no-block
+    #    (задача ставится в systemd без ожидания; нужен для перезапуска
+    #    панели «самой себя», иначе HTTP-ответ рвётся посреди stop-фазы);
+    #  * status/journal-follow — дополнительный extra запрещён.
+    MUTATING = ("start", "stop", "restart", "enable", "disable")
+    no_block = False
+    extra = argv[2:]
+    if action in ("journal", "journal-follow"):
         if len(extra) != 1 or not extra[0].isdigit() or not (1 <= int(extra[0]) <= JOURNAL_MAX_LINES):
             die(2, "journal принимает ровно один аргумент — целое 1..5000")
         lines = int(extra[0])
+    elif action in MUTATING:
+        if extra == ["--no-block"]:
+            no_block = True
+        elif extra:
+            die(2, "изменяющие действия принимают максимум один флаг --no-block")
+    elif extra:  # status
+        die(2, "status не принимает дополнительных аргументов")
 
     if dry_run:
         plan = {"action": action, "unit": unit, "allowed": True}
@@ -142,7 +156,8 @@ def main() -> int:
         elif action == "status":
             plan["argv"] = ["systemctl", "show", "--no-pager", unit]
         else:
-            plan["argv"] = ["systemctl", action, "--no-ask-password", unit]
+            plan["argv"] = ["systemctl", action, "--no-ask-password",
+                            *(["--no-block"] if no_block else []), unit]
         print(json.dumps(plan, ensure_ascii=False))
         syslog.syslog(syslog.LOG_INFO, f"helper: DRY-RUN {action} {unit} — валидация пройдена")
         return 0
@@ -200,7 +215,8 @@ def main() -> int:
             if rc < 0:
                 rc = 0
     else:
-        rc = run(["systemctl", action, "--no-ask-password", unit])
+        rc = run(["systemctl", action, "--no-ask-password",
+                  *(["--no-block"] if no_block else []), unit])
 
     syslog.syslog(syslog.LOG_INFO, f"helper: {action} {unit} -> rc={rc}")
     return rc

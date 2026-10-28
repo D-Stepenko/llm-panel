@@ -247,6 +247,76 @@ def test_display_csrf_required(authed_client):
     assert r.status_code == 403
 
 
+# ----------------------------------------------- самоперезапуск панели (0.1.6) --
+
+def test_panel_self_restart_uses_no_block(authed_client, monkeypatch):
+    """restart/stop для юнита ПАНЕЛИ идут с --no-block: ответ браузеру не рвётся."""
+    c = authed_client
+    import llm_panel.routes.services as svc_mod
+
+    captured = {}
+
+    def fake_call(helper_path, action, unit, extra=(), timeout=60.0):
+        captured["extra"] = extra
+        from llm_panel.helper_client import HelperResult
+        return HelperResult(ok=True, stdout="", stderr="", code=0)
+
+    monkeypatch.setattr(svc_mod, "call_helper", fake_call)
+    monkeypatch.setattr(svc_mod, "show_unit",
+                        lambda unit, timeout=5.0, scope="system": None)
+    r = c.post("/services/llm-panel/restart", data={"csrf": _csrf(c)},
+               headers={"host": "localhost"})
+    assert r.status_code == 200
+    assert captured["extra"] == ("--no-block",)
+    assert "page will reconnect" in r.text or "restarting" in r.text
+    # restart обычного сервиса — БЕЗ флага
+    r2 = c.post("/services/vllm/restart", data={"csrf": _csrf(c)},
+                headers={"host": "localhost"})
+    assert r2.status_code == 200
+    assert captured["extra"] == ()
+
+
+def test_panel_stop_uses_no_block_too(authed_client, monkeypatch):
+    c = authed_client
+    import llm_panel.routes.services as svc_mod
+
+    captured = {}
+
+    def fake_call(helper_path, action, unit, extra=(), timeout=60.0):
+        captured["extra"] = extra
+        from llm_panel.helper_client import HelperResult
+        return HelperResult(ok=True, stdout="", stderr="", code=0)
+
+    monkeypatch.setattr(svc_mod, "call_helper", fake_call)
+    monkeypatch.setattr(svc_mod, "show_unit",
+                        lambda unit, timeout=5.0, scope="system": None)
+    r = c.post("/services/llm-panel/stop", data={"csrf": _csrf(c)},
+               headers={"host": "localhost"})
+    assert r.status_code == 200
+    assert captured["extra"] == ("--no-block",)
+
+
+def test_panel_denied_shows_allowlist_hint(authed_client, monkeypatch):
+    """Отказ helper'а для юнита панели — с подсказкой про allowlist.json."""
+    c = authed_client
+    import llm_panel.routes.services as svc_mod
+    from llm_panel.helper_client import HelperError
+
+    def fake_call(helper_path, action, unit, extra=(), timeout=60.0):
+        raise HelperError(kind="denied", message="отказано: юнит или операция вне allowlist")
+
+    monkeypatch.setattr(svc_mod, "call_helper", fake_call)
+    r = c.post("/services/llm-panel/restart", data={"csrf": _csrf(c)},
+               headers={"host": "localhost"})
+    assert r.status_code == 200
+    assert "allowlist.json" in r.text
+    # отказ для ОБЫЧНОГО сервиса — без подсказки
+    r2 = c.post("/services/vllm/restart", data={"csrf": _csrf(c)},
+                headers={"host": "localhost"})
+    assert r2.status_code == 200
+    assert "allowlist.json" not in r2.text
+
+
 # ----------------------------------------------- поиск сервисов --------------
 
 def test_scan_lists_found_units(authed_client, monkeypatch):

@@ -44,7 +44,12 @@ class HelperResult:
 
 def _map_exit(code: int, stderr: str) -> str:
     if code == HELPER_EXIT_DENY:
-        return "отказано: юнит или операция вне allowlist (проверено самим helper)"
+        msg = "отказано: юнит или операция вне allowlist (проверено самим helper)"
+        detail = stderr.strip().splitlines()
+        if detail:
+            # точная причина от helper («юнит не внесён» / «действие не разрешено»)
+            msg += ": " + detail[0][:160]
+        return msg
     if code == HELPER_EXIT_USAGE:
         return "ошибка аргументов helper"
     if code == HELPER_EXIT_SYSTEMD:
