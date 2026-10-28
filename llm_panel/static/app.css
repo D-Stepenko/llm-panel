@@ -208,6 +208,7 @@ h1 { margin: 0; font-size: clamp(26px,3vw,34px); line-height: 1.14; letter-spaci
 .load-pill.pill-warn { color: var(--amber); border-color: var(--pill-warn-border); background: var(--pill-warn-bg); }
 .gpu-body { padding: 14px 18px 15px; display: flex; flex-direction: column; gap: 9px; }
 .gpu-body .host-label { min-width: 104px; }
+.gpu-planned { color: var(--muted); opacity: .75; }
 .gpu-tags { display: flex; flex-wrap: wrap; gap: 6px; }
 .tag { max-width: 100%; border-radius: 6px; border: 1px solid var(--tag-border); background: var(--surface-3); padding: 4px 7px; color: var(--tag-fg); font-size: 10px; font-weight: 650; overflow-wrap: anywhere; }
 .notice { display: flex; align-items: flex-start; gap: 12px; padding: 13px 15px; border: 1px solid var(--notice-border); border-radius: 12px; background: var(--notice-bg); margin-top: 14px; color: var(--notice-fg); font-size: 12px; }

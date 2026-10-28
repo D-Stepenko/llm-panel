@@ -19,7 +19,7 @@
       <div class="service-fields">
         <div class="field">
           <div class="field-label">{{ t('f_port') }}</div>
-          <div class="field-value">{% if svc.port %}{{ svc.bind_host or '?' }}:{{ svc.port }}{% else %}—{% endif %}</div>
+          <div class="field-value">{% if svc.port %}{{ svc.bind_host or '?' }}:{{ svc.port }}{% elif svc.listen %}<code>{{ svc.listen[0] }}</code> <span class="muted">{{ t('port_auto') }}</span>{% else %}—{% endif %}</div>
         </div>
         <div class="field">
           <div class="field-label">{{ t('f_uptime') }}</div>
@@ -35,7 +35,7 @@
         </div>
         <div class="field">
           <div class="field-label">{{ t('f_gpu') }}</div>
-          <div class="field-value">{% if svc.gpu_info %}{% for g in svc.gpu_info %}{% if g.name %}<code title="{{ g.uuid }}">{{ g.name }}</code>{% elif g.uuid %}<code title="{{ g.uuid }}">{{ g.uuid[-12:] }}</code>{% endif %}{% endfor %}{% else %}—{% endif %}</div>
+          <div class="field-value">{% if svc.gpu_actual %}{% for g in svc.gpu_actual %}{% if g.name %}<code title="{{ g.uuid }}">{{ g.name }}</code>{% else %}<code title="{{ g.uuid }}">{{ g.uuid[-12:] }}</code>{% endif %}{% endfor %} <span class="muted">{{ t('f_gpu_actual') }}</span>{% elif svc.gpu_info %}{% for g in svc.gpu_info %}{% if g.name %}<code title="{{ g.uuid }}">{{ g.name }}</code>{% elif g.uuid %}<code title="{{ g.uuid }}">{{ g.uuid[-12:] }}</code>{% endif %}{% endfor %}{% else %}—{% endif %}</div>
         </div>
       </div>
     </div>

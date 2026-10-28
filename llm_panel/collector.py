@@ -12,7 +12,11 @@ import dataclasses
 import datetime as _dt
 import time
 
+import psutil
+
+from . import health as health_mod
 from .metrics import build_gpu_rows
+from .registry import HealthDef
 from .status import DisplayState, STATE_RU, compute_display
 from .systemd_units import show_unit
 
@@ -45,6 +49,55 @@ def _uptime_s(info, now: float) -> float | None:
     return max(0.0, now - dt.timestamp())
 
 
+def _listen_ports(pid: int) -> list[int]:
+    """Порты, которые процесс и его потомки РЕАЛЬНО слушают (psutil).
+
+    Юниты без health-описания в services.yaml всё равно показывают
+    живость: если главный процесс или движок-ребёнок держит LISTEN —
+    по нему можно сделать настоящую TCP-проверку (не подмена состояния).
+    """
+    try:
+        root = psutil.Process(pid)
+        tree = [root, *root.children(recursive=True)]
+    except psutil.Error:
+        return []
+    ports: list[int] = []
+    for pr in tree:
+        try:
+            conns = pr.connections(kind="inet")
+        except psutil.Error:      # включая AccessDenied
+            continue
+        for c in conns:
+            if c.status == psutil.CONN_LISTEN and c.laddr and c.laddr.port not in ports:
+                ports.append(c.laddr.port)
+    return ports
+
+
+def _gpu_attribution(gpu_rows, pid_owner: dict[int, str]) -> dict[str, list]:
+    """Фактические владельцы карт по NVML-процессам (pid → сервис через pid_owner).
+
+    Возвращает svc_id -> [{uuid,index,name}]; попутно проставляет
+    proc["owner"] и g["services"] (список id фактических владельцев карты).
+    Работает и для юнитов БЕЗ привязки gpus в yaml: Maya, занявшая все
+    три карты, будет видна на каждой из них.
+    """
+    actual: dict[str, list] = {}
+    if not gpu_rows:
+        return actual
+    for g in gpu_rows:
+        owners: list[str] = []
+        for proc in g["procs"]:
+            owned = pid_owner.get(proc["pid"]) or ""
+            proc["owner"] = owned
+            if owned and owned not in owners:
+                owners.append(owned)
+        g["services"] = owners
+        for sid in owners:
+            actual.setdefault(sid, []).append(
+                {"uuid": g["uuid"], "index": g["index"], "name": g.get("name") or ""})
+    return actual
+
+
 class Collector:
     def __init__(self, cfg, registry, metrics, hub):
         self.cfg = cfg
@@ -59,6 +112,10 @@ class Collector:
         self._last_ready: dict[str, float] = {}     # unit -> прошлый успешный health ts
         self._last_health_check = 0.0
         self._health_cache: dict[str, object] = {}   # unit -> HealthResult
+        # Авто-health для юнитов БЕЗ health в yaml: TCP по фактически
+        # слушающему порту. Кэш сохраняется между циклами (проверка раз в
+        # health_interval), чтобы состояние не мигало «неизвестно/готов».
+        self._auto_health_cache: dict[str, object] = {}
         # Дополнительные юниты (Config Panel → «Настройка отображения сервисов»,
         # найденные «Поиском сервисов»): минимальные описания без services.yaml.
         # Меняется на ходу при сохранении настроек отображения.
@@ -110,21 +167,46 @@ class Collector:
                 None, show_unit, svc.unit, 5.0, getattr(svc, "scope", "system"))
             units[svc.unit] = info
 
+        # 1.5) фактические pid и слушающие порты (psutil от имени пользователя
+        # панели — соединения процессов того же пользователя читаются; у Maya
+        # порт 8010 слушает движок-ребёнок, поэтому смотрим и детей)
+        pid_owner: dict[int, str] = {}
+        listen: dict[str, list[int]] = {}    # unit -> отсортированные порты
+        for svc in all_defs:
+            info = units.get(svc.unit)
+            if info is None or not info.pid:
+                continue
+            pid_owner.setdefault(info.pid, svc.id)
+            ports = await loop.run_in_executor(None, _listen_ports, info.pid)
+            if ports:
+                listen[svc.unit] = sorted(ports)
+
         # 2) health-проверки (не чаще health_interval)
         now = time.time()
+        auto_health: dict[str, object] = {}
         if now - self._last_health_check >= self.cfg.health_interval:
             self._last_health_check = now
-            import llm_panel.health as health_mod
 
             for svc in all_defs:
-                if svc.health is None:
+                if svc.health is not None:
+                    result = await health_mod.run_health(svc.health)
+                    if result.ok:
+                        self._last_ready[svc.unit] = now
+                    self._health_cache[svc.unit] = result
                     continue
-                result = await health_mod.run_health(svc.health)
-                prev = self._health_cache.get(svc.unit)
+                # Авто-TCP-health для юнитов без health в yaml: проверяем
+                # ТОЛЬКО порт, который процесс сам слушает (реальная
+                # проверка, не подмена готовности — ТЗ §4.2).
+                ports = listen.get(svc.unit)
+                if not ports:
+                    self._auto_health_cache.pop(svc.unit, None)
+                    continue
+                hdef = HealthDef(kind="tcp", url=None, host="127.0.0.1",
+                                 port=ports[0], path="", timeout_s=3.0, interval_s=10.0)
+                result = await health_mod.run_health(hdef)
                 if result.ok:
-                    self._last_ready[svc.unit] = now
-                self._health_cache[svc.unit] = result
-                _ = prev
+                    self._last_ready.setdefault(svc.unit, now)
+                self._auto_health_cache[svc.unit] = result
 
         # 3) GPU и хост
         gpu_rows = await loop.run_in_executor(None, build_gpu_rows, self.metrics)
@@ -132,17 +214,15 @@ class Collector:
             warnings.append(self.metrics.nvml_error or "NVML недоступен (нет данных по GPU)")
         host = await loop.run_in_executor(None, self.metrics.read_host, tuple(self.model_roots))
         present_uuids = gpu_rows if gpu_rows is None else [g["uuid"] for g in gpu_rows]
+        gpu_actual = _gpu_attribution(gpu_rows, pid_owner)
 
         # 4) отображаемые состояния
         # названия карт (как в nvidia-smi) для отображения вместо UUID-хвостов
         uuid_name = {g["uuid"]: (g.get("name") or "") for g in gpu_rows} if gpu_rows else {}
         svc_rows = []
-        pid_owner: dict[int, str] = {}
         for svc in all_defs:
             info = units.get(svc.unit)
-            health = self._health_cache.get(svc.unit)
-            if info is not None and info.pid:
-                pid_owner.setdefault(info.pid, svc.id)
+            health = self._health_cache.get(svc.unit) or self._auto_health_cache.get(svc.unit)
             uptime_s = _uptime_s(info, now)
             disp = compute_display(
                 info,
@@ -164,11 +244,13 @@ class Collector:
                 "edit_mode": svc.edit_mode,
                 "port": svc.port,
                 "bind_host": svc.bind_host,
+                "listen": listen.get(svc.unit, [])[:2],
                 "gpus": list(svc.gpus),
                 "gpu_info": [
                     {"uuid": u, "name": uuid_name.get(u, "")}
                     for u in svc.gpus
                 ],
+                "gpu_actual": gpu_actual.get(svc.id, []),
                 "state": disp.state.value,
                 "state_ru": STATE_RU[disp.state.value],
                 "note": disp.note,

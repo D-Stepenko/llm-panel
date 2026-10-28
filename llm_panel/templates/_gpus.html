@@ -36,8 +36,11 @@
         <span class="host-label">{{ t('gpu_temp') }}</span>
         <span class="host-val">{% if g.get('temp_c') is not none %}{{ temp(g.temp_c) }}{% else %}{{ t('no_data') }}{% endif %}</span>
       </div>
+      {% if g.get('services') %}
+      <div class="host-row"><span class="host-label">{{ t('services') }}</span><span class="host-val">{% for s in g.services %}<code>{{ s }}</code> {% endfor %}</span></div>
+      {% endif %}
       {% if g.get('assigned') %}
-      <div class="host-row"><span class="host-label">{{ t('services') }}</span><span class="host-val">{% for s in g.assigned %}<code>{{ s }}</code> {% endfor %}</span></div>
+      <div class="host-row"><span class="host-label gpu-planned">{{ t('planned_binding') }}</span><span class="host-val gpu-planned">{% for s in g.assigned %}<code>{{ s }}</code> {% endfor %}</span></div>
       {% endif %}
     </div>
   </article>

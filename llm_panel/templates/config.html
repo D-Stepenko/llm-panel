@@ -153,7 +153,11 @@ EOF</code></pre>
     scope: {{ added_scope }}
     managed: adopted
     edit_mode: manage_only
-    # port/bind_host/health/gpus — заполнить по факту (для карточки не обязательны)</code></pre>
+    # port/bind_host/health/gpus — необязательны, но улучшают карточку:
+    # port: 8010
+    # bind_host: 127.0.0.1
+    # health: {kind: tcp, port: 8010}
+    # gpus: ["UUID-полностью", ...]   # панель и так покажет фактические карты (NVML)</code></pre>
     <div class="muted cfg-hint">{{ t('cfg_priv_yaml_hint') }}</div>
   </div>
   {% endif %}
