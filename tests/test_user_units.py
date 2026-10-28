@@ -113,9 +113,9 @@ def test_show_unit_user_argv(monkeypatch):
 
     class P:
         returncode = 0
-        stdout = ("ActiveState=active\nSubState=running\nResult=success\n"
-                  "ExecMainPID=1531\nExecMainStartTimestamp=\nNRestarts=0\n"
-                  "UnitFileState=enabled\n")
+        stdout = ("LoadState=loaded\nActiveState=active\nSubState=running\n"
+                  "Result=success\nExecMainPID=1531\nExecMainStartTimestamp=\n"
+                  "NRestarts=0\nUnitFileState=enabled\n")
         stderr = ""
 
     def fake_run(argv, **kw):
@@ -395,3 +395,44 @@ def test_collector_passes_scope(tmp_path, monkeypatch):
     assert seen.get("openclaw-gateway.service") == "user"
     row = next(r for r in snap.services if r["unit"] == "openclaw-gateway.service")
     assert row["scope"] == "user"
+
+
+# ------------------------------------------ show: LoadState gate -------------
+
+def test_info_from_show_not_found():
+    """Регрессия (баг 2026-10-28): systemctl show отвечает rc=0 и непустым
+    ActiveState (inactive) даже для НЕсуществующего юнита. Юнит определяется
+    по LoadState: not-found -> None, иначе добавлялись любые имена .service."""
+    from llm_panel.systemd_units import _info_from_show
+
+    out = ("LoadState=not-found\nActiveState=inactive\nSubState=dead\n"
+           "Result=success\nExecMainPID=0\nExecMainStartTimestamp=\n"
+           "ExecMainExitTimestamp=\nNRestarts=0\nUnitFileState=\n")
+    assert _info_from_show(out) is None
+
+
+def test_info_from_show_loaded():
+    from llm_panel.systemd_units import _info_from_show
+
+    out = ("LoadState=loaded\nActiveState=active\nSubState=running\n"
+           "Result=success\nExecMainPID=1234\nExecMainStartTimestamp=\n"
+           "ExecMainExitTimestamp=\nNRestarts=2\nUnitFileState=enabled\n")
+    info = _info_from_show(out)
+    assert info is not None
+    assert info.active == "active"
+    assert info.nrestarts == 2
+    assert info.unit_file_state == "enabled"
+    assert info.load_state == "loaded"
+
+
+def test_info_from_show_found_not_loaded():
+    """Юнит-файл есть, но юнит ни разу не стартовал (LoadState=found)."""
+    from llm_panel.systemd_units import _info_from_show
+
+    out = ("LoadState=found\nActiveState=inactive\nSubState=dead\n"
+           "Result=success\nExecMainPID=0\nExecMainStartTimestamp=\n"
+           "ExecMainExitTimestamp=\nNRestarts=0\nUnitFileState=disabled\n")
+    info = _info_from_show(out)
+    assert info is not None
+    assert info.load_state == "found"
+    assert info.active == "inactive"

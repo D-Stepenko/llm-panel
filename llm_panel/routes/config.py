@@ -8,6 +8,7 @@ from __future__ import annotations
 
 import asyncio
 import json
+import re
 from urllib.parse import quote
 
 from fastapi import APIRouter, Request
@@ -71,6 +72,14 @@ async def config_page(request: Request):
     # ключ проверяется по белому списку, чтобы из query не подставить произвольный.
     add_err = request.query_params.get("add_err") or ""
     add_err = add_err if add_err in _ADD_ERRORS else ""
+    # Блок «права панели» для только что добавленного юнита (?added=&scope=):
+    # имя проверяется UNIT_RE, scope — по белому списку, id — slug из имени.
+    added = request.query_params.get("added") or ""
+    if added and not UNIT_RE.match(added):
+        added = ""
+    added_scope = request.query_params.get("scope") or "system"
+    added_scope = added_scope if added_scope in ("user", "system") else "system"
+    added_id = re.sub(r"[^a-z0-9_-]+", "-", added.lower()).strip("-") or "new-unit"
     return state.render(
         "config.html",
         request=request,
@@ -78,6 +87,10 @@ async def config_page(request: Request):
         roots_error=request.query_params.get("err") == "roots",
         add_err=add_err,
         add_unit=request.query_params.get("unit", ""),
+        added=added,
+        added_scope=added_scope,
+        added_id=added_id,
+        registry_path=str(state.cfg.services_file),
         lang_value=state.i18n_lang,
         temp_value=state.temp_unit,
         theme_value=state.theme,
@@ -210,7 +223,8 @@ async def services_add(request: Request):
     ip = request.client.host if request.client else ""
     state.db.audit(ip, request.state.session["username"], "config", "services_add",
                    "ok", f"{scope}:{unit}")
-    return RedirectResponse("/config?saved=1", status_code=303)
+    return RedirectResponse(
+        f"/config?saved=1&added={quote(unit, safe='')}&scope={scope}", status_code=303)
 
 
 @router.post("/config/services-display")

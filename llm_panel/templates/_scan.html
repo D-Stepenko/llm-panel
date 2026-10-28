@@ -17,7 +17,7 @@
 {% if s.scope == 'user' %}{% set val = 'user:' ~ s.unit %}{% else %}{% set val = s.unit %}{% endif %}
 <label class="svc-display-row svc-extra">
   <input type="checkbox" name="extra_units" value="{{ val }}" checked>
-  <span><code>{{ val }}</code></span>
+  <span><code>{{ val }}</code>{% if s.scope == 'user' %} <span class="svc-scope-badge">{{ t('user_unit') }}</span>{% endif %}</span>
 </label>
 {% endfor %}
 

@@ -24,6 +24,7 @@ class UnitInfo:
     nrestarts: int
     unit_file_state: str
     error: str = ""
+    load_state: str = "" # LoadState ("loaded"/"found"/...; "not-found" = юнита нет)
 
 
 _PROPERTIES = [
@@ -35,6 +36,7 @@ _PROPERTIES = [
     "ExecMainExitTimestamp",
     "NRestarts",
     "UnitFileState",
+    "LoadState",
 ]
 
 _TIME_FORMATS = ("%a %Y-%m-%d %H:%M:%S %Z", "%a %Y-%m-%d %H:%M:%S")
@@ -96,11 +98,24 @@ def show_unit(unit: str, timeout: float = 5.0, scope: str = "system") -> UnitInf
 
     if proc.returncode != 0:
         return None
+    return _info_from_show(proc.stdout)
+
+
+def _info_from_show(stdout: str) -> UnitInfo | None:
+    """Разбор вывода `systemctl show --property=...`; None — юнита нет.
+
+    ВАЖНО: `systemctl show` (включая --user) отвечает кодом 0 и НЕПУСТЫМ
+    ActiveState (inactive) даже для несуществующего юнита — наличие юнита
+    проверяется по LoadState ("not-found" = юнита нет). Наблюдение станции
+    2026-10-28: через user-менеджер «находились» любые имена *.service.
+    """
     vals: dict[str, str] = {}
-    for line in proc.stdout.splitlines():
+    for line in stdout.splitlines():
         key, sep, value = line.partition("=")
         if sep:
             vals[key.strip()] = value.strip()
+    if vals.get("LoadState", "") in ("", "not-found"):
+        return None
     if not vals.get("ActiveState"):
         return None
     return UnitInfo(
@@ -112,6 +127,7 @@ def show_unit(unit: str, timeout: float = 5.0, scope: str = "system") -> UnitInf
         nrestarts=int(vals.get("NRestarts", "0") or 0),
         unit_file_state=vals.get("UnitFileState", ""),
         error="",
+        load_state=vals.get("LoadState", ""),
     )
 
 

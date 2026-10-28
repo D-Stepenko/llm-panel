@@ -110,5 +110,52 @@
     </form>
     <div class="muted cfg-hint">{{ t('cfg_scan_add_hint') }}</div>
   </div>
+
+  {% if added %}
+  {# Что ещё нужно, чтобы панель управляла юнитом: готовые команды для копирования
+     (allowlist — для system-юнитов) и блок services.yaml с фактическими путями. #}
+  <div class="cfg-priv-block" id="cfg-priv">
+    <h3 class="cfg-section-title">{{ t('cfg_priv_title') }}: <code>{{ added }}</code></h3>
+    {% if added_scope == 'user' %}
+      <div class="muted cfg-hint">{{ t('cfg_priv_user') }}</div>
+    {% else %}
+      <div class="muted cfg-hint">{{ t('cfg_priv_system_hint') }}</div>
+      <div class="copy-row">
+        <span class="copy-label">{{ t('cfg_priv_allowlist') }}</span>
+        <button type="button" class="action-btn btn-muted" data-copy="copy-allowlist" data-copy-ok="{{ t('copied') }}">{{ t('copy') }}</button>
+      </div>
+      <pre class="code-block"><code id="copy-allowlist">sudo python3 - <<'EOF'
+import json
+p = "/etc/llm-panel/allowlist.json"
+with open(p, encoding="utf-8") as f:
+    d = json.load(f)
+d["units"]["{{ added }}"] = {
+    "actions": ["start", "stop", "restart", "enable", "disable",
+                "status", "journal", "journal-follow"],
+}
+with open(p, "w", encoding="utf-8") as f:
+    json.dump(d, f, ensure_ascii=False, indent=2)
+EOF</code></pre>
+      <div class="copy-row">
+        <span class="copy-label">{{ t('cfg_priv_check') }}</span>
+        <button type="button" class="action-btn btn-muted" data-copy="copy-check" data-copy-ok="{{ t('copied') }}">{{ t('copy') }}</button>
+      </div>
+      <pre class="code-block"><code id="copy-check">sudo -n /usr/local/sbin/llm-panel-systemd status {{ added }}</code></pre>
+    {% endif %}
+    <div class="copy-row">
+      <span class="copy-label">{{ t('cfg_priv_yaml') }} <code>{{ registry_path }}</code>:</span>
+      <button type="button" class="action-btn btn-muted" data-copy="copy-yaml" data-copy-ok="{{ t('copied') }}">{{ t('copy') }}</button>
+    </div>
+    <pre class="code-block"><code id="copy-yaml">  - id: {{ added_id }}
+    name: "{{ added }}"
+    type: generic
+    unit: {{ added }}
+    scope: {{ added_scope }}
+    managed: adopted
+    edit_mode: manage_only
+    # port/bind_host/health/gpus — заполнить по факту (для карточки не обязательны)</code></pre>
+    <div class="muted cfg-hint">{{ t('cfg_priv_yaml_hint') }}</div>
+  </div>
+  {% endif %}
 </div>
 {% endblock %}

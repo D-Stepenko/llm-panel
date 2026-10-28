@@ -154,3 +154,18 @@
     if (order.active && e.key === "Escape") exitOrder("");
   });
 })();
+// --- Config Panel: кнопки «Копировать» в блоке прав добавленного юнита -------
+(function () {
+  "use strict";
+  document.addEventListener("click", function (e) {
+    var btn = e.target.closest("[data-copy]");
+    if (!btn) return;
+    var code = document.getElementById(btn.dataset.copy);
+    if (!code || !navigator.clipboard) return;
+    navigator.clipboard.writeText(code.textContent).then(function () {
+      var old = btn.textContent;
+      btn.textContent = btn.dataset.copyOk || "OK";
+      setTimeout(function () { btn.textContent = old; }, 1200);
+    }).catch(function () { /* нет доступа к буферу — текст можно выделить вручную */ });
+  });
+})();

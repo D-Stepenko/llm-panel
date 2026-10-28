@@ -412,7 +412,7 @@ def test_add_by_name_user_unit(authed_client, monkeypatch):
     r = c.post("/config/services-add", data={"unit": "my-new.service", "csrf": _csrf(c)},
                headers={"host": "localhost"}, follow_redirects=False)
     assert r.status_code == 303
-    assert "/config?saved=1" in r.headers["location"]
+    assert "/config?saved=1&added=my-new.service&scope=user" in r.headers["location"]
     stored = json.loads(c.app.state.panel.db.get_setting("extra_units"))
     assert "user:my-new.service" in stored
     assert "my-new.service" in c.app.state.panel.extra_defs
@@ -434,6 +434,7 @@ def test_add_by_name_system_fallback(authed_client, monkeypatch):
     r = c.post("/config/services-add", data={"unit": "maya-maya-m.service", "csrf": _csrf(c)},
                headers={"host": "localhost"}, follow_redirects=False)
     assert r.status_code == 303
+    assert "scope=system" in r.headers["location"]
     stored = json.loads(c.app.state.panel.db.get_setting("extra_units"))
     assert "maya-maya-m.service" in stored          # без префикса
     assert "user:maya-maya-m.service" not in stored
