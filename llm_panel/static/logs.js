@@ -11,13 +11,29 @@
   const errPrefix = pre.dataset.err || "Stream error: ";
   let es = null;
 
-  function applyFilter() {
-    const f = (filter.value || "").toLowerCase();
-    for (const line of pre.children) {           // при follow строки — <div>
-      line.hidden = f && !line.textContent.toLowerCase().includes(f);
+  // Сервер отдаёт журнал одним текстовым узлом; фильтр и поток работают
+  // построчно — нормализуем в <div> на строку один раз при загрузке.
+  if (pre.textContent && pre.children.length === 0) {
+    const lines = pre.textContent.split("\n");
+    pre.textContent = "";
+    for (const ln of lines) {
+      const div = document.createElement("div");
+      div.textContent = ln;
+      pre.appendChild(div);
     }
   }
-  if (filter) filter.addEventListener("input", applyFilter);
+
+  function applyFilter() {
+    const f = (filter.value || "").toLowerCase();
+    for (const line of pre.children) {           // строки — <div>
+      line.hidden = f && !line.textContent.toLowerCase().includes(f);
+    }
+    if (!f) pre.scrollTop = pre.scrollHeight;
+  }
+  if (filter) {
+    filter.addEventListener("input", applyFilter);
+    applyFilter();                               // значение могло прийти из GET ?filter=
+  }
 
   if (!btn || !streamURL) return;
 
@@ -40,7 +56,7 @@
     es.addEventListener("error", e => {
       const div = document.createElement("div");
       div.className = "log-error";
-      div.textContent = errPrefix + String(e.data || "");
+      div.textContent = errPrefix + (e.data != null && e.data !== undefined ? String(e.data) : "");
       pre.appendChild(div);
       stop();
     });

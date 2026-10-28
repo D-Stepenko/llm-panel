@@ -86,10 +86,14 @@ async def logs_stream(request: Request, svc_id: str, lines: int = 50):
     async def gen():
         proc = None
         try:
-            if is_user:
-                proc = spawn_user_follow(svc.unit, min(n, 200))
-            else:
-                proc = spawn_helper_follow(state.cfg.helper_path, svc.unit, min(n, 200))
+            try:
+                if is_user:
+                    proc = spawn_user_follow(svc.unit, min(n, 200))
+                else:
+                    proc = spawn_helper_follow(state.cfg.helper_path, svc.unit, min(n, 200))
+            except Exception as e:  # noqa: BLE001 — spawn-сбой должен быть ВИДЕН в UI,
+                yield _event("error", f"{type(e).__name__}: {e}")  # а не «Ошибка потока:»
+                return
             # helper либо отдаёт поток journalctl, либо сразу завершается (ошибка)
             assert proc.stdout is not None
             first = True
@@ -109,6 +113,13 @@ async def logs_stream(request: Request, svc_id: str, lines: int = 50):
                 yield _event("log", _redact(line, state.cfg.redact_patterns))
                 if await request.is_disconnected():
                     break
+        except GeneratorExit:
+            raise
+        except Exception as e:  # noqa: BLE001 — любая ошибка внутри потока видна клиенту
+            try:
+                yield _event("error", f"{type(e).__name__}: {e}")
+            except Exception:  # noqa: BLE001
+                pass
         finally:
             if proc is not None and proc.poll() is None:
                 try:

@@ -261,10 +261,16 @@ def create_app(config: PanelConfig) -> FastAPI:
     @app.get("/favicon.ico", include_in_schema=False)
     async def _favicon():
         svg = (
-            '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32">'
-            '<rect width="32" height="32" rx="6" fill="#171d29"/>'
-            '<path d="M16 5l9.5 5.5v11L16 27l-9.5-5.5v-11z" fill="none" stroke="#4f8cff" stroke-width="2.2"/>'
-            '<circle cx="16" cy="16" r="3.2" fill="#46c78c"/>'
+            '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64">'
+            '<rect width="64" height="64" rx="14" fill="#141a24"/>'
+            '<rect x="11" y="13" width="42" height="16" rx="4" fill="#223047"/>'
+            '<rect x="11" y="35" width="42" height="16" rx="4" fill="#223047"/>'
+            '<circle cx="19" cy="21" r="3.2" fill="#73e0c0"/>'
+            '<circle cx="19" cy="43" r="3.2" fill="#73e0c0"/>'
+            '<rect x="27" y="19.5" width="20" height="3" rx="1.5" fill="#3d5373"/>'
+            '<rect x="27" y="25" width="14" height="3" rx="1.5" fill="#3d5373"/>'
+            '<rect x="27" y="41.5" width="20" height="3" rx="1.5" fill="#3d5373"/>'
+            '<rect x="27" y="47" width="14" height="3" rx="1.5" fill="#3d5373"/>'
             "</svg>"
         )
         return Response(svg, media_type="image/svg+xml",

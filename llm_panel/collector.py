@@ -26,6 +26,25 @@ class Snapshot:
     warnings: list
 
 
+def _uptime_s(info, now: float) -> float | None:
+    """Время работы процесса юнита; None — если процесс не идёт.
+
+    ExecMainStartTimestamp сохраняется в systemd ДО выгрузки юнита (GC):
+    у остановленного юнита без проверки ActiveState счётчик «тиквал» на
+    месте бесконечно (наблюдение станции 2026-10-28: inactive/dead, а
+    время работы росло). Считаем только пока процесс реально идёт.
+    """
+    if info is None or not info.since:
+        return None
+    if info.active not in ("active", "activating", "deactivating"):
+        return None
+    try:
+        dt = _dt.datetime.fromisoformat(info.since)
+    except ValueError:
+        return None
+    return max(0.0, now - dt.timestamp())
+
+
 class Collector:
     def __init__(self, cfg, registry, metrics, hub):
         self.cfg = cfg
@@ -124,13 +143,7 @@ class Collector:
             health = self._health_cache.get(svc.unit)
             if info is not None and info.pid:
                 pid_owner.setdefault(info.pid, svc.id)
-            uptime_s = None
-            if info is not None and info.since:
-                try:
-                    dt = _dt.datetime.fromisoformat(info.since)
-                    uptime_s = max(0.0, now - dt.timestamp())
-                except ValueError:
-                    uptime_s = None
+            uptime_s = _uptime_s(info, now)
             disp = compute_display(
                 info,
                 health,
