@@ -36,6 +36,13 @@
           <option value="F" {{ 'selected' if temp_value == 'F' else '' }}>°F</option>
         </select>
       </dd>
+      <dt><label for="cfg-theme">{{ t('cfg_theme') }}</label></dt>
+      <dd>
+        <select id="cfg-theme" name="theme">
+          <option value="dark" {{ 'selected' if theme_value == 'dark' else '' }}>{{ t('theme_dark') }}</option>
+          <option value="light" {{ 'selected' if theme_value == 'light' else '' }}>{{ t('theme_light') }}</option>
+        </select>
+      </dd>
       <dt><label for="cfg-interval">{{ t('cfg_interval') }}</label></dt>
       <dd>
         <select id="cfg-interval" name="refresh_interval">

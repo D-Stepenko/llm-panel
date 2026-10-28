@@ -55,6 +55,7 @@ class AppState:
         self.i18n_lang: str = "en"     # язык интерфейса (по умолчанию английский)
         self.temp_unit: str = "C"      # единица температуры: C/F
         self.audit_limit: int = 30     # записей аудита на странице
+        self.theme: str = "dark"       # тема оформления: dark | light
         self.model_roots: list[str] = []   # пути для дисковой сводки (Config Panel)
 
 
@@ -88,6 +89,8 @@ def create_app(config: PanelConfig) -> FastAPI:
         state.i18n_lang = db.get_setting("lang") if db.get_setting("lang") in ("en", "ru") else "en"
         temp_unit = (db.get_setting("temp_unit") or "C").strip().upper()[:1]
         state.temp_unit = temp_unit if temp_unit in ("C", "F") else "C"
+        theme = (db.get_setting("theme") or "dark").strip().lower()
+        state.theme = theme if theme in ("dark", "light") else "dark"
         try:
             state.audit_limit = max(1, min(200, int(db.get_setting("audit_limit") or 30)))
         except (TypeError, ValueError):
@@ -126,6 +129,7 @@ def create_app(config: PanelConfig) -> FastAPI:
             ctx.setdefault("csrf", getattr(req.state, "csrf", "") or "")
         lang = state.i18n_lang
         ctx.setdefault("lang", lang)
+        ctx.setdefault("theme", state.theme)
 
         def t(key: str, **kw):
             return translate(lang, key, **kw)

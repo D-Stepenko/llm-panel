@@ -17,6 +17,7 @@ router = APIRouter()
 
 _LANGS = ("en", "ru")
 _TEMP_UNITS = ("C", "F")
+_THEMES = ("dark", "light")
 _INTERVALS = ("2", "3", "5", "10")        # секунд между снимками (SSE)
 _AUDIT_LIMITS = ("30", "50", "100", "200")  # записей аудита на странице
 _ROOTS_MAX = 8                            # максимум путей дисковой сводки
@@ -55,6 +56,7 @@ async def config_page(request: Request):
         roots_error=request.query_params.get("err") == "roots",
         lang_value=state.i18n_lang,
         temp_value=state.temp_unit,
+        theme_value=state.theme,
         interval_value=interval_value,
         audit_value=str(state.audit_limit),
         roots_value="\n".join(state.model_roots),
@@ -80,6 +82,16 @@ async def config_save(request: Request):
         # невалидные значения — просто вернуть форму без сохранения
         return RedirectResponse("/config", status_code=303)
 
+    # Тема: поле может отсутствовать (старая форма/тесты) — тогда не менять.
+    theme_detail = ""
+    if "theme" in form:
+        theme = str(form.get("theme", "")).strip().lower()
+        if theme not in _THEMES:
+            return RedirectResponse("/config", status_code=303)
+        state.theme = theme
+        state.db.set_setting("theme", theme)
+        theme_detail = f" theme={theme}"
+
     # Диски сводки: поле может отсутствовать (старая форма/тесты) — тогда не менять.
     roots_detail = ""
     if "model_roots" in form:
@@ -103,5 +115,5 @@ async def config_save(request: Request):
     ip = request.client.host if request.client else ""
     state.db.audit(ip, request.state.session["username"], "config", "panel", "ok",
                    f"lang={lang} temp={temp_unit} interval={interval} "
-                   f"audit_limit={audit_limit}{roots_detail}")
+                   f"audit_limit={audit_limit}{theme_detail}{roots_detail}")
     return RedirectResponse("/config?saved=1", status_code=303)

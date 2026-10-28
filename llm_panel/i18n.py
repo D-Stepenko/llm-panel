@@ -12,14 +12,14 @@ LANGS = ("en", "ru")
 STRINGS: dict[str, dict[str, str]] = {
     "en": {
         # --- навигация / шапка ---
-        "nav_status": "Statuses",
+        "nav_status": "Status",
         "nav_audit": "Audit",
         "nav_aria": "Main navigation",
         "role_admin": "Administrator",
         "logout": "Sign out",
         "config_panel": "Config Panel",
         # --- статусы (главная) ---
-        "page_status_title": "Statuses — llm-panel",
+        "page_status_title": "Status — llm-panel",
         "sse_warn": "Real-time updates unavailable (SSE is off). Showing the last snapshot.",
         "services": "Services:",
         "sort": "sort",
@@ -142,6 +142,9 @@ STRINGS: dict[str, dict[str, str]] = {
         "cfg_interval": "Refresh interval",
         "cfg_interval_hint": "How often the panel collects metrics (SSE push)",
         "cfg_audit_limit": "Audit entries shown",
+        "cfg_theme": "Theme",
+        "theme_dark": "Dark",
+        "theme_light": "Light",
         "cfg_roots": "Disks summary paths",
         "cfg_roots_hint": "One absolute path per line (up to 8). Disk usage is shown for these paths; missing paths display “n/a”. Applies immediately, no restart needed.",
         "cfg_roots_err": "Invalid paths: each line must be an absolute path starting with “/”, no duplicates, at most 8 lines.",
@@ -151,14 +154,14 @@ STRINGS: dict[str, dict[str, str]] = {
     },
     "ru": {
         # --- навигация / шапка ---
-        "nav_status": "Статусы",
+        "nav_status": "Статус",
         "nav_audit": "Аудит",
         "nav_aria": "Основная навигация",
         "role_admin": "Администратор",
         "logout": "Выйти",
         "config_panel": "Панель настроек",
         # --- статусы (главная) ---
-        "page_status_title": "Статусы — llm-panel",
+        "page_status_title": "Статус — llm-panel",
         "sse_warn": "Обновление в реальном времени недоступно (SSE выключен). Показан последний снимок состояния.",
         "services": "Сервисы:",
         "sort": "sort",
@@ -281,6 +284,9 @@ STRINGS: dict[str, dict[str, str]] = {
         "cfg_interval": "Интервал обновления",
         "cfg_interval_hint": "Как часто панель собирает метрики (SSE-толчок)",
         "cfg_audit_limit": "Записей аудита на странице",
+        "cfg_theme": "Тема",
+        "theme_dark": "Тёмная",
+        "theme_light": "Светлая",
         "cfg_roots": "Пути дисковой сводки",
         "cfg_roots_hint": "По одному абсолютному пути в строке (до 8). Для этих путей показывается занятость дисков; несуществующие пути дадут «нет данных». Применяется сразу, без рестарта панели.",
         "cfg_roots_err": "Неверные пути: каждая строка — абсолютный путь начиная с «/», без дубликатов, не более 8 строк.",

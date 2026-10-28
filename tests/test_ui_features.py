@@ -353,6 +353,58 @@ def test_config_model_roots_invalid_rejected(authed_client):
     assert "абсолютный путь" in err_page.text or "absolute path" in err_page.text
 
 
+# ----------------------------------------------- Config Panel: тема оформления
+def test_config_theme_saved_and_applied(authed_client):
+    """Тема: сохранение в settings + data-theme на <html> всех страниц."""
+    c = authed_client
+    page = c.get("/config", headers={"host": "localhost"})
+    csrf = re.search(r'name="csrf" value="([^"]+)"', page.text).group(1)
+    r = c.post("/config", data={"lang": "ru", "temp_unit": "C", "refresh_interval": "3",
+                                "audit_limit": "30", "theme": "light", "csrf": csrf},
+               headers={"host": "localhost"}, follow_redirects=False)
+    assert r.status_code == 303 and r.headers["location"] == "/config?saved=1"
+    panel = c.app.state.panel
+    assert panel.theme == "light"
+    assert panel.db.get_setting("theme") == "light"
+    page = c.get("/", headers={"host": "localhost"})
+    assert 'data-theme="light"' in page.text
+    login = c.get("/login", headers={"host": "localhost"}, follow_redirects=False)
+    # вошедшего редиректнет с /login — проверяем главную и config
+    cfg = c.get("/config", headers={"host": "localhost"})
+    assert 'data-theme="light"' in cfg.text
+    # обратно на тёмную
+    r = c.post("/config", data={"lang": "ru", "temp_unit": "C", "refresh_interval": "3",
+                                "audit_limit": "30", "theme": "dark", "csrf": csrf},
+               headers={"host": "localhost"}, follow_redirects=False)
+    assert r.status_code == 303
+    assert c.app.state.panel.theme == "dark"
+    page = c.get("/", headers={"host": "localhost"})
+    assert 'data-theme="dark"' in page.text
+
+
+def test_config_theme_invalid_rejected(authed_client):
+    c = authed_client
+    page = c.get("/config", headers={"host": "localhost"})
+    csrf = re.search(r'name="csrf" value="([^"]+)"', page.text).group(1)
+    r = c.post("/config", data={"lang": "ru", "temp_unit": "C", "refresh_interval": "3",
+                                "audit_limit": "30", "theme": "blue", "csrf": csrf},
+               headers={"host": "localhost"}, follow_redirects=False)
+    assert r.status_code == 303 and r.headers["location"] == "/config"
+    assert c.app.state.panel.theme == "dark"      # не изменилась
+
+
+def test_config_theme_absent_keeps_value(authed_client):
+    """Поле theme отсутствует (старый клиент) — тема не меняется."""
+    c = authed_client
+    page = c.get("/config", headers={"host": "localhost"})
+    csrf = re.search(r'name="csrf" value="([^"]+)"', page.text).group(1)
+    r = c.post("/config", data={"lang": "ru", "temp_unit": "C", "refresh_interval": "3",
+                                "audit_limit": "30", "csrf": csrf},
+               headers={"host": "localhost"}, follow_redirects=False)
+    assert r.status_code == 303 and r.headers["location"] == "/config?saved=1"
+    assert c.app.state.panel.theme == "dark"
+
+
 def test_config_model_roots_absent_keeps_value(authed_client):
     """Поле отсутствует в форме (старый клиент) — значение не трогается."""
     c = authed_client
