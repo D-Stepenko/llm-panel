@@ -49,6 +49,26 @@ def _parse_since(raw: str):
     return raw
 
 
+def _user_env() -> dict | None:
+    """Окружение для user-вызовов (systemctl --user / journalctl --user).
+
+    llm-panel — СИСТЕМНЫЙ сервис, работающий от пользователя-владельца юнитов
+    (dispot): у процесса нет XDG_RUNTIME_DIR, и без него systemctl --user
+    отвечает «Failed to connect to bus: No medium found» (наблюдение станции
+    2026-10-28: карточка user-юнита unknown, скан user-юнитов пуст). Явно
+    задаём runtime-каталог сессии этого пользователя /run/user/<uid>.
+    None — uid определить нельзя (Windows dev, вызовы и так не сработают).
+    """
+    import os
+    try:
+        uid = os.getuid()
+    except AttributeError:
+        return None
+    env = dict(os.environ)
+    env.setdefault("XDG_RUNTIME_DIR", f"/run/user/{uid}")
+    return env
+
+
 def show_unit(unit: str, timeout: float = 5.0, scope: str = "system") -> UnitInfo | None:
     """Состояние одного юнита; None при отсутствии юнита либо недоступности systemd.
 
@@ -67,7 +87,8 @@ def show_unit(unit: str, timeout: float = 5.0, scope: str = "system") -> UnitInf
     argv.append("--")
     argv.append(unit)
     try:
-        proc = subprocess.run(argv, capture_output=True, text=True, timeout=timeout)
+        proc = subprocess.run(argv, capture_output=True, text=True, timeout=timeout,
+                              env=_user_env() if scope == "user" else None)
     except FileNotFoundError:
         return None  # systemd недоступен (dev-режим на Windows и т.п.)
     except subprocess.TimeoutExpired:
@@ -94,13 +115,14 @@ def show_unit(unit: str, timeout: float = 5.0, scope: str = "system") -> UnitInf
     )
 
 
-def _run_list(argv: list[str], timeout: float):
+def _run_list(argv: list[str], timeout: float, env: dict | None = None):
     """subprocess.run для list-units (отделено для удобного monkeypatch в тестах).
 
     Возврат None — команда недоступна/таймаут (dev на Windows и т.п.).
     """
     try:
-        proc = subprocess.run(argv, capture_output=True, text=True, timeout=timeout)
+        proc = subprocess.run(argv, capture_output=True, text=True, timeout=timeout,
+                              env=env)
     except FileNotFoundError:
         return None
     except subprocess.TimeoutExpired:
@@ -145,7 +167,7 @@ def list_loaded_services(timeout: float = 10.0) -> list[dict] | None:
     out = _parse_list_output(proc.stdout)
     user_argv = ["systemctl", "--user", "list-units", "--type=service", "--all",
                  "--no-pager", "--no-legend", "--plain"]
-    uproc = _run_list(user_argv, timeout)
+    uproc = _run_list(user_argv, timeout, _user_env())
     if uproc is not None and uproc.returncode == 0:
         seen = {e["unit"] for e in out}
         for e in _parse_list_output(uproc.stdout):
@@ -171,7 +193,8 @@ def run_user_action(action: str, unit: str, timeout: float = 90.0) -> tuple[bool
         return False, "bad unit"
     argv = ["systemctl", "--user", action, "--no-ask-password", "--", unit]
     try:
-        proc = subprocess.run(argv, capture_output=True, text=True, timeout=timeout)
+        proc = subprocess.run(argv, capture_output=True, text=True, timeout=timeout,
+                              env=_user_env())
     except FileNotFoundError:
         return False, "systemctl --user недоступен (dev-среда?)"
     except subprocess.TimeoutExpired:
@@ -190,7 +213,8 @@ def journal_user_text(unit: str, lines: int, timeout: float = 10.0) -> tuple[int
     argv = ["journalctl", "--user", f"--unit={unit}", f"--lines={int(lines)}",
             "--no-pager", "--no-color"]
     try:
-        proc = subprocess.run(argv, capture_output=True, text=True, timeout=timeout)
+        proc = subprocess.run(argv, capture_output=True, text=True, timeout=timeout,
+                              env=_user_env())
     except FileNotFoundError:
         return 1, "journalctl недоступен (dev-среда)"
     except subprocess.TimeoutExpired:
@@ -205,7 +229,7 @@ def spawn_user_follow(unit: str, lines: int):
     argv = ["journalctl", "--user", f"--unit={unit}", f"--lines={int(lines)}",
             "--no-pager", "--no-color", "-f"]
     return subprocess.Popen(argv, stdout=subprocess.PIPE,
-                            stderr=subprocess.PIPE, text=True)
+                            stderr=subprocess.PIPE, text=True, env=_user_env())
 
 
 def list_unit_files(patterns: tuple[str, ...], timeout: float = 5.0) -> dict[str, str]:

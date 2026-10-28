@@ -29,6 +29,43 @@ from llm_panel.registry import make_display_def
 from llm_panel.systemd_units import UnitInfo
 
 
+def test_user_env_runtime_dir(monkeypatch):
+    """Для user-вызовов задаётся XDG_RUNTIME_DIR=/run/user/<uid> (из системного
+    сервиса шины нет — «No medium found»; фикс станции 2026-10-28)."""
+    import llm_panel.systemd_units as su
+
+    captured = {}
+
+    class P:
+        returncode = 0
+        stdout = ("ActiveState=active\nSubState=running\nResult=success\n"
+                  "ExecMainPID=7\nExecMainStartTimestamp=\nNRestarts=0\n"
+                  "UnitFileState=enabled\n")
+        stderr = ""
+
+    def fake_run(argv, text=None, capture_output=None, timeout=None, env=None):
+        captured["argv"] = argv
+        captured["env"] = env
+        return P()
+
+    monkeypatch.setattr(su.subprocess, "run", fake_run)
+    import os as _os
+    monkeypatch.setattr(_os, "getuid", lambda: 1000, raising=False)
+    su.show_unit("openclaw-gateway.service", scope="user")
+    assert captured["env"]["XDG_RUNTIME_DIR"] == "/run/user/1000"
+    # системный вызов — окружение не переопределяется
+    su.show_unit("vllm.service")
+    assert captured["env"] is None
+
+
+def test_user_env_no_uid_on_windows():
+    """На Windows uid нет — окружение не задаётся (dev)."""
+    import os
+    if not hasattr(os, "getuid"):
+        import llm_panel.systemd_units as su
+        assert su._user_env() is None
+
+
 # ----------------------------------------------- registry --------------------
 
 def test_scope_parsing(tmp_path):
@@ -110,7 +147,7 @@ def test_scan_merges_user_units(monkeypatch):
                  "cron.service  loaded  active  running  cron(user)\n"),
     }
 
-    def fake_run(argv, timeout=None):
+    def fake_run(argv, timeout=None, env=None):
         key = "user" if "--user" in argv else "system"
         return P(outputs[key])
 

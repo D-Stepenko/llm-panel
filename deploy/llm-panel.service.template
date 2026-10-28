@@ -16,6 +16,11 @@
 #   * ProtectSystem=strict требует явного ReadWritePaths= на каталог данных,
 #     иначе запись БД/аудита будет нарушена. Включайте sandbox-опции ПО ОДНОЙ
 #     с проверкой (nvml, запись БД, sudo -n … status <юнит> от имени пользователя).
+#   * XDG_RUNTIME_DIR: user-юниты (scope: user, напр. openclaw-gateway.service)
+#     панель вызывает напрямую systemctl --user / journalctl --user. Из
+#     системного сервиса переменной нет → «Failed to connect to bus: No medium
+#     found». Панель задаёт XDG_RUNTIME_DIR=/run/user/<uid> сама (systemd_units);
+#     дополнительно ничего в юните прописывать не нужно.
 
 [Unit]
 Description=LLM Panel — локальная веб-панель управления LLM-станцией
