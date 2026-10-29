@@ -17,6 +17,7 @@
 from __future__ import annotations
 
 import dataclasses
+import errno
 import os
 import re
 import shutil
@@ -78,6 +79,40 @@ def resolve_dest(root: str, subpath: str) -> tuple[str | None, str]:
     if not os.path.isdir(base):
         return None, "hf_err_root_missing"
     return dest, ""
+
+
+def _writable_err_key(e: OSError) -> str:
+    if e.errno == errno.EROFS:
+        return "hf_err_ro"
+    if e.errno in (errno.EACCES, errno.EPERM):
+        return "hf_err_perm"
+    return "hf_err_write"
+
+
+def check_writable(dest: str) -> str:
+    """Пробная запись в dest → "" или ключ ошибки i18n.
+
+    `hf download --local-dir` пишет метаданные ВНУТРИ каталога назначения
+    (<dest>/.cache/huggingface): на read-only ФС это EROFS, на чужих правах —
+    EACCES. Проверяем заранее (пробный файл создаётся и сразу удаляется),
+    чтобы показать внятное уведомление вместо падения загрузчика.
+    """
+    try:
+        os.makedirs(dest, exist_ok=True)
+    except OSError as e:
+        return _writable_err_key(e)
+    probe = os.path.join(dest, ".llm-panel-write-probe")
+    try:
+        fd = os.open(probe, os.O_CREAT | os.O_EXCL | os.O_WRONLY, 0o644)
+        os.close(fd)
+    except OSError as e:
+        return _writable_err_key(e)
+    finally:
+        try:
+            os.remove(probe)
+        except OSError:
+            pass
+    return ""
 
 
 @dataclasses.dataclass

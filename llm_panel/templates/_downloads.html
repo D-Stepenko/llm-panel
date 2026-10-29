@@ -17,12 +17,14 @@
       <div class="hf-job-side">
         <span class="badge hf-badge-{{ j.status }}">{{ t('hf_status_' ~ j.status) }}</span>
         {% if j.status == 'running' %}
-        <form method="post" action="/models/jobs/{{ j.id }}/stop">
+        <form method="post" action="/models/jobs/{{ j.id }}/stop"
+              hx-post="/models/jobs/{{ j.id }}/stop" hx-target="#hf-jobs" hx-swap="outerHTML">
           <input type="hidden" name="csrf" value="{{ csrf }}">
           <button class="action-btn btn-muted">{{ t('hf_stop') }}</button>
         </form>
         {% elif j.status in ('done', 'error', 'stopped') %}
-        <form method="post" action="/models/jobs/{{ j.id }}/clear">
+        <form method="post" action="/models/jobs/{{ j.id }}/clear"
+              hx-post="/models/jobs/{{ j.id }}/clear" hx-target="#hf-jobs" hx-swap="outerHTML">
           <input type="hidden" name="csrf" value="{{ csrf }}">
           <button class="action-btn btn-muted">{{ t('hf_clear') }}</button>
         </form>

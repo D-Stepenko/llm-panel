@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "llm-panel"
-version = "0.3.2"
+version = "0.3.3"
 description = "Локальная веб-панель управления LLM-станцией (ТЗ llm-panel-tz-reviewed.md, этап 1 MVP)"
 readme = "README.md"
 requires-python = ">=3.11"

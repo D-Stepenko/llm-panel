@@ -1,6 +1,7 @@
 """HF-загрузки (этап 3, v0.3.1): валидация, уведомление об отсутствии инструмента,
 жизненный цикл задач, роуты."""
 
+import errno
 import os
 import pathlib
 import re
@@ -154,6 +155,40 @@ def test_download_uses_custom_tool_path(tmp_path, monkeypatch):
     assert launched["tool"] == str(exe)
 
 
+# ------------------------------------------------ read-only destination ------
+
+def test_check_writable(tmp_path, monkeypatch):
+    """Пробная запись: обычный каталог → ""; EROFS → ключ hf_err_ro."""
+    d = tmp_path / "w"
+    d.mkdir()
+    assert hf.check_writable(str(d)) == ""
+
+    def fake_open(path, flags, *a, **k):
+        raise OSError(errno.EROFS, "Read-only file system")
+
+    monkeypatch.setattr(os, "open", fake_open)
+    assert hf.check_writable(str(d)) == "hf_err_ro"
+
+
+def test_download_readonly_dest_shows_notice(tmp_path, monkeypatch):
+    """read-only корень (как /home/dispot/models): уведомление вместо 500."""
+    c, state = _client(tmp_path)
+    monkeypatch.setattr(hf, "find_tool", lambda *a, **k: "/usr/bin/hf")
+    root = tmp_path / "models"
+    root.mkdir()
+    state.model_roots = [str(root)]
+    monkeypatch.setattr(hf, "check_writable", lambda dest: "hf_err_ro")
+    page = c.get("/models", headers={"host": "localhost"})
+    csrf = re.search(r'data-csrf="([^"]+)"', page.text).group(1)
+    r = c.post("/models/download", data={"repo": "ornith-ai/Ornith-1.5-35B-A3B-FP8",
+                                         "root": str(root), "subpath": "",
+                                         "csrf": csrf},
+               headers={"host": "localhost"})
+    assert r.status_code == 200
+    assert "READ-ONLY" in r.text
+    assert not state.hf_jobs          # задача не стартовала
+
+
 # ------------------------------------------------ роуты ----------------------
 
 def _client(tmp_path):
@@ -271,3 +306,4 @@ def test_fragment_polling_renders_jobs(tmp_path):
     assert frag.status_code == 200
     assert "x/y" in frag.text and "45%" in frag.text
     assert "hx-trigger=\"every 2s\"" in frag.text
+    assert 'hx-post="/models/jobs/job03/stop"' in frag.text   # стоп — без перехода со страницы

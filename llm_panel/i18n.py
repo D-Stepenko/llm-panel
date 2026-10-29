@@ -207,6 +207,12 @@ STRINGS: dict[str, dict[str, str]] = {
         "hf_err_root_missing": "Configured root directory does not exist.",
         "hf_err_busy": "Too many concurrent downloads (max 3) — wait or stop one.",
         "hf_err_no_job": "Download job not found (panel was probably restarted).",
+        "hf_err_ro": ("Destination directory is on a READ-ONLY filesystem — hf writes download "
+                      "metadata (.cache/huggingface) inside it. Create a writable directory "
+                      "(e.g. /home/<user>/models-in), add it in Config Panel → «Disks summary "
+                      "paths» and pick it as the destination."),
+        "hf_err_perm": "No write permission in the destination directory — pick another root.",
+        "hf_err_write": "Cannot write to the destination directory (unexpected error).",
         # --- настройки сервиса ---
         "page_settings_title": "Settings {name} — llm-panel",
         "settings_eyebrow": "Configuration",
@@ -485,6 +491,12 @@ STRINGS: dict[str, dict[str, str]] = {
         "hf_err_root_missing": "Заданный корневой каталог не существует.",
         "hf_err_busy": "Слишком много одновременных загрузок (максимум 3) — подождите или остановите одну.",
         "hf_err_no_job": "Задача не найдена (панель, вероятно, перезапускалась).",
+        "hf_err_ro": ("Каталог назначения — на read-only файловой системе: hf пишет метаданные "
+                      "загрузки (.cache/huggingface) внутри него. Создайте каталог, доступный "
+                      "на запись (например /home/dispot/models-in), добавьте его в Панели "
+                      "настроек → «Пути дисковой сводки» и выберите его каталогом назначения."),
+        "hf_err_perm": "Нет прав на запись в каталог назначения — выберите другой корень.",
+        "hf_err_write": "Не удалось записать в каталог назначения (неожиданная ошибка).",
         # --- настройки сервиса ---
         "page_settings_title": "Параметры {name} — llm-panel",
         "settings_eyebrow": "Конфигурация",

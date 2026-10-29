@@ -79,6 +79,42 @@ def _gguf_base(fname: str) -> str:
     return GGM_SHARD_RE.sub("", stem).rstrip("-. ")
 
 
+def _gguf_entry(d: pathlib.Path, ggufs: list[str], root: str) -> ModelEntry:
+    """Одна запись на каталог с GGUF.
+
+    Один шард-набор (или одиночный файл) → имя по файлу, квант из него.
+    Несколько РАЗНЫХ наборов (например talker+tokenizer, vocab+mmproj) →
+    одна запись с именем КАТАЛОГА: иначе каждая вспомогательная GGUF-часть
+    выглядела отдельной «моделью».
+    """
+    groups: dict[str, list[str]] = {}
+    for n in ggufs:
+        groups.setdefault(_gguf_base(n), []).append(n)
+    if len(groups) == 1:
+        base = sorted(groups)[0]
+        files = groups[base]
+        name = base
+        quant = _quant_from_name(base)
+    else:
+        files = sorted(n for fs in groups.values() for n in fs)
+        name = d.name
+        quants = [q for q in (_quant_from_name(b) for b in groups) if q]
+        quant = (max(set(quants), key=quants.count) if quants else "") \
+            or _quant_from_name(name)
+    size = 0
+    for n in files:
+        try:
+            size += (d / n).stat().st_size
+        except OSError:
+            pass
+    return ModelEntry(
+        name=name, path=str(d), root=root, kind="gguf",
+        size_bytes=size, n_files=len(files),
+        family=_family(name), quant=quant,
+        dtype="", model_type="",
+    )
+
+
 def _safetensors_info(d: pathlib.Path) -> tuple[str, str]:
     """(model_type, dtype) из config.json; пусто, если не читается."""
     model_type = dtype = ""
@@ -100,6 +136,7 @@ def scan_models(roots, max_depth: int = MAX_DEPTH_DEFAULT,
     models: list[ModelEntry] = []
     errors: list[str] = []
     roots_info: list[dict] = []
+    seen: set[str] = set()      # realpath каталога: симлинки и вложенные корни — без дублей
 
     for raw in roots or []:
         root = str(raw).strip()
@@ -121,6 +158,13 @@ def scan_models(roots, max_depth: int = MAX_DEPTH_DEFAULT,
             errors.append(f"{root}: {type(e).__name__}: {e}")
             continue
         for d in it:
+            try:
+                rp = os.path.realpath(d)
+            except OSError:
+                rp = str(d)
+            if rp in seen:      # симлинк или уже посещённый (вложенный корень)
+                continue
+            seen.add(rp)
             if len(models) >= max_entries:
                 errors.append(f"Достигнут лимит записей ({max_entries}) — каталог показан не весь")
                 break
@@ -130,23 +174,7 @@ def scan_models(roots, max_depth: int = MAX_DEPTH_DEFAULT,
                 continue
             ggufs = [n for n in names if n.lower().endswith(".gguf")]
             if ggufs:
-                # шард-группы внутри каталога: «model-00001-of-00003» → одна запись
-                groups: dict[str, list[str]] = {}
-                for n in ggufs:
-                    groups.setdefault(_gguf_base(n), []).append(n)
-                for base, files in sorted(groups.items()):
-                    size = 0
-                    for n in files:
-                        try:
-                            size += (d / n).stat().st_size
-                        except OSError:
-                            pass
-                    models.append(ModelEntry(
-                        name=base, path=str(d), root=root, kind="gguf",
-                        size_bytes=size, n_files=len(files),
-                        family=_family(base), quant=_quant_from_name(base),
-                        dtype="", model_type="",
-                    ))
+                models.append(_gguf_entry(d, ggufs, root))
             elif "config.json" in names:
                 model_type, dtype = _safetensors_info(d)
                 size, n_files = _dir_size(d)

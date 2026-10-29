@@ -133,6 +133,14 @@ async def download(request: Request):
                             data=data, roots=state.model_roots,
                             err=err_key, **ctx)
 
+    # hf пишет метаданные (.cache/huggingface) ВНУТРИ dest: read-only ФС или
+    # чужие права ловим заранее — иначе загрузчик падает Errno 30 / 500.
+    werr = hf.check_writable(dest)
+    if werr:
+        return state.render("models.html", request=request, version=__version__,
+                            data=data, roots=state.model_roots,
+                            err=werr, **ctx)
+
     if hf.active_count(_jobs(state)) >= hf.MAX_CONCURRENT:
         return state.render("models.html", request=request, version=__version__,
                             data=data, roots=state.model_roots,

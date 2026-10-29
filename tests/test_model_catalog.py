@@ -80,6 +80,45 @@ def test_scan_limits_and_missing_root(tmp_path):
     assert missing and missing[0]["path"].endswith("no-such")
 
 
+def test_scan_dedupes_nested_roots(tmp_path):
+    """Один и тот же каталог через корень и вложенно — не дублируется."""
+    m = tmp_path / "models"
+    a = m / "a"
+    a.mkdir(parents=True)
+    (a / "x-Q8_0.gguf").write_bytes(b"x" * 64)
+    result = scan_models([str(m), str(a)])
+    assert len(result["models"]) == 1
+
+
+def test_scan_dedupes_symlinked_dir(tmp_path):
+    """Симлинк на каталог модели (maya → Maya-M) не даёт второй записи."""
+    base = tmp_path / "models" / "Maya-M"
+    base.mkdir(parents=True)
+    (base / "model-IQ2_S.gguf").write_bytes(b"m" * 128)
+    link = tmp_path / "models" / "maya"
+    try:
+        link.symlink_to(base, target_is_directory=True)
+    except (OSError, NotImplementedError):
+        pytest.skip("symlinks unavailable on this platform/account")
+    result = scan_models([str(tmp_path / "models")])
+    assert len(result["models"]) == 1
+    assert pathlib.Path(result["models"][0].path).resolve() == base.resolve()
+
+
+def test_scan_multi_gguf_dir_grouped_as_one(tmp_path):
+    """Несколько разных GGUF в одном каталоге (talker/tokenizer) — одна запись."""
+    d = tmp_path / "models" / "qwen3-tts"
+    d.mkdir(parents=True)
+    (d / "qwen-talker-1.7b-base-Q8_0.gguf").write_bytes(b"a" * 10)
+    (d / "qwen-talker-1.7b-customvoice-Q8_0.gguf").write_bytes(b"b" * 20)
+    (d / "qwen-tokenizer-12hz-Q8_0.gguf").write_bytes(b"c" * 30)
+    result = scan_models([str(tmp_path / "models")])
+    assert len(result["models"]) == 1
+    e = result["models"][0]
+    assert e.name == "qwen3-tts" and e.n_files == 3 and e.size_bytes == 60
+    assert e.quant == "Q8_0"          # самый частый квант из имён файлов
+
+
 def test_human_bytes():
     assert human_bytes(None) == ""
     assert human_bytes(0) == "0 Б"
