@@ -6,6 +6,7 @@ import os
 import pathlib
 import re
 import sys
+import types
 
 import pytest
 
@@ -168,6 +169,48 @@ def test_check_writable(tmp_path, monkeypatch):
 
     monkeypatch.setattr(os, "open", fake_open)
     assert hf.check_writable(str(d)) == "hf_err_ro"
+
+
+# ------------------------------------------------ HF_HOME в песочнице -------
+
+def test_hf_env_redirects_cache(tmp_path):
+    """HF_HOME направляется в <data_dir>/hf-home (песочница закрывает ~/.cache)."""
+    st = types.SimpleNamespace(cfg=types.SimpleNamespace(
+        db_path=str(tmp_path / "d" / "panel.db")))
+    env = hf.hf_env(st)
+    assert env["HF_HOME"] == str(tmp_path / "d" / "hf-home")
+    assert (tmp_path / "d" / "hf-home").is_dir()
+
+
+def test_hf_env_fallback_when_unwritable(tmp_path):
+    """hf-home занят файлом → тихий откат к исходному окружению (без HF_HOME)."""
+    d = tmp_path / "d"
+    d.mkdir()
+    (d / "hf-home").write_text("x", encoding="utf-8")
+    st = types.SimpleNamespace(cfg=types.SimpleNamespace(db_path=str(d / "panel.db")))
+    env = hf.hf_env(st)
+    assert "HF_HOME" not in env
+
+
+def test_start_job_sets_hf_home_env(tmp_path, monkeypatch):
+    """Старт загрузки передаёт hf окружение с перенаправленным HF_HOME."""
+    import asyncio
+    st = types.SimpleNamespace(
+        cfg=types.SimpleNamespace(db_path=str(tmp_path / "d" / "panel.db")),
+        hf_jobs={})
+    captured = {}
+
+    async def fake_exec(*args, **kwargs):
+        captured["env"] = kwargs.get("env")
+        return types.SimpleNamespace(terminate=lambda: None)
+
+    async def fake_pump(proc, job):
+        pass
+
+    monkeypatch.setattr(asyncio, "create_subprocess_exec", fake_exec)
+    monkeypatch.setattr(hf, "_pump", fake_pump)
+    asyncio.run(hf.start_job(st, "/usr/bin/hf", "a/b", str(tmp_path / "d" / "dest")))
+    assert captured["env"]["HF_HOME"] == str(tmp_path / "d" / "hf-home")
 
 
 def test_download_readonly_dest_shows_notice(tmp_path, monkeypatch):

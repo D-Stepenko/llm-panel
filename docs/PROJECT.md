@@ -190,11 +190,20 @@ services.yaml, allowlist.json, systemd-юниты, sudoers. Редактор к�
   Причина на станции — НЕ read-only ФС, а песочница юнита панели
   (ProtectSystem=strict + ProtectHome=read-only): процесс панели (и его hf)
   может писать только в ReadWritePaths; исправление на станции — добавить
-  ReadWritePaths=/home/dispot/models в llm-panel.service; (2) кнопки Стоп/Убрать
+  ReadWritePaths=/home/dispot/models в llm-panel.service;
+  (2) кнопки Стоп/Убрать
   задач — hx-post (HTMX), без ухода на голый фрагмент; (3) каталог моделей:
   дедуп каталогов по realpath (симлинк maya → Maya-M и вложенные корни больше
   не дублируются) и одна запись на каталог с несколькими разными GGUF
   (talker/tokenizer/vocab/mmproj больше не отдельные «модели»).
+  Продолжение (0.3.4): после открытия /home/dispot/models загрузка больших
+  файлов всё равно ломалась — hf/xet пишут служебные данные в
+  ~/.cache/huggingface (refs/main, логи/чанки xet), закрытый
+  ProtectHome=read-only. Решение в коде: hf_env(state) направляет HF_HOME
+  процесса hf в <data_dir>/hf-home (каталог данных панели уже в
+  ReadWritePaths, создаются/проверяются пробной записью; при недоступности —
+  тихий откат к исходному окружению). Расширять песочницу на ~/.cache
+  больше не нужно.
 - **Этап 4**: Open WebUI-интеграция.
 
 ## 8. Известные ограничения

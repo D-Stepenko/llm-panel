@@ -19,6 +19,7 @@ from __future__ import annotations
 import dataclasses
 import errno
 import os
+import pathlib
 import re
 import shutil
 import time
@@ -137,6 +138,33 @@ def tail_text(job: HFJob) -> str:
     return "\n".join(job.tail)
 
 
+def hf_env(state) -> dict:
+    """Окружение для процесса hf: HF_HOME — в каталог данных панели.
+
+    Песочница юнита (ProtectHome=read-only) делает ~/.cache/huggingface
+    read-only: hf/xet пишут туда refs/логи/чанки — большие файлы ломаются
+    («Ignored error … refs/main», xet-логи, 0/31). Каталог данных панели
+    (/var/lib/llm-panel) уже в ReadWritePaths → кэш HF направляем в
+    <data_dir>/hf-home (создаём, проверяем пробной записью). Если каталог
+    данных недоступен — тихо оставляем исходное окружение.
+    """
+    env = os.environ.copy()
+    try:
+        db_path = getattr(getattr(state, "cfg", None), "db_path", "")
+        home = pathlib.Path(db_path).parent / "hf-home" if db_path else None
+        if not home:
+            return env
+        home.mkdir(parents=True, exist_ok=True)
+        probe = home / ".probe"
+        with open(probe, "x"):
+            pass
+        os.remove(probe)
+    except OSError:
+        return env
+    env["HF_HOME"] = str(home)
+    return env
+
+
 async def start_job(state, tool: str, repo: str, dest: str) -> HFJob:
     """Запуск `hf download <repo> --local-dir <dest>` как фоновой задачи."""
     import asyncio
@@ -148,6 +176,7 @@ async def start_job(state, tool: str, repo: str, dest: str) -> HFJob:
         stdout=asyncio.subprocess.PIPE,
         stderr=asyncio.subprocess.STDOUT,
         limit=8192,
+        env=hf_env(state),
     )
     job = HFJob(id=jid, repo=repo.strip(), dest=dest, proc=proc)
     state.hf_jobs[jid] = job
