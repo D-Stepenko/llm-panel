@@ -1,0 +1,116 @@
+{% extends "base.html" %}
+{% block title %}{{ t('wizard_h1') }}{% endblock %}
+{% block content %}
+<div class="page-head">
+  <div>
+    <div class="eyebrow"><span class="live-dot blue"></span>{{ t('wizard_eyebrow') }}</div>
+    <h1>{{ t('wizard_h1') }}</h1>
+    <p class="subtitle">{{ t('wizard_subtitle') }}</p>
+  </div>
+</div>
+
+{% if err %}<div class="notice err">
+  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><path d="M12 9v4m0 4h.01M10.3 3.9 1.8 18a2 2 0 0 0 1.7 3h17a2 2 0 0 0 1.7-3L13.7 3.9a2 2 0 0 0-3.4 0z"/></svg>
+  <span>{{ t('wizard_err_no_model') }}</span>
+</div>{% endif %}
+
+{% if step == 1 %}
+<div class="page-card">
+  <h3 class="cfg-section-title">{{ t('wizard_step1_title') }}</h3>
+  {% if data.models %}
+  <form method="post" action="/wizard/select" class="wizard-form">
+    <input type="hidden" name="csrf" value="{{ csrf }}">
+    <div class="wizard-models">
+      {% for m in data.models %}
+      <label class="wizard-model">
+        <input type="radio" name="model" value="{{ m.path }}" required>
+        <span class="wizard-model-name">{{ m.name }}</span>
+        <span class="badge">{{ 'GGUF' if m.kind == 'gguf' else 'safetensors' }}</span>
+        {% if m.quant %}<span class="badge">{{ m.quant }}</span>{% endif %}
+        <span class="muted wizard-model-path"><code>{{ m.path }}</code></span>
+      </label>
+      {% endfor %}
+    </div>
+    <button class="order-btn">{{ t('wizard_next') }}</button>
+  </form>
+  {% else %}
+  <div class="muted cfg-hint">{{ t('wizard_none') }}</div>
+  {% endif %}
+</div>
+
+{% elif step == 2 %}
+<div class="page-card">
+  <h3 class="cfg-section-title">{{ t('wizard_step2_title') }}</h3>
+  <p class="muted cfg-hint"><code>{{ entry.path }}</code></p>
+  {% if port_err %}<div class="notice err">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><path d="M12 9v4m0 4h.01M10.3 3.9 1.8 18a2 2 0 0 0 1.7 3h17a2 2 0 0 0 1.7-3L13.7 3.9a2 2 0 0 0-3.4 0z"/></svg>
+    <span>{{ t(port_err, min=ports_min, max=ports_max) }}</span>
+  </div>{% endif %}
+  <form method="post" action="/wizard" class="wizard-form">
+    <input type="hidden" name="csrf" value="{{ csrf }}">
+    <input type="hidden" name="model" value="{{ entry.path }}">
+    <dl class="kv">
+      <dt><label for="wz-engine">{{ t('wizard_engine') }}</label></dt>
+      <dd>
+        <select id="wz-engine" name="engine">
+          <option value="llamacpp" {{ 'selected' if engine == 'llamacpp' else '' }}>llama.cpp (GGUF)</option>
+          <option value="vllm" {{ 'selected' if engine == 'vllm' else '' }}>vLLM (safetensors)</option>
+        </select>
+      </dd>
+      <dt><label for="wz-unit">{{ t('wizard_unit') }}</label></dt>
+      <dd><input id="wz-unit" type="text" name="unit" value="{{ unit }}" spellcheck="false" required></dd>
+      <dt><label for="wz-port">{{ t('wizard_port') }}</label></dt>
+      <dd>
+        <input id="wz-port" type="number" name="port" value="{{ port if port else '' }}"
+               min="{{ ports_min }}" max="{{ ports_max }}">
+        <div class="muted cfg-hint">{{ t('wizard_port_hint', min=ports_min, max=ports_max) }}</div>
+      </dd>
+    </dl>
+    <div class="wizard-gpus">
+      <div class="cfg-section-title">{{ t('wizard_gpus') }}</div>
+      {% for g in gpus %}
+      <label class="wizard-gpu">
+        <input type="checkbox" name="gpus" value="{{ g.uuid }}">
+        <span>#{{ g.index if g.index is not none else '?' }} {{ g.name }}</span>
+        {% if g.mem_total_mb %}<span class="muted">{{ (g.mem_total_mb / 1024) | round(0, 'floor') | int }} ГБ</span>{% endif %}
+        {% if g.planned_by %}<span class="badge">{{ t('wizard_gpu_planned', ids=g.planned_by | join(', ')) }}</span>{% endif %}
+        {% if g.actual_by %}<span class="badge">{{ t('wizard_gpu_actual', ids=g.actual_by | join(', ')) }}</span>{% endif %}
+      </label>
+      {% endfor %}
+      {% if not gpus %}<div class="muted cfg-hint">{{ t('wizard_gpu_none') }}</div>{% endif %}
+    </div>
+    <button class="order-btn">{{ t('wizard_generate') }}</button>
+  </form>
+</div>
+
+{% elif step == 3 %}
+<div class="page-card">
+  <h3 class="cfg-section-title">{{ t('wizard_result_h') }}</h3>
+  <p class="muted cfg-hint">{{ entry.name }} · {{ engine }} · {{ t('wizard_port') }} {{ port }} · {{ gpus | length }} GPU</p>
+  {% for w in conflicts %}
+  <div class="notice err">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><path d="M12 9v4m0 4h.01M10.3 3.9 1.8 18a2 2 0 0 0 1.7 3h17a2 2 0 0 0 1.7-3L13.7 3.9a2 2 0 0 0-3.4 0z"/></svg>
+    <span>{{ w }}</span>
+  </div>
+  {% endfor %}
+  <pre class="code-block wizard-snippet"><code>{{ yaml_text }}</code></pre>
+</div>
+
+<div class="page-card">
+  <h3 class="cfg-section-title">{{ t('wizard_unit_h') }}</h3>
+  <pre class="code-block wizard-snippet"><code>{{ unit_text }}</code></pre>
+</div>
+
+<div class="page-card">
+  <h3 class="cfg-section-title">{{ t('wizard_steps_h') }}</h3>
+  <ol class="wizard-steps">
+    <li>{{ t('wizard_step_files', unit=unit) }}</li>
+    <li>{{ t('wizard_step_daemon', unit=unit) }}</li>
+    <li>{{ t('wizard_step_yaml', file=services_file) }}</li>
+  </ol>
+  <form method="get" action="/wizard">
+    <button class="action-btn btn-muted">{{ t('wizard_back') }}</button>
+  </form>
+</div>
+{% endif %}
+{% endblock %}
