@@ -70,6 +70,13 @@ NVML на момент запуска.
   sudo отвергается до аутентификации) и `systemctl show`. Исправление: убрать
   `NoNewPrivileges=yes`, `daemon-reload`, restart. Урок зашит в
   `deploy/llm-panel.service.template`.
+- **2026-10-29, инцидент «HF-загрузка: Errno 30 EROFS»**: `/home/dispot/models`
+  принадлежит dispot и доступна на запись, но процесс панели (и его дочерний
+  `hf download`) живёт в песочнице юнита (`ProtectSystem=strict`,
+  `ProtectHome=read-only`) → весь /home read-only вне `ReadWritePaths`.
+  Исправление: добавить `ReadWritePaths=/home/dispot/models` в [Service]
+  юнита llm-panel.service → `daemon-reload` → restart. Панель ловит это
+  заранее пробной записью и показывает инструкцию (v0.3.3).
 - sudoers `/etc/sudoers.d/llm-panel` (dispot → helper, NOPASSWD) установлен
   2026-10-28 с подтверждения владельца, `visudo -c` — OK.
 - Версия 0.1.1: универсализация (install.sh, шаблоны деплоя, диски в Панели

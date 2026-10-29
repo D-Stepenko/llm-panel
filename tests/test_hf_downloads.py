@@ -185,7 +185,7 @@ def test_download_readonly_dest_shows_notice(tmp_path, monkeypatch):
                                          "csrf": csrf},
                headers={"host": "localhost"})
     assert r.status_code == 200
-    assert "READ-ONLY" in r.text
+    assert "ReadWritePaths" in r.text          # инструкция по песочнице юнита
     assert not state.hf_jobs          # задача не стартовала
 
 

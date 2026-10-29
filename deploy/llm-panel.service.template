@@ -16,6 +16,10 @@
 #   * ProtectSystem=strict требует явного ReadWritePaths= на каталог данных,
 #     иначе запись БД/аудита будет нарушена. Включайте sandbox-опции ПО ОДНОЙ
 #     с проверкой (nvml, запись БД, sudo -n … status <юнит> от имени пользователя).
+#   * Всё, куда панель должна писать (каталог данных, каталоги моделей для
+#     HF-загрузок, …), перечислите в ReadWritePaths= — иначе ProtectSystem=strict
+#     / ProtectHome=read-only дадут дочернему `hf download` Errno 30 (EROFS),
+#     и панель покажет уведомление с этой инструкцией.
 #   * XDG_RUNTIME_DIR: user-юниты (scope: user, напр. openclaw-gateway.service)
 #     панель вызывает напрямую systemctl --user / journalctl --user. Из
 #     системного сервиса переменной нет → «Failed to connect to bus: No medium
