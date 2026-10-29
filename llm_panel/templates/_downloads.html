@@ -1,0 +1,37 @@
+{# Фрагмент списка HF-загрузок: HTMX-поллинг каждые 2 с (CSP-safe, без inline JS). #}
+<div id="hf-jobs" hx-get="/models/jobs" hx-trigger="every 2s" hx-swap="outerHTML">
+  {% if jobs %}
+  <div class="hf-jobs">
+    {% for j in jobs %}
+    <div class="hf-job hf-job-{{ j.status }}">
+      <div class="hf-job-main">
+        <div class="hf-job-title">
+          <span class="hf-dot {{ 'hf-dot-run' if j.status == 'running' else ('hf-dot-ok' if j.status == 'done' else 'hf-dot-err') }}"></span>
+          {{ j.repo }}
+          <span class="muted"> → <code>{{ j.dest }}</code></span>
+        </div>
+        {% if j.tail %}
+        <pre class="code-block hf-tail"><code>{{ j.tail | join('\n') | e }}</code></pre>
+        {% endif %}
+      </div>
+      <div class="hf-job-side">
+        <span class="badge hf-badge-{{ j.status }}">{{ t('hf_status_' ~ j.status) }}</span>
+        {% if j.status == 'running' %}
+        <form method="post" action="/models/jobs/{{ j.id }}/stop">
+          <input type="hidden" name="csrf" value="{{ csrf }}">
+          <button class="action-btn btn-muted">{{ t('hf_stop') }}</button>
+        </form>
+        {% elif j.status in ('done', 'error', 'stopped') %}
+        <form method="post" action="/models/jobs/{{ j.id }}/clear">
+          <input type="hidden" name="csrf" value="{{ csrf }}">
+          <button class="action-btn btn-muted">{{ t('hf_clear') }}</button>
+        </form>
+        {% endif %}
+      </div>
+    </div>
+    {% endfor %}
+  </div>
+  {% else %}
+  <div class="muted cfg-hint">{{ t('hf_none') }}</div>
+  {% endif %}
+</div>

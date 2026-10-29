@@ -22,6 +22,13 @@
 </div>
 {% endfor %}
 
+{% if err %}<div class="notice err">
+  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><path d="M12 9v4M12 17h.01"/><path d="M10.3 3.9 1.8 18a2 2 0 0 0 1.7 3h17a2 2 0 0 0 1.7-3L13.7 3.9a2 2 0 0 0-3.4 0z"/></svg>
+  <span>{{ t(err) }}</span></div>{% endif %}
+{% if ok %}<div class="notice ok">
+  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M20 6 9 17l-5-5"/></svg>
+  <span>{{ t(ok) }}</span></div>{% endif %}
+
 {% for r in data.roots %}
 <div class="models-root muted">
   <span class="models-root-path"><code>{{ r.path }}</code></span>
@@ -58,4 +65,30 @@
   <span>{{ t('models_empty') }}</span>
 </div>
 {% endif %}
+
+{% if not hf_tool %}
+<div class="notice err">
+  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><path d="M12 9v4M12 17h.01"/><path d="M10.3 3.9 1.8 18a2 2 0 0 0 1.7 3h17a2 2 0 0 0 1.7-3L13.7 3.9a2 2 0 0 0-3.4 0z"/></svg>
+  <span>{{ t('hf_missing_notice') }}
+    <pre class="code-block hf-cmd"><code>{{ hf_install_cmd }}</code></pre>
+    <span class="muted">{{ hf_install_hint }}</span>
+  </span>
+</div>
+{% endif %}
+
+<div class="page-card hf-card">
+  <h3 class="cfg-section-title">{{ t('hf_section') }}</h3>
+  {% if hf_tool %}
+  <form method="post" action="/models/download" class="cfg-add-unit hf-form">
+    <input type="hidden" name="csrf" value="{{ csrf }}">
+    <input type="text" name="repo" placeholder="{{ t('hf_repo_ph') }}" required pattern="[A-Za-z0-9][A-Za-z0-9_.\-]*/[A-Za-z0-9][A-Za-z0-9_.\-]*">
+    <select name="root">
+      {% for r in roots %}<option value="{{ r }}">{{ r }}</option>{% endfor %}
+    </select>
+    <input type="text" name="subpath" placeholder="{{ t('hf_subpath_ph') }}" maxlength="200">
+    <button class="btn">{{ t('hf_start') }}</button>
+  </form>
+  {% endif %}
+  {% include "_downloads.html" %}
+</div>
 {% endblock %}

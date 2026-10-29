@@ -62,6 +62,8 @@ class AppState:
         self.audit_limit: int = 30     # записей аудита на странице
         self.theme: str = "dark"       # тема оформления: dark | light
         self.model_roots: list[str] = []   # пути для дисковой сводки (Config Panel)
+        self.models_scan: dict | None = None  # кэш скана каталога моделей
+        self.hf_jobs: dict = {}        # id → HFJob (загрузки HF, память панели)
 
 
 def _get_state(request: Request) -> AppState:

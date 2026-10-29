@@ -254,6 +254,26 @@ table.matrix thead th { font-size: 11px; color: var(--muted); font-weight: 700; 
 .model-size-val { font-weight: 650; color: var(--val-fg, var(--text)); font-size: 13px; }
 .model-files { display: block; font-size: 10.5px; }
 
+/* ---- HF-загрузки (этап 3, v0.3.1) ---- */
+.hf-card { margin-top: 18px; }
+.hf-form { flex-wrap: wrap; }
+.hf-form select { max-width: 40%; }
+.hf-cmd { margin: 8px 0 2px; user-select: all; }
+.hf-jobs { display: flex; flex-direction: column; gap: 8px; margin-top: 12px; }
+.hf-job { display: flex; gap: 14px; padding: 10px 14px; border: 1px solid var(--line-soft); border-radius: 10px; background: var(--surface-2); }
+.hf-job-main { flex: 1; min-width: 0; }
+.hf-job-title { font-weight: 650; overflow-wrap: anywhere; }
+.hf-job-side { display: flex; flex-direction: column; align-items: flex-end; gap: 8px; flex: none; }
+.hf-dot { display: inline-block; width: 9px; height: 9px; border-radius: 50%; margin-right: 6px; background: var(--muted); }
+.hf-dot-run { background: var(--blue, #6ea3ff); animation: hf-pulse 1.2s ease-in-out infinite; }
+.hf-dot-ok { background: var(--green, #46c78c); }
+.hf-dot-err { background: var(--red, #ff6b6b); }
+@keyframes hf-pulse { 0%, 100% { opacity: 1; } 50% { opacity: .35; } }
+.hf-tail { max-height: 20vh; margin: 6px 0 0; font-size: 10.5px; }
+.hf-badge-running { background: rgba(79,140,255,.16); color: #6ea3ff; }
+.hf-badge-done { background: rgba(70,199,140,.16); color: #46c78c; }
+.hf-badge-error, .hf-badge-stopped, .hf-badge-stopping { background: rgba(255,107,107,.14); color: #ff8585; }
+
 /* ---- редактор конфигураций (этап 2) ---- */
 .topbar-actions { display: flex; gap: 10px; align-items: center; }
 .cfgfiles-list { display: flex; flex-direction: column; gap: 8px; }
