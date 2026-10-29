@@ -106,6 +106,42 @@ def test_gpu_attribution_none_rows():
     assert col_mod._gpu_attribution(None, {10: "maya"}) == {}
 
 
+# ------------------------------------------------ _pid_tree ------------------
+
+class _TreeProc:
+    def __init__(self, pid, children=()):
+        self.pid = pid
+        self._children = list(children)
+
+    def children(self, recursive=True):
+        # эмуляция recursive=True из psutil: все потомки (вглубь)
+        out = []
+        for c in self._children:
+            out.append(c)
+            out.extend(c.children(recursive=True))
+        return out
+
+
+def test_pid_tree_children_recursive(monkeypatch):
+    import llm_panel.collector as col_mod
+
+    grand = _TreeProc(51879)          # движок build/maya
+    child = _TreeProc(51870, [grand])  # maya.py
+    root = _TreeProc(51800, [child])   # обёртка maya.sh (MainPID)
+    monkeypatch.setattr(psutil, "Process", lambda pid: root)
+    assert col_mod._pid_tree(51800) == [51800, 51870, 51879]
+
+
+def test_pid_tree_missing_process(monkeypatch):
+    import llm_panel.collector as col_mod
+
+    def boom(pid):
+        raise psutil.NoSuchProcess(pid=pid)
+
+    monkeypatch.setattr(psutil, "Process", boom)
+    assert col_mod._pid_tree(4242) == [4242]   # процесс умер — остаётся сам pid
+
+
 # ------------------------------------------------ _collect интеграция --------
 
 def test_collect_auto_health_and_gpu_actual(tmp_path, monkeypatch):
@@ -173,6 +209,70 @@ def test_collect_auto_health_and_gpu_actual(tmp_path, monkeypatch):
     # запланированной привязки у maya нет (сниппет без gpus)
     assert row["gpus"] == []
     assert all("maya" not in g["assigned"] for g in snap.gpus)
+
+
+def test_collect_gpu_actual_via_child(tmp_path, monkeypatch):
+    """Кейс Maya (v0.2.1): MainPID юнита — обёртка (maya.sh), карты держит
+    движок-ПОТОМОК (build/maya). gpu_actual должен атрибутироваться и по нему."""
+    import llm_panel.collector as col_mod
+    import llm_panel.health as health_mod
+    from llm_panel.systemd_units import UnitInfo
+
+    cfg = load_config(_make_config(tmp_path))
+    svc_file = cfg.services_file
+    data = yaml.safe_load(open(svc_file, encoding="utf-8"))
+    data["services"].append({"id": "maya", "name": "Maya", "type": "generic",
+                             "unit": "maya-maya-m.service"})
+    open(svc_file, "w", encoding="utf-8").write(
+        yaml.safe_dump(data, allow_unicode=True))
+    app = create_app(cfg)
+    state = app.state.panel
+
+    now = time.time()
+
+    def fake_show(unit, timeout=5.0, scope="system"):
+        if unit == "maya-maya-m.service":
+            return UnitInfo(active="active", sub="running", result="success",
+                            pid=51800,   # MainPID — обёртка maya.sh
+                            since=dt_mod.datetime.fromtimestamp(
+                                now - 60, dt_mod.timezone.utc).isoformat(),
+                            nrestarts=0, unit_file_state="disabled",
+                            load_state="loaded")
+        return None
+
+    monkeypatch.setattr(col_mod, "show_unit", fake_show)
+    monkeypatch.setattr(col_mod, "_listen_ports", lambda pid: [8010])
+
+    # дерево процессов: MainPID 51800 → 51870 (maya.py) → 51879 (build/maya,
+    # именно он держит карты по NVML)
+    grand = _TreeProc(51879)
+    child = _TreeProc(51870, [grand])
+    wrapper = _TreeProc(51800, [child])
+    monkeypatch.setattr(psutil, "Process", lambda pid: wrapper)
+
+    def fake_gpu_rows(metrics):
+        return [
+            {"uuid": "GPU-U1", "index": 0, "name": "Tesla V100-32GB", "mem_pct": 50,
+             "procs": [{"pid": 51879, "name": "build/maya", "mem_mb": 12000}]},
+            {"uuid": "GPU-U2", "index": 1, "name": "Tesla V100-32GB", "mem_pct": 30,
+             "procs": []},
+        ]
+
+    monkeypatch.setattr(col_mod, "build_gpu_rows", fake_gpu_rows)
+
+    async def fake_run_health(hdef):
+        return health_mod.HealthResult(ok=True, detail="ok")
+
+    monkeypatch.setattr(health_mod, "run_health", fake_run_health)
+
+    state.collector._last_health_check = 0.0
+    snap = asyncio.run(state.collector._collect())
+    row = next(r for r in snap.services if r["id"] == "maya")
+
+    # движок-ребёнок атрибутирован юниту → «факт» виден в матрице/карточке
+    assert row["gpu_actual"] == [{"uuid": "GPU-U1", "index": 0,
+                                  "name": "Tesla V100-32GB"}]
+    assert snap.gpus[0]["services"] == ["maya"]
 
 
 def test_collect_auto_health_cleared_when_not_listening(tmp_path, monkeypatch):

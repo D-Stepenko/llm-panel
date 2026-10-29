@@ -73,6 +73,19 @@ def _listen_ports(pid: int) -> list[int]:
     return ports
 
 
+def _pid_tree(pid: int) -> list[int]:
+    """pid процесса и все его потомки (для атрибуции GPU/портов).
+
+    Движок может быть потомком обёртки юнита (Maya: maya.sh → build/maya):
+    карты держит ребёнок — атрибуция должна это покрывать.
+    """
+    try:
+        root = psutil.Process(pid)
+        return [root.pid, *(c.pid for c in root.children(recursive=True))]
+    except psutil.Error:
+        return [pid]
+
+
 def _gpu_attribution(gpu_rows, pid_owner: dict[int, str]) -> dict[str, list]:
     """Фактические владельцы карт по NVML-процессам (pid → сервис через pid_owner).
 
@@ -177,6 +190,10 @@ class Collector:
             if info is None or not info.pid:
                 continue
             pid_owner.setdefault(info.pid, svc.id)
+            # движок может быть ПОТОМКОМ обёртки юнита (Maya: maya.sh → build/maya):
+            # карты держит ребёнок, поэтому атрибутируем GPU и по потомкам
+            for p in _pid_tree(info.pid)[1:]:
+                pid_owner.setdefault(p, svc.id)
             ports = await loop.run_in_executor(None, _listen_ports, info.pid)
             if ports:
                 listen[svc.unit] = sorted(ports)
