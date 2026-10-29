@@ -56,7 +56,12 @@
     es.addEventListener("error", e => {
       const div = document.createElement("div");
       div.className = "log-error";
-      div.textContent = errPrefix + (e.data != null && e.data !== undefined ? String(e.data) : "");
+      // native-ошибки EventSource приходят БЕЗ data — это просто обрыв соединения;
+      // осмысленная причина приходит отдельным событием "error" с data от сервера
+      const reason = (e.data != null && String(e.data).trim() !== "")
+        ? String(e.data)
+        : (pre.dataset.noconn || "connection closed");
+      div.textContent = errPrefix + reason;
       pre.appendChild(div);
       stop();
     });

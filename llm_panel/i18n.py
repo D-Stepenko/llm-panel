@@ -161,7 +161,13 @@ STRINGS: dict[str, dict[str, str]] = {
         "logs_following": "Stop",
         "logs_filter": "Filter:",
         "logs_stream_err": "Stream error: ",
+        "logs_stream_noconn": "connection closed",
         "svc_not_found": "Service not found",
+        # --- v0.2.1 ---
+        "port_open_t": "Open in a new tab (panel host : unit port)",
+        "port_local_only": "loopback only — not reachable from outside",
+        "matrix_other_section": "Without GPU binding",
+        "matrix_other_note": "No planned or actual GPU binding",
         # --- настройки сервиса ---
         "page_settings_title": "Settings {name} — llm-panel",
         "settings_eyebrow": "Configuration",
@@ -391,7 +397,13 @@ STRINGS: dict[str, dict[str, str]] = {
         "logs_following": "Стоп",
         "logs_filter": "Фильтр:",
         "logs_stream_err": "Ошибка потока: ",
+        "logs_stream_noconn": "соединение закрыто",
         "svc_not_found": "Сервис не найден",
+        # --- v0.2.1 ---
+        "port_open_t": "Открыть в новой вкладке (хост панели : порт юнита)",
+        "port_local_only": "только loopback — снаружи недоступен",
+        "matrix_other_section": "Без привязки GPU",
+        "matrix_other_note": "Нет плановой или фактической привязки карт",
         # --- настройки сервиса ---
         "page_settings_title": "Параметры {name} — llm-panel",
         "settings_eyebrow": "Конфигурация",

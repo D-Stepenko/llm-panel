@@ -131,7 +131,7 @@ async def logs_stream(request: Request, svc_id: str, lines: int = 50):
                 except Exception:  # noqa: BLE001
                     pass
 
-    async def _event(name: str, text: str) -> str:
+    def _event(name: str, text: str) -> str:
         data = "".join(f"data: {ln}\n" for ln in text.splitlines()) or "data: \n"
         return f"event: {name}\n{data}\n"
 

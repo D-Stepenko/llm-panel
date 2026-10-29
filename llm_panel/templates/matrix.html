@@ -32,7 +32,7 @@
 </div>
 {% endif %}
 
-{% if data.gpus %}
+{% if data.rows_gpu %}
 <div class="matrix-wrap">
   <table class="matrix">
     <thead>
@@ -47,7 +47,7 @@
       </tr>
     </thead>
     <tbody>
-      {% for r in data.rows %}
+      {% for r in data.rows_gpu %}
       <tr>
         <td>
           <div class="matrix-svc">{{ r.name }}</div>
@@ -70,6 +70,26 @@
     </tbody>
   </table>
 </div>
+{% if data.rows_other %}
+<div class="matrix-other">
+  <h3 class="cfg-section-title">{{ t('matrix_other_section') }}</h3>
+  <div class="matrix-wrap muted-section">
+    <table class="matrix matrix-muted">
+      <tbody>
+        {% for r in data.rows_other %}
+        <tr>
+          <td>
+            <div class="matrix-svc">{{ r.name }}</div>
+            <div class="muted matrix-unit">{{ r.unit }} · {{ t('state_' ~ r.state) }}</div>
+          </td>
+          <td class="matrix-other-note">{{ t('matrix_other_note') }}</td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+{% endif %}
 {% else %}
 <div class="notice info"><span>{{ t('gpu_no_data') }}</span></div>
 {% endif %}

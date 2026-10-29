@@ -19,7 +19,12 @@
       <div class="service-fields">
         <div class="field">
           <div class="field-label">{{ t('f_port') }}</div>
-          <div class="field-value">{% if svc.port %}{{ svc.bind_host or '?' }}:{{ svc.port }}{% elif svc.listen %}<code>{{ svc.listen[0] }}</code> <span class="muted">{{ t('port_auto') }}</span>{% else %}—{% endif %}</div>
+          {% set loopback = ['127.0.0.1', '::1', 'localhost', '::'] %}
+          {% if svc.port and svc.bind_host in loopback %}
+          <div class="field-value">{{ svc.bind_host }}:{{ svc.port }} <span class="muted">{{ t('port_local_only') }}</span></div>
+          {% elif svc.port %}
+          <div class="field-value"><a class="port-link" href="http://{{ request.url.hostname }}:{{ svc.port }}/" target="_blank" rel="noopener noreferrer" title="{{ t('port_open_t') }}">{{ svc.bind_host or '?' }}:{{ svc.port }}</a></div>
+          {% elif svc.listen %}<div class="field-value"><code>{{ svc.listen[0] }}</code> <span class="muted">{{ t('port_auto') }}</span></div>{% else %}<div class="field-value">—</div>{% endif %}
         </div>
         <div class="field">
           <div class="field-label">{{ t('f_uptime') }}</div>

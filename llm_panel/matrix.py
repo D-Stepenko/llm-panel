@@ -142,6 +142,11 @@ def build_matrix(defs, svc_rows, gpu_rows) -> dict:
                 detail=f"Порт {p} запланирован у работающих сервисов: {', '.join(ids)}",
             ))
 
+    # строки матрицы: только сервисы с привязкой карт (плановой или фактической);
+    # остальные — отдельная приглушённая секция (не шумят в основной таблице)
+    rows_gpu = [r for r in rows if r.planned or r.actual]
+    rows_other = [r for r in rows if not (r.planned or r.actual)]
+
     return {
         "gpus": [
             {"uuid": g["uuid"], "index": g.get("index"),
@@ -149,6 +154,8 @@ def build_matrix(defs, svc_rows, gpu_rows) -> dict:
             for g in gpu_rows
         ],
         "rows": rows,
+        "rows_gpu": rows_gpu,
+        "rows_other": rows_other,
         "conflicts": conflicts,
         "gpu_planned": gpu_planned,
         "gpu_actual": gpu_actual,

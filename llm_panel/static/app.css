@@ -228,6 +228,14 @@ table.matrix thead th { font-size: 11px; color: var(--muted); font-weight: 700; 
 .matrix-conflicts { display: flex; flex-direction: column; gap: 8px; margin-bottom: 14px; }
 .legend { margin-top: 12px; font-size: 12px; }
 .legend .mx { margin: 0 2px; }
+.matrix-other { margin-top: 18px; }
+.matrix-muted td { color: var(--muted); font-size: 11.5px; }
+.matrix-other-note { font-size: 11px; color: var(--muted); }
+.muted-section { opacity: .75; }
+
+/* ---- порт-ссылка в карточке сервиса (v0.2.1) ---- */
+.port-link { color: var(--blue, #6ea3ff); text-decoration: none; border-bottom: 1px dashed currentColor; }
+.port-link:hover { text-decoration: underline; }
 
 /* ---- редактор конфигураций (этап 2) ---- */
 .topbar-actions { display: flex; gap: 10px; align-items: center; }

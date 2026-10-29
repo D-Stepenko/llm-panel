@@ -28,6 +28,6 @@
   <label>{{ t('logs_filter') }} <input id="log-filter" type="text" value="{{ filt }}"></label>
 </div>
 
-<pre id="log" class="logview" data-stream="/services/{{ svc.id }}/logs/stream?lines=50" data-err="{{ t('logs_stream_err') }}">{{ text }}</pre>
+<pre id="log" class="logview" data-stream="/services/{{ svc.id }}/logs/stream?lines=50" data-err="{{ t('logs_stream_err') }}" data-noconn="{{ t('logs_stream_noconn') }}">{{ text }}</pre>
 <script src="/static/logs.js" defer></script>
 {% endblock %}

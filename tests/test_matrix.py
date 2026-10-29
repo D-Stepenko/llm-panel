@@ -104,3 +104,28 @@ def test_matrix_no_nvml_and_empty():
                              "listen": []}], None)
     assert m["gpus"] == [] and m["rows"][0].planned_idx == ()
     assert m["rows"][0].snippet == ""    # индексы неизвестны — сниппет не выдумываем
+
+
+def test_matrix_rows_split_gpu_vs_other():
+    """v0.2.1: строки с GPU (план/факт) отдельно от сервисов без привязки."""
+    defs = (
+        _svc("maya", "maya-maya-m.service", ("GPU-aaa",), addressing="index"),
+        _svc("tts", "tts-proxy.service"),          # без плановых карт
+    )
+    svc_rows = [
+        {"id": "maya", "state": "ready", "gpu_actual": [{"uuid": "GPU-aaa"}],
+         "listen": []},
+        {"id": "tts", "state": "ready", "gpu_actual": [], "listen": [8004]},
+    ]
+    m = build_matrix(defs, svc_rows, GPU_ROWS)
+
+    assert [r.id for r in m["rows_gpu"]] == ["maya"]
+    assert [r.id for r in m["rows_other"]] == ["tts"]
+    # rows (все) сохранены для совместимости
+    assert [r.id for r in m["rows"]] == ["maya", "tts"]
+
+    # фактическая занятость тоже выводит строку в основную таблицу
+    svc_rows[1]["gpu_actual"] = [{"uuid": "GPU-bbb"}]
+    m = build_matrix(defs, svc_rows, GPU_ROWS)
+    assert [r.id for r in m["rows_gpu"]] == ["maya", "tts"]
+    assert m["rows_other"] == []
