@@ -85,6 +85,7 @@ async def config_page(request: Request):
         request=request,
         saved=request.query_params.get("saved") == "1",
         roots_error=request.query_params.get("err") == "roots",
+        hfpath_error=request.query_params.get("err") == "hfpath",
         add_err=add_err,
         add_unit=request.query_params.get("unit", ""),
         added=added,
@@ -97,6 +98,7 @@ async def config_page(request: Request):
         interval_value=interval_value,
         audit_value=str(state.audit_limit),
         roots_value="\n".join(state.model_roots),
+        hf_path_value=getattr(state, "hf_tool_path", ""),
         svc_display=svc_display,
         extra_list_html=extra_list_html,
     )
@@ -317,6 +319,19 @@ async def config_save(request: Request):
         state.db.set_setting("model_roots", json.dumps(paths))
         roots_detail = f" roots={len(paths)}"
 
+    # Путь к hf (conda env без активации): пусто — авто-поиск в PATH.
+    hfpath_detail = ""
+    if "hf_tool_path" in form:
+        hf_path = str(form.get("hf_tool_path", "")).strip()
+        if hf_path:
+            import os as _os
+            if not _os.path.isabs(hf_path) or not _os.path.isfile(hf_path) \
+                    or not _os.access(hf_path, _os.X_OK):
+                return RedirectResponse("/config?err=hfpath", status_code=303)
+        state.hf_tool_path = hf_path
+        state.db.set_setting("hf_tool_path", hf_path)
+        hfpath_detail = " hf_path=set" if hf_path else " hf_path=auto"
+
     state.i18n_lang = lang
     state.db.set_setting("lang", lang)
     state.temp_unit = temp_unit
@@ -329,5 +344,5 @@ async def config_save(request: Request):
     ip = request.client.host if request.client else ""
     state.db.audit(ip, request.state.session["username"], "config", "panel", "ok",
                    f"lang={lang} temp={temp_unit} interval={interval} "
-                   f"audit_limit={audit_limit}{theme_detail}{roots_detail}")
+                   f"audit_limit={audit_limit}{theme_detail}{roots_detail}{hfpath_detail}")
     return RedirectResponse("/config?saved=1", status_code=303)

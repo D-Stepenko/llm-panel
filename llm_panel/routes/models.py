@@ -34,9 +34,9 @@ def _ctx(state, request: Request, **extra) -> dict:
                   key=lambda j: (0 if j.status == "running" else 1, j.started),
                   reverse=False)
     ctx = {
-        "hf_tool": hf.find_tool(),
-        "hf_install_cmd": hf.HF_INSTALL_CMD,
-        "hf_install_hint": hf.INSTALL_HINT,
+        "hf_tool": hf.find_tool(getattr(state, "hf_tool_path", "") or None),
+        "hf_install_variants": hf.HF_INSTALL_VARIANTS,
+        "hf_find_path_cmd": hf.HF_FIND_PATH_CMD,
         "jobs": jobs,
     }
     ctx.update(extra)

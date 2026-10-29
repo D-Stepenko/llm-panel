@@ -17,6 +17,10 @@
   <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><path d="M12 9v4m0 4h.01M10.3 3.9 1.8 18a2 2 0 0 0 1.7 3h17a2 2 0 0 0 1.7-3L13.7 3.9a2 2 0 0 0-3.4 0z"/></svg>
   <span>{{ t('cfg_roots_err') }}</span>
 </div>{% endif %}
+{% if hfpath_error %}<div class="notice err">
+  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><path d="M12 9v4m0 4h.01M10.3 3.9 1.8 18a2 2 0 0 0 1.7 3h17a2 2 0 0 0 1.7-3L13.7 3.9a2 2 0 0 0-3.4 0z"/></svg>
+  <span>{{ t('cfg_hf_path_err') }}</span>
+</div>{% endif %}
 
 <div class="page-card">
   <h3 class="cfg-section-title">{{ t('cfgfiles_h1') }}</h3>
@@ -70,6 +74,11 @@
       <dd>
         <textarea id="cfg-roots" name="model_roots" rows="4" spellcheck="false">{{ roots_value }}</textarea>
         <div class="muted cfg-hint">{{ t('cfg_roots_hint') }}</div>
+      </dd>
+      <dt><label for="cfg-hf-path">{{ t('cfg_hf_path') }}</label></dt>
+      <dd>
+        <input id="cfg-hf-path" type="text" name="hf_tool_path" value="{{ hf_path_value }}" placeholder="/home/dispot/miniconda3/envs/<env>/bin/hf" spellcheck="false">
+        <div class="muted cfg-hint">{{ t('cfg_hf_path_hint') }}</div>
       </dd>
     </dl>
     <p class="settings-links">

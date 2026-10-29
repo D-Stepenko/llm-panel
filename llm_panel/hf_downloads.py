@@ -29,14 +29,28 @@ TAIL_LINES = 12
 
 REPO_RE = re.compile(r"^[A-Za-z0-9][A-Za-z0-9_.-]*/[A-Za-z0-9][A-Za-z0-9_.-]*$")
 SUBPATH_RE = re.compile(r"^[A-Za-z0-9][A-Za-z0-9_.\-/ ]*$")   # без «..» (см. resolve)
-HF_INSTALL_CMD = 'pip3 install --user -U "huggingface_hub[cli]"'
+# Варианты установки (для уведомления на /models): (ключ i18n подписи, команда)
+HF_INSTALL_VARIANTS = [
+    ("hf_install_pipx", 'pipx install "huggingface_hub[cli]"'),
+    ("hf_install_conda", 'conda activate <env> && pip install -U "huggingface_hub[cli]"'),
+    ("hf_install_pip", 'pip3 install --user --break-system-packages -U "huggingface_hub[cli]"'),
+]
+# У пользователя hf может жить в conda-окружении — панель запускается systemd-юнитом
+# БЕЗ окружения: нужен полный путь до бинаря env (она сама его пропишет в Панели настроек).
+HF_FIND_PATH_CMD = "conda activate <env> && which hf"
 
-INSTALL_HINT = ("Если система ответит «externally-managed-environment» — "
-                "добавьте флаг --break-system-packages к команде.")
 
+def find_tool(custom_path: str | None = None) -> str | None:
+    """Путь к hf / huggingface-cli.
 
-def find_tool() -> str | None:
-    """Абсолютный путь к hf / huggingface-cli (или None — UI покажет уведомление)."""
+    Порядок: настроенный пользователем полный путь (например
+    …/miniconda3/envs/<env>/bin/hf — панель работает без активации окружения,
+    бинарь env'а запускается напрямую) → PATH (hf, затем huggingface-cli).
+    """
+    if custom_path:
+        p = str(custom_path).strip()
+        if p and os.path.isfile(p) and os.access(p, os.X_OK):
+            return p
     for name in ("hf", "huggingface-cli"):
         p = shutil.which(name)
         if p:

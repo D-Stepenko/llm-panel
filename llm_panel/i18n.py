@@ -181,9 +181,13 @@ STRINGS: dict[str, dict[str, str]] = {
         "models_files": "file(s)",
         "models_empty": ("No models found in the configured roots. "
                           "Add model directories in Config Panel → «Disks summary paths»."),
-        # --- HF-загрузки (этап 3, v0.3.1) ---
+        # --- HF-загрузки (этап 3, v0.3.1; v0.3.2 — варианты установки + путь) ---
         "hf_section": "Download from Hugging Face",
-        "hf_missing_notice": "Download tool not found (hf / huggingface-cli). Install it in the terminal:",
+        "hf_missing_notice": "Download tool not found (hf / huggingface-cli). Install it in the terminal (one of the options):",
+        "hf_install_pipx": "Option 1 — pipx (recommended, outside of conda)",
+        "hf_install_conda": "Option 2 — inside your conda environment",
+        "hf_install_pip": "Option 3 — pip --user (overrides PEP 668)",
+        "hf_hint_conda": "If hf lives in a conda environment, find its full path with «{cmd}» — the panel runs without activation and needs the path like /home/<user>/miniconda3/envs/<env>/bin/hf. Set it in Config Panel → «Path to hf».",
         "hf_repo_ph": "Repository, e.g. Qwen/Qwen3-8B-GGUF",
         "hf_subpath_ph": "Subdirectory (optional)",
         "hf_start": "Download",
@@ -276,6 +280,9 @@ STRINGS: dict[str, dict[str, str]] = {
         "cfg_roots": "Disks summary paths",
         "cfg_roots_hint": "One absolute path per line (up to 8). Disk usage is shown for these paths; missing paths display “n/a”. Applies immediately, no restart needed.",
         "cfg_roots_err": "Invalid paths: each line must be an absolute path starting with “/”, no duplicates, at most 8 lines.",
+        "cfg_hf_path": "Path to hf",
+        "cfg_hf_path_hint": "Full path to the hf binary when it lives in a conda environment (the panel runs without activation). Empty — search in PATH.",
+        "cfg_hf_path_err": "Path to hf must be absolute, an existing file and executable (check on the station with «ls -l <path>»).",
         "cfg_save": "Save",
         "cfg_saved": "Settings saved.",
         "unit_seconds": "s",
@@ -452,9 +459,13 @@ STRINGS: dict[str, dict[str, str]] = {
         "models_files": "файл(ов)",
         "models_empty": ("В заданных корнях модели не найдены. Добавьте каталоги с моделями "
                           "в Панели настроек → «Пути дисковой сводки»."),
-        # --- HF-загрузки (этап 3, v0.3.1) ---
+        # --- HF-загрузки (этап 3, v0.3.1; v0.3.2 — варианты установки + путь) ---
         "hf_section": "Загрузка с Hugging Face",
-        "hf_missing_notice": "Инструмент загрузки не найден (hf / huggingface-cli). Установите в терминале:",
+        "hf_missing_notice": "Инструмент загрузки не найден (hf / huggingface-cli). Установите его в терминале (один из вариантов):",
+        "hf_install_pipx": "Вариант 1 — pipx (рекомендуется, вне conda)",
+        "hf_install_conda": "Вариант 2 — внутри вашего conda-окружения",
+        "hf_install_pip": "Вариант 3 — pip --user (обход PEP 668)",
+        "hf_hint_conda": "Если hf живёт в conda-окружении, узнайте полный путь командой «{cmd}» — панель работает без активации, ей нужен путь вида /home/<user>/miniconda3/envs/<env>/bin/hf. Пропишите его в Панели настроек → «Путь к hf».",
         "hf_repo_ph": "Репозиторий, например Qwen/Qwen3-8B-GGUF",
         "hf_subpath_ph": "Подкаталог (необязательно)",
         "hf_start": "Скачать",
@@ -547,6 +558,9 @@ STRINGS: dict[str, dict[str, str]] = {
         "cfg_roots": "Пути дисковой сводки",
         "cfg_roots_hint": "По одному абсолютному пути в строке (до 8). Для этих путей показывается занятость дисков; несуществующие пути дадут «нет данных». Применяется сразу, без рестарта панели.",
         "cfg_roots_err": "Неверные пути: каждая строка — абсолютный путь начиная с «/», без дубликатов, не более 8 строк.",
+        "cfg_hf_path": "Путь к hf",
+        "cfg_hf_path_hint": "Полный путь до бинаря hf, если он живёт в conda-окружении (панель работает без активации). Пусто — поиск в PATH.",
+        "cfg_hf_path_err": "Путь к hf должен быть абсолютным, существующим файлом и исполняемым (проверьте на станции «ls -l <путь>»).",
         "cfg_save": "Сохранить",
         "cfg_saved": "Настройки сохранены.",
         "unit_seconds": "с",

@@ -70,8 +70,11 @@
 <div class="notice err">
   <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><path d="M12 9v4M12 17h.01"/><path d="M10.3 3.9 1.8 18a2 2 0 0 0 1.7 3h17a2 2 0 0 0 1.7-3L13.7 3.9a2 2 0 0 0-3.4 0z"/></svg>
   <span>{{ t('hf_missing_notice') }}
-    <pre class="code-block hf-cmd"><code>{{ hf_install_cmd }}</code></pre>
-    <span class="muted">{{ hf_install_hint }}</span>
+    {% for key, cmd in hf_install_variants %}
+    <div class="hf-variant">{{ t(key) }}:</div>
+    <pre class="code-block hf-cmd"><code>{{ cmd }}</code></pre>
+    {% endfor %}
+    <span class="muted hf-hint">{{ t('hf_hint_conda', cmd=hf_find_path_cmd) }}</span>
   </span>
 </div>
 {% endif %}

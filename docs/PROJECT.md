@@ -177,6 +177,13 @@ services.yaml, allowlist.json, systemd-юниты, sudoers. Редактор к�
   в выбранный корень (подкаталог опционально) как фоновой задачи: статус,
   хвост вывода (HTMX-поллинг 2 с), стоп (SIGTERM, без SIGKILL — ТЗ §4.2),
   очистка; лимит 3 одновременных; dest только внутри model_roots; аудит.
+  Учёт conda-окружения (0.3.2): hf вне PATH юнита панели (conda env) — в
+  Config Panel появилось поле «Путь к hf» (settings.hf_tool_path, полный путь
+  до бинаря env, например …/miniconda3/envs/<env>/bin/hf — запускается без
+  активации; валидация isabs+isfile+X_OK, иначе редирект err=hfpath). Баннер
+  без инструмента: три копируемых варианта установки (pipx — рекомендован,
+  pip внутри conda env, pip --user --break-system-packages) + подсказка
+  «conda activate <env> && which hf» и указание прописать путь в Config Panel.
 - **Этап 4**: Open WebUI-интеграция.
 
 ## 8. Известные ограничения

@@ -64,6 +64,7 @@ class AppState:
         self.model_roots: list[str] = []   # пути для дисковой сводки (Config Panel)
         self.models_scan: dict | None = None  # кэш скана каталога моделей
         self.hf_jobs: dict = {}        # id → HFJob (загрузки HF, память панели)
+        self.hf_tool_path: str = ""    # полный путь к hf (conda env без активации)
 
 
 def _get_state(request: Request) -> AppState:
@@ -128,6 +129,8 @@ def create_app(config: PanelConfig) -> FastAPI:
             roots = list(config.model_roots)
         state.model_roots = roots
         state.collector.model_roots = list(roots)
+        # hf вне PATH юнита (conda-окружение): полный путь задаётся в Config Panel
+        state.hf_tool_path = (db.get_setting("hf_tool_path") or "").strip()
         # отображение сервисов: скрытые id + найденные («Поиск сервисов») юниты;
         # extra_units хранятся с префиксом scope ("user:<unit>" для user-менеджера)
         state.hidden_ids = _load_str_list("hidden_ids")

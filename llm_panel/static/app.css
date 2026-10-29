@@ -259,6 +259,8 @@ table.matrix thead th { font-size: 11px; color: var(--muted); font-weight: 700; 
 .hf-form { flex-wrap: wrap; }
 .hf-form select { max-width: 40%; }
 .hf-cmd { margin: 8px 0 2px; user-select: all; }
+.hf-variant { margin-top: 8px; font-weight: 650; }
+.hf-hint { display: block; margin-top: 6px; }
 .hf-jobs { display: flex; flex-direction: column; gap: 8px; margin-top: 12px; }
 .hf-job { display: flex; gap: 14px; padding: 10px 14px; border: 1px solid var(--line-soft); border-radius: 10px; background: var(--surface-2); }
 .hf-job-main { flex: 1; min-width: 0; }

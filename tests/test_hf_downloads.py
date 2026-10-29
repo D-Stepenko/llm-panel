@@ -1,6 +1,7 @@
 """HF-загрузки (этап 3, v0.3.1): валидация, уведомление об отсутствии инструмента,
 жизненный цикл задач, роуты."""
 
+import os
 import pathlib
 import re
 import sys
@@ -60,6 +61,99 @@ def test_find_tool_prefers_hf(monkeypatch):
     assert hf.find_tool() == "/usr/bin/hf"
 
 
+def test_find_tool_custom_path(tmp_path, monkeypatch):
+    """v0.3.2: настроенный полный путь (conda env без активации) имеет приоритет."""
+    monkeypatch.setattr(hf.shutil, "which", lambda name: None)   # в PATH ничего нет
+    exe = tmp_path / "envs" / "x" / "bin" / "hf"
+    exe.parent.mkdir(parents=True)
+    exe.write_text("#!/bin/sh\n")
+    # валидный custom → он и возвращается
+    p = str(exe)
+    assert hf.find_tool(p) == p
+    # несуществующий/неисполняемый → fallback в PATH → None
+    assert hf.find_tool(str(tmp_path / "no-such" / "hf")) is None
+
+
+# ------------------------------------------------ Config Panel: путь к hf ----
+
+def _csrf(c):
+    page = c.get("/models", headers={"host": "localhost"})
+    return re.search(r'data-csrf="([^"]+)"', page.text).group(1)
+
+
+def test_config_save_hf_tool_path(tmp_path):
+    """v0.3.2: путь к hf сохраняется в settings и показывается в форме."""
+    c, panel = _client(tmp_path)
+    exe = tmp_path / "hf"
+    exe.write_text("#!/bin/sh\n")
+    page = c.get("/config", headers={"host": "localhost"})
+    csrf = re.search(r'name="csrf" value="([^"]+)"', page.text).group(1)
+    r = c.post("/config", data={"lang": "ru", "temp_unit": "C", "refresh_interval": "3",
+                                "audit_limit": "30",
+                                "hf_tool_path": str(exe), "csrf": csrf},
+               headers={"host": "localhost"}, follow_redirects=False)
+    assert r.status_code == 303
+    assert panel.hf_tool_path == str(exe)
+    assert panel.db.get_setting("hf_tool_path") == str(exe)
+    page = c.get("/config", headers={"host": "localhost"})
+    assert str(exe) in page.text
+
+
+def test_config_save_hf_tool_path_invalid(tmp_path):
+    """Несуществующий путь — редирект err=hfpath, значение не меняется."""
+    c, panel = _client(tmp_path)
+    page = c.get("/config", headers={"host": "localhost"})
+    csrf = re.search(r'name="csrf" value="([^"]+)"', page.text).group(1)
+    bad = str(tmp_path / "no-such" / "hf")
+    r = c.post("/config", data={"lang": "ru", "temp_unit": "C", "refresh_interval": "3",
+                                "audit_limit": "30", "hf_tool_path": bad, "csrf": csrf},
+               headers={"host": "localhost"}, follow_redirects=False)
+    assert r.status_code == 303 and r.headers["location"] == "/config?err=hfpath"
+    assert panel.hf_tool_path == ""                       # не изменилось
+    err_page = c.get("/config?err=hfpath", headers={"host": "localhost"})
+    assert "cfg_hf_path_err" not in err_page.text         # переведён, не сырой ключ
+
+
+def test_page_banner_mentions_conda(tmp_path, monkeypatch):
+    """Баннер без инструмента: три варианта установки + подсказка про conda-путь."""
+    c, _ = _client(tmp_path)
+    monkeypatch.setattr(hf, "find_tool", lambda *a, **k: None)
+    page = c.get("/models", headers={"host": "localhost"})
+    assert "pipx install" in page.text
+    assert "pip install -U" in page.text                  # вариант для conda env
+    assert "break-system-packages" in page.text
+    assert "conda activate" in page.text                  # подсказка which hf
+
+
+def test_download_uses_custom_tool_path(tmp_path, monkeypatch):
+    """v0.3.2: загрузка использует настроенный путь к hf из conda env."""
+    c, state = _client(tmp_path)
+    monkeypatch.setattr(hf.shutil, "which", lambda name: None)  # PATH пуст
+    exe = tmp_path / "envs" / "hf"
+    exe.parent.mkdir(parents=True)
+    exe.write_text("#!/bin/sh\n")
+    state.hf_tool_path = str(exe)
+    root = tmp_path / "models"
+    root.mkdir()
+    state.model_roots = [str(root)]
+    launched = {}
+
+    async def fake_start(st, tool, repo, dest):
+        launched["tool"] = tool
+        job = hf.HFJob(id="jobcx", repo=repo, dest=dest, proc=None)
+        st.hf_jobs[job.id] = job
+        return job
+
+    monkeypatch.setattr(hf, "start_job", fake_start)
+    csrf = _csrf(c)
+    r = c.post("/models/download", data={"repo": "Qwen/Qwen3-8B-GGUF",
+                                         "root": str(root),
+                                         "subpath": "", "csrf": csrf},
+               headers={"host": "localhost"})
+    assert r.status_code == 200
+    assert launched["tool"] == str(exe)
+
+
 # ------------------------------------------------ роуты ----------------------
 
 def _client(tmp_path):
@@ -81,7 +175,7 @@ def _client(tmp_path):
 
 def test_page_shows_install_banner_when_tool_missing(tmp_path, monkeypatch):
     c, state = _client(tmp_path)
-    monkeypatch.setattr(hf, "find_tool", lambda: None)
+    monkeypatch.setattr(hf, "find_tool", lambda *a, **k: None)
     page = c.get("/models", headers={"host": "localhost"})
     assert page.status_code == 200
     assert "pip3 install --user" in page.text          # команда для копирования
@@ -90,7 +184,7 @@ def test_page_shows_install_banner_when_tool_missing(tmp_path, monkeypatch):
 
 def test_page_shows_form_when_tool_present(tmp_path, monkeypatch):
     c, state = _client(tmp_path)
-    monkeypatch.setattr(hf, "find_tool", lambda: "/usr/bin/hf")
+    monkeypatch.setattr(hf, "find_tool", lambda *a, **k: "/usr/bin/hf")
     page = c.get("/models", headers={"host": "localhost"})
     assert 'action="/models/download"' in page.text
     assert page.text.count("name=\"root\"") == 1
@@ -98,7 +192,7 @@ def test_page_shows_form_when_tool_present(tmp_path, monkeypatch):
 
 def test_download_bad_repo_rejected(tmp_path, monkeypatch):
     c, state = _client(tmp_path)
-    monkeypatch.setattr(hf, "find_tool", lambda: "/usr/bin/hf")
+    monkeypatch.setattr(hf, "find_tool", lambda *a, **k: "/usr/bin/hf")
     page = c.get("/models", headers={"host": "localhost"})
     csrf = re.search(r'data-csrf="([^"]+)"', page.text).group(1)
     r = c.post("/models/download", data={"repo": "no slash", "root": "/tmp",
@@ -109,7 +203,7 @@ def test_download_bad_repo_rejected(tmp_path, monkeypatch):
 
 def test_download_starts_job_and_audits(tmp_path, monkeypatch):
     c, state = _client(tmp_path)
-    monkeypatch.setattr(hf, "find_tool", lambda: "/usr/bin/hf")
+    monkeypatch.setattr(hf, "find_tool", lambda *a, **k: "/usr/bin/hf")
     root = tmp_path / "models"
     root.mkdir()
     state.model_roots = [str(root)]
@@ -136,7 +230,7 @@ def test_download_starts_job_and_audits(tmp_path, monkeypatch):
 
 def test_stop_and_clear_lifecycle(tmp_path, monkeypatch):
     c, state = _client(tmp_path)
-    monkeypatch.setattr(hf, "find_tool", lambda: "/usr/bin/hf")
+    monkeypatch.setattr(hf, "find_tool", lambda *a, **k: "/usr/bin/hf")
     page = c.get("/models", headers={"host": "localhost"})
     csrf = re.search(r'data-csrf="([^"]+)"', page.text).group(1)
 
