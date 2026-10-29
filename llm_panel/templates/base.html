@@ -13,11 +13,12 @@
 <div class="shell">
   <header class="topbar">
     <a class="brand" href="/" aria-label="llm-panel">
-      <div><div class="brand-name">llm-panel</div><div class="version">VERSION {{ version | default('0.2.2') }}</div></div>
+      <div><div class="brand-name">llm-panel</div><div class="version">VERSION {{ version | default('0.3.0') }}</div></div>
     </a>
     <nav class="nav" aria-label="{{ t('nav_aria') }}">
       <a class="nav-btn {{ 'active' if request.url.path == '/' }}" href="/">{{ t('nav_status') }}</a>
       <a class="nav-btn {{ 'active' if request.url.path == '/matrix' }}" href="/matrix">{{ t('nav_matrix') }}</a>
+      <a class="nav-btn {{ 'active' if request.url.path.startswith('/models') }}" href="/models">{{ t('nav_models') }}</a>
       <a class="nav-btn {{ 'active' if request.url.path == '/audit' }}" href="/audit">{{ t('nav_audit') }}</a>
     </nav>
     <div class="top-spacer"></div>

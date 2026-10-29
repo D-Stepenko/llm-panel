@@ -237,6 +237,23 @@ table.matrix thead th { font-size: 11px; color: var(--muted); font-weight: 700; 
 .port-link { color: var(--blue, #6ea3ff); text-decoration: none; border-bottom: 1px dashed currentColor; }
 .port-link:hover { text-decoration: underline; }
 
+/* ---- каталог моделей (этап 3, v0.3.0) ---- */
+.models-root { margin: 6px 0 2px; font-size: 12px; }
+.models-list { margin-top: 12px; display: flex; flex-direction: column; gap: 8px; }
+.model-row { display: flex; align-items: center; gap: 14px; padding: 10px 14px; border: 1px solid var(--line-soft); border-radius: 10px; background: var(--surface); }
+.model-main { min-width: 0; flex: 1; }
+.model-name { font-weight: 650; color: var(--text); overflow-wrap: anywhere; }
+.model-path { font-size: 11px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 46vw; }
+.model-meta { display: flex; gap: 6px; align-items: center; flex-wrap: wrap; }
+.badge { display: inline-block; padding: 2px 8px; border-radius: 999px; font-size: 10.5px; font-weight: 700; }
+.badge-gguf { background: rgba(79,140,255,.16); color: #6ea3ff; }
+.badge-sft { background: rgba(160,110,255,.16); color: #a88bff; }
+.badge-quant { background: rgba(240,170,60,.16); color: #f0a94c; }
+.badge-dtype { background: var(--surface-3); color: var(--muted); font-weight: 600; }
+.model-size { text-align: right; flex: none; }
+.model-size-val { font-weight: 650; color: var(--val-fg, var(--text)); font-size: 13px; }
+.model-files { display: block; font-size: 10.5px; }
+
 /* ---- редактор конфигураций (этап 2) ---- */
 .topbar-actions { display: flex; gap: 10px; align-items: center; }
 .cfgfiles-list { display: flex; flex-direction: column; gap: 8px; }

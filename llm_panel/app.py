@@ -164,6 +164,8 @@ def create_app(config: PanelConfig) -> FastAPI:
     templates.env.filters["mem"] = lambda v: fmt_mem_mb(v, state.i18n_lang)   # человекочитаемые ГБ/МБ/КБ
     templates.env.filters["dur"] = lambda v: fmt_uptime(v, state.i18n_lang)   # время работы: 5ч 12м / 5h 12m
     templates.env.filters["hms"] = _hms                                       # время снимка: HH:MM:SS
+    from .model_catalog import human_bytes as _hb
+    templates.env.filters["hb"] = _hb                                         # размеры моделей: 16.1 ГБ
 
     def render(name: str, **ctx):
         # CSRF доступен во всех шаблонах (base.html: кнопка «Выйти») — устраняет
@@ -257,6 +259,7 @@ def create_app(config: PanelConfig) -> FastAPI:
     app.include_router(routes.config.router)
     app.include_router(routes.matrix.router)
     app.include_router(routes.config_files.router)
+    app.include_router(routes.models.router)
 
     app.mount("/static", StaticFiles(directory=str(BASE_DIR / "static")), name="static")
 

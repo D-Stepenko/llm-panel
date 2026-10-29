@@ -14,6 +14,7 @@ STRINGS: dict[str, dict[str, str]] = {
         # --- навигация / шапка ---
         "nav_status": "Status",
         "nav_matrix": "GPU matrix",
+        "nav_models": "Models",
         "nav_audit": "Audit",
         "nav_aria": "Main navigation",
         "role_admin": "Administrator",
@@ -168,6 +169,18 @@ STRINGS: dict[str, dict[str, str]] = {
         "port_local_only": "loopback only — not reachable from outside",
         "matrix_other_section": "Without GPU binding",
         "matrix_other_note": "No planned or actual GPU binding",
+        # --- каталог моделей (этап 3, v0.3.0) ---
+        "page_models_title": "Models — llm-panel",
+        "models_eyebrow": "Catalog",
+        "models_h1": "Local models",
+        "models_subtitle": ("{n} model(s) found in the configured roots. "
+                            "Read-only listing — downloads and the «model → service» wizard are next."),
+        "models_refresh": "Rescan",
+        "models_free": "free:",
+        "models_root_missing": "directory does not exist",
+        "models_files": "file(s)",
+        "models_empty": ("No models found in the configured roots. "
+                          "Add model directories in Config Panel → «Disks summary paths»."),
         # --- настройки сервиса ---
         "page_settings_title": "Settings {name} — llm-panel",
         "settings_eyebrow": "Configuration",
@@ -249,6 +262,7 @@ STRINGS: dict[str, dict[str, str]] = {
         # --- навигация / шапка ---
         "nav_status": "Статус",
         "nav_matrix": "Матрица GPU",
+        "nav_models": "Модели",
         "nav_audit": "Аудит",
         "nav_aria": "Основная навигация",
         "role_admin": "Администратор",
@@ -404,6 +418,18 @@ STRINGS: dict[str, dict[str, str]] = {
         "port_local_only": "только loopback — снаружи недоступен",
         "matrix_other_section": "Без привязки GPU",
         "matrix_other_note": "Нет плановой или фактической привязки карт",
+        # --- каталог моделей (этап 3, v0.3.0) ---
+        "page_models_title": "Модели — llm-panel",
+        "models_eyebrow": "Каталог",
+        "models_h1": "Локальные модели",
+        "models_subtitle": ("Найдено моделей: {n}. Только просмотр — "
+                            "загрузки HF и мастер «модель → сервис» — следующие шаги."),
+        "models_refresh": "Пересканировать",
+        "models_free": "свободно:",
+        "models_root_missing": "каталог не существует",
+        "models_files": "файл(ов)",
+        "models_empty": ("В заданных корнях модели не найдены. Добавьте каталоги с моделями "
+                          "в Панели настроек → «Пути дисковой сводки»."),
         # --- настройки сервиса ---
         "page_settings_title": "Параметры {name} — llm-panel",
         "settings_eyebrow": "Конфигурация",

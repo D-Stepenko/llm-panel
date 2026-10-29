@@ -1,0 +1,61 @@
+{% extends "base.html" %}
+{% block title %}{{ t('page_models_title') }}{% endblock %}
+{% block content %}
+<div class="page-head">
+  <div>
+    <div class="eyebrow"><span class="live-dot blue"></span>{{ t('models_eyebrow') }}</div>
+    <h1>{{ t('models_h1') }}</h1>
+    <p class="subtitle">{{ t('models_subtitle', n=data.models | length) }}</p>
+  </div>
+  <div class="topbar-actions">
+    <form method="post" action="/models/refresh">
+      <input type="hidden" name="csrf" value="{{ csrf }}">
+      <button class="order-btn">{{ t('models_refresh') }}</button>
+    </form>
+  </div>
+</div>
+
+{% for e in data.errors %}
+<div class="notice info">
+  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M12 8h.01M11 12h1v4h1"/></svg>
+  <span>{{ e }}</span>
+</div>
+{% endfor %}
+
+{% for r in data.roots %}
+<div class="models-root muted">
+  <span class="models-root-path"><code>{{ r.path }}</code></span>
+  {% if r.exists %}
+  <span class="muted"> · {{ t('models_free') }} {{ r.free_bytes | hb }}</span>
+  {% else %}<span class="muted"> · {{ t('models_root_missing') }}</span>{% endif %}
+</div>
+{% endfor %}
+
+{% if data.models %}
+<div class="models-list">
+  {% for m in data.models %}
+  <div class="model-row">
+    <div class="model-main">
+      <div class="model-name">{{ m.name }}</div>
+      <div class="muted model-path" title="{{ m.path }}">{{ m.path }}</div>
+    </div>
+    <div class="model-meta">
+      <span class="badge {{ 'badge-gguf' if m.kind == 'gguf' else 'badge-sft' }}">{{ 'GGUF' if m.kind == 'gguf' else 'safetensors' }}</span>
+      {% if m.quant %}<span class="badge badge-quant">{{ m.quant }}</span>{% endif %}
+      {% if m.dtype %}<span class="badge badge-dtype">{{ m.dtype }}</span>{% endif %}
+      {% if m.model_type %}<span class="muted">{{ m.model_type }}</span>{% endif %}
+    </div>
+    <div class="model-size">
+      <span class="model-size-val">{{ m.size_bytes | hb }}</span>
+      <span class="muted model-files">{{ m.n_files }} {{ t('models_files') }}</span>
+    </div>
+  </div>
+  {% endfor %}
+</div>
+{% else %}
+<div class="notice info">
+  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M12 8h.01M11 12h1v4h1"/></svg>
+  <span>{{ t('models_empty') }}</span>
+</div>
+{% endif %}
+{% endblock %}
