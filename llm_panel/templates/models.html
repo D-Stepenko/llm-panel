@@ -10,7 +10,6 @@
   <div class="topbar-actions">
     <form method="post" action="/models/refresh">
       <input type="hidden" name="csrf" value="{{ csrf }}">
-      <input type="hidden" name="sort" value="{{ sort }}">
       <button class="order-btn">{{ t('models_refresh') }}</button>
     </form>
   </div>
@@ -42,14 +41,17 @@
 {% if data.models %}
 <div class="services-head">
   <div class="grid-title">{{ t('models_catalog') }}</div>
-  <a class="order-btn" href="/models?sort={{ next_sort }}" title="{{ t('sort_models_title') }}">
+  <button id="models-order-btn" type="button" class="order-btn" title="{{ t('sort_models_title') }}"
+          data-label="{{ t('sort') }}" data-label-save="{{ t('save_order') }}"
+          data-toast-ok="{{ t('order_saved') }}" data-toast-err="{{ t('order_save_err') }}"
+          data-toast-nocards="{{ t('order_no_cards') }}">
     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><path d="M4 5h16M4 10h10M4 15h16M4 20h10"/></svg>
-    <span>{{ t('sort') }}</span>
-  </a>
+    <span id="models-order-btn-label">{{ t('sort') }}</span>
+  </button>
 </div>
 <div class="models-list">
   {% for m in data.models %}
-  <div class="model-row">
+  <div class="model-row" data-model="{{ m.path }}">
     <span class="model-num">{{ loop.index }}</span>
     <div class="model-main">
       <div class="model-name">{{ m.name }}</div>

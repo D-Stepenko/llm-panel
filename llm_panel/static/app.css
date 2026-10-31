@@ -191,7 +191,7 @@ h1 { margin: 0; font-size: clamp(26px,3vw,34px); line-height: 1.14; letter-spaci
 .mini-track > span:first-child { display: block; height: 100%; border-radius: 999px; background: var(--accent); transition: width .6s ease; }
 .mini-track.t-warn > span:first-child { background: var(--amber); }
 .mini-track.t-err > span:first-child { background: var(--red); }
-.bar-pct { position: absolute; inset: 0; display: grid; place-items: center; z-index: 2; color: var(--val-fg); font-size: 9px; font-weight: 400; line-height: 1; font-variant-numeric: tabular-nums; letter-spacing: .01em; pointer-events: none; }
+.bar-pct { position: absolute; inset: 0; display: grid; place-items: center; z-index: 2; color: var(--val-fg); font-size: 9px; font-weight: 400; line-height: 1; font-variant-numeric: tabular-nums; letter-spacing: .01em; text-shadow: 0 1px 2px rgba(0,0,0,.6), 0 0 4px rgba(0,0,0,.45); pointer-events: none; }
 /* Проценты заполнения шкал: CSP style-src self запрещает inline style — ширина классами */
 .p0{width:0%} .p1{width:1%} .p2{width:2%} .p3{width:3%} .p4{width:4%} .p5{width:5%} .p6{width:6%} .p7{width:7%} .p8{width:8%} .p9{width:9%} .p10{width:10%} .p11{width:11%} .p12{width:12%} .p13{width:13%} .p14{width:14%} .p15{width:15%} .p16{width:16%} .p17{width:17%} .p18{width:18%} .p19{width:19%} .p20{width:20%} .p21{width:21%} .p22{width:22%} .p23{width:23%} .p24{width:24%} .p25{width:25%} .p26{width:26%} .p27{width:27%} .p28{width:28%} .p29{width:29%} .p30{width:30%} .p31{width:31%} .p32{width:32%} .p33{width:33%} .p34{width:34%} .p35{width:35%} .p36{width:36%} .p37{width:37%} .p38{width:38%} .p39{width:39%} .p40{width:40%} .p41{width:41%} .p42{width:42%} .p43{width:43%} .p44{width:44%} .p45{width:45%} .p46{width:46%} .p47{width:47%} .p48{width:48%} .p49{width:49%} .p50{width:50%} .p51{width:51%} .p52{width:52%} .p53{width:53%} .p54{width:54%} .p55{width:55%} .p56{width:56%} .p57{width:57%} .p58{width:58%} .p59{width:59%} .p60{width:60%} .p61{width:61%} .p62{width:62%} .p63{width:63%} .p64{width:64%} .p65{width:65%} .p66{width:66%} .p67{width:67%} .p68{width:68%} .p69{width:69%} .p70{width:70%} .p71{width:71%} .p72{width:72%} .p73{width:73%} .p74{width:74%} .p75{width:75%} .p76{width:76%} .p77{width:77%} .p78{width:78%} .p79{width:79%} .p80{width:80%} .p81{width:81%} .p82{width:82%} .p83{width:83%} .p84{width:84%} .p85{width:85%} .p86{width:86%} .p87{width:87%} .p88{width:88%} .p89{width:89%} .p90{width:90%} .p91{width:91%} .p92{width:92%} .p93{width:93%} .p94{width:94%} .p95{width:95%} .p96{width:96%} .p97{width:97%} .p98{width:98%} .p99{width:99%} .p100{width:100%}
 
@@ -210,9 +210,7 @@ h1 { margin: 0; font-size: clamp(26px,3vw,34px); line-height: 1.14; letter-spaci
 .gpu-ident-txt { min-width: 0; }
 .gpu-label { color: var(--muted); font-size: 11px; font-weight: 700; letter-spacing: .08em; text-transform: uppercase; }
 .gpu-name { font-weight: 740; margin-top: 3px; font-size: 13px; line-height: 1.35; overflow-wrap: anywhere; }
-.load-pill { flex: none; padding: 5px 8px; border: 1px solid var(--pill-err-border); color: var(--pill-err-fg); background: var(--pill-err-bg); border-radius: 8px; font-weight: 800; font-size: 12px; }
-.load-pill.pill-ok { color: var(--accent); border-color: var(--pill-ok-border); background: var(--pill-ok-bg); }
-.load-pill.pill-warn { color: var(--amber); border-color: var(--pill-warn-border); background: var(--pill-warn-bg); }
+.load-pill { flex: none; padding: 5px 8px; border: 1px solid var(--gpu-border); color: var(--val-fg); background: transparent; border-radius: 8px; font-weight: 800; font-size: 12px; }
 .gpu-body { padding: 14px 18px 15px; display: grid; grid-template-columns: max-content minmax(min-content, max-content) minmax(120px, 1fr); gap: 9px 10px; align-items: center; }
 .gpu-planned { color: var(--muted); opacity: .75; }
 
@@ -322,7 +320,7 @@ textarea.cfg-editor { width: 100%; min-height: 46vh; background: var(--surface-2
 
 /* ----------------------------- сервисы --------------------------------- */
 .grid-title { font-weight: 740; font-size: 15px; letter-spacing: -.02em; margin: 26px 0 12px; }
-.services-head { display: flex; align-items: center; justify-content: flex-start; gap: 12px; margin: 26px 0 12px; }
+.services-head { display: flex; align-items: center; justify-content: flex-start; gap: 12px; margin: 5px 0 12px; }
 .services-head .grid-title { margin: 0; }
 .config-form select { background: var(--surface-2); color: var(--text); border: 1px solid var(--line-soft); border-radius: 8px; padding: 7px 10px; font-size: 13px; }
 .config-form textarea { background: var(--surface-2); color: var(--text); border: 1px solid var(--line-soft); border-radius: 8px; padding: 8px 10px; font: ui-monospace, "Cascadia Mono", Consolas, monospace; font-size: 12.5px; width: min(420px, 100%); resize: vertical; }
@@ -388,9 +386,9 @@ body.order-dragging { cursor: grabbing; user-select: none; -webkit-user-select: 
 .service-bottom form { display: inline-flex; align-items: center; }
 
 /* режим «Порядок»: перетаскивание карточек */
-.order-mode .service-card { cursor: grab; outline: 2px dashed var(--order-dash); border-radius: var(--radius); }
-.order-mode .service-card.drag-src { opacity: .55; }
-.order-mode .service-card:hover { box-shadow: 0 0 0 3px var(--order-glow), var(--shadow); }
+.order-mode .service-card, .order-mode .model-row { cursor: grab; outline: 2px dashed var(--order-dash); border-radius: var(--radius); }
+.order-mode .service-card.drag-src, .order-mode .model-row.drag-src { opacity: .55; }
+.order-mode .service-card:hover, .order-mode .model-row:hover { box-shadow: 0 0 0 3px var(--order-glow), var(--shadow); }
 
 /* ------------------------------ аудит ----------------------------------- */
 .audit-card { border: 1px solid var(--line-soft); border-radius: var(--radius); background: var(--surface); overflow: hidden; }

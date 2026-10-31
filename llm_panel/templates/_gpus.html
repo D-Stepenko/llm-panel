@@ -8,7 +8,6 @@
 <div class="gpu-grid">
 {% for g in g_list %}
   {% set mem_pct = g.get('mem_pct') %}
-  {% set pill_tone = 'pill-err' if (mem_pct or 0) > 75 else ('pill-warn' if (mem_pct or 0) > 50 else 'pill-ok') %}
   {% set tone = 't-err' if (mem_pct or 0) > 75 else ('t-warn' if (mem_pct or 0) > 50) %}
   <article class="gpu-card">
     <div class="gpu-card-head">
@@ -16,7 +15,7 @@
         <div class="gpu-label">GPU {{ g.get('index') }}</div>
         <div class="gpu-name">{{ g.get('name') or t('no_data') }}</div>
       </div>
-      {% if mem_pct %}<span class="load-pill {{ pill_tone }}">{{ mem_pct }}%</span>{% endif %}
+      {% if mem_pct %}<span class="load-pill">{{ mem_pct }}%</span>{% endif %}
     </div>
     <div class="gpu-body">
       <div class="host-row">

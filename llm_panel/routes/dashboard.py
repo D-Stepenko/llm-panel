@@ -125,6 +125,35 @@ async def save_services_order(request: Request):
     return PlainTextResponse(translate(state.i18n_lang, "order_saved"))
 
 
+@router.post("/ui/models-order")
+async def save_models_order(request: Request):
+    """Сохранение ручного порядка строк моделей (/models, кнопка «sort»).
+
+    Порядок задаётся ПОЛНЫМИ путями моделей; посторонние значения
+    отбрасываются, максимум 200 строк.
+    """
+    state = request.app.state.panel
+    try:
+        form = await request.form()
+    except Exception:  # noqa: BLE001
+        form = {}
+    if form.get("csrf") != request.state.csrf:
+        return PlainTextResponse(translate(state.i18n_lang, "bad_csrf"), status_code=403)
+
+    paths: list[str] = []
+    for piece in str(form.get("order", "")).split(","):
+        piece = piece.strip()
+        if piece.startswith("/") and len(piece) <= 400 and piece not in paths:
+            paths.append(piece)
+    paths = paths[:200]
+
+    state.db.set_setting("models_order", json.dumps(paths))
+    ip = request.client.host if request.client else ""
+    state.db.audit(ip, request.state.session["username"],
+                   "ui_order", "models", "ok", f"порядок: {len(paths)} моделей")
+    return PlainTextResponse(translate(state.i18n_lang, "order_saved"))
+
+
 @router.get("/events")
 async def events(request: Request):
     state = request.app.state.panel

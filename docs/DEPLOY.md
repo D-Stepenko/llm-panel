@@ -154,6 +154,51 @@ UFW для 8443 (upstream) не открывать; 8444 — только с а�
 панели — пошагово в `docs/UNITS.md`; быстрое добавление юнита без правки yaml —
 «Поиск сервисов» / «Добавить юнит по имени» в Config Panel.
 
+## 6.1. Мощность CPU в строке вывода (RAPL)
+
+Панель показывает потребление CPU в Вт из счётчиков Intel RAPL
+(`/sys/class/powercap/intel-rapl:*/energy_uj`). Файлы счётчиков имеют права
+`0400 root`, а панель работает от непривилегированного пользователя в
+песочнице systemd-юнита — по умолчанию счётчик нечитаем, и панель просто
+не показывает Вт (это штатный режим «достоверность важнее полноты»).
+
+Чтобы Вт появились, дайте процессу панели право **только на чтение** таких
+файлов — capability `CAP_DAC_READ_SEARCH`:
+
+```bash
+# 1. Проверка (подтверждает диагноз — должно быть Permission denied):
+sudo -u PANEL_USER cat /sys/class/powercap/intel-rapl:0/energy_uj
+
+# 2. Право на чтение для процесса панели:
+sudo systemctl edit llm-panel
+```
+
+В открывшемся редакторе дописать:
+
+```ini
+[Service]
+AmbientCapabilities=CAP_DAC_READ_SEARCH
+CapabilityBoundingSet=CAP_DAC_READ_SEARCH
+```
+
+```bash
+# 3. Применить:
+sudo systemctl daemon-reload && sudo systemctl restart llm-panel
+```
+
+Примечания:
+
+- capability даёт **только чтение** файлов, запись не разрешает — песочница
+  (`ProtectSystem=strict`, `ReadWritePaths=…`) не ослабляется;
+- `CapabilityBoundingSet` в drop-in заменяет исходный набор capabilities —
+  у панели других нет, поэтому переопределение безопасно;
+- Вт появляются со второго опроса метрик (мощность считается по дельте
+  счётчика за интервал) — подождите ~30–60 секунд после рестарта;
+- если Вт всё ещё нет: `systemctl show llm-panel -p NoNewPrivileges`
+  (должно быть `no`) и `journalctl -u llm-panel -n 20`;
+- на CPU без RAPL (не Intel или старое ядро) Вт не показываются вовсе —
+  это норма.
+
 ## 7. Обновление версии
 
 ```bash

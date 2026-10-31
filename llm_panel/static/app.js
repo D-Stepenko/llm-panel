@@ -5,14 +5,7 @@
   if (!document.body) return;
   var root = document.getElementById("sse-root");
   var sseWarn = document.getElementById("sse-warn");
-  var orderBtn = document.getElementById("order-btn");
-  var orderLabel = document.getElementById("order-btn-label");
   var csrf = document.body.dataset.csrf || "";
-  var order = { active: false };   // состояние режима «sort»
-
-  function servicesContainer() {
-    return document.getElementById("services-live") || document.getElementById("services-init");
-  }
 
   function toast(msg, kind) {
     var el = document.getElementById("toast");
@@ -34,7 +27,7 @@
     es.onerror = function () { if (sseWarn) sseWarn.hidden = false; };
 
     function swap(name, e) {
-      if (order.active) return;   // в режиме «sort» SSE не перерисовывает карточки
+      if (activeSorts.some(function (s) { return s.active; })) return;   // в режиме «sort» SSE не перерисовывает карточки
       var el = targets[name];
       if (!el) {
         el = document.createElement("section");
@@ -52,106 +45,124 @@
     sseWarn.hidden = false;
   }
 
-  // ------------------- sort: порядок карточек сервисов --------------------
-  // Перетаскивание на mouse-событиях: надёжно для всех карточек с кнопками
-  // и текстом (HTML5 drag & drop в таких картах работает нестабильно).
-  if (!orderBtn) return;
+  // ------------------- sort: перетаскивание карточек --------------------
+  // Один режим на сущность: сервисы (главная) и модели (/models). Включение
+  // кнопкой, перетаскивание мышью (надёжнее HTML5 DnD на картах с кнопками),
+  // сохранение — повторным нажатием кнопки (v0.3.9: обобщено на модели).
+  var activeSorts = [];   // активные режимы (SSE не перерисовывает, пока идёт sort)
 
-  var drag = null;   // { card, x, y, moved } — текущее перетаскивание
+  function setupSort(cfg) {
+    var btn = document.getElementById(cfg.btnId);
+    if (!btn) return;
+    var label = document.getElementById(cfg.labelId);
+    var drag = null;   // { card, x, y, moved }
+    var st = { active: false };
+    activeSorts.push(st);
 
-  function cards(c) { return Array.prototype.slice.call(c.querySelectorAll(".service-card")); }
-
-  function setLabel(saveMode) {
-    if (orderLabel) orderLabel.textContent = saveMode ? (orderBtn.dataset.labelSave || "save") : (orderBtn.dataset.label || "sort");
-  }
-
-  function enterOrder() {
-    var c = servicesContainer();
-    if (!c) { toast(orderBtn.dataset.toastNocards || "", "err"); return; }
-    order.active = true;
-    setLabel(true);
-    orderBtn.classList.add("order-active");
-    c.classList.add("order-mode");
-    if (!c.dataset.orderBound) {
-      c.dataset.orderBound = "1";
-      c.addEventListener("mousedown", onDown);
+    function container() { return cfg.container(); }
+    function cards(c) { return Array.prototype.slice.call(c.querySelectorAll(cfg.cardClass)); }
+    function setLabel(saveMode) {
+      if (label) label.textContent = saveMode ? (btn.dataset.labelSave || "save") : (btn.dataset.label || "sort");
     }
-  }
-
-  function exitOrder(msgAndKind) {
-    order.active = false;
-    orderBtn.classList.remove("order-active");
-    setLabel(false);
-    var c = servicesContainer();
-    if (c) c.classList.remove("order-mode");
-    if (drag) { drag.card.classList.remove("drag-src"); drag = null; }
-    document.body.classList.remove("order-dragging");
-    if (msgAndKind) toast(msgAndKind[0], msgAndKind[1]);
-  }
-
-  function onDown(e) {
-    if (e.button !== 0 || !order.active) return;
-    var t = e.target;
-    var card = null;
-    while (t && t !== document.body) {
-      if (t.classList && t.classList.contains("service-card")) { card = t; break; }
-      t = t.parentElement;
+    function enter() {
+      var c = container();
+      if (!c) { toast(btn.dataset.toastNocards || "", "err"); return; }
+      st.active = true;
+      setLabel(true);
+      btn.classList.add("order-active");
+      c.classList.add("order-mode");
+      if (!c.dataset.orderBound) {
+        c.dataset.orderBound = "1";
+        c.addEventListener("mousedown", onDown);
+      }
     }
-    if (!card) return;
-    drag = { card: card, x: e.clientX, y: e.clientY, moved: false };
-    document.addEventListener("mousemove", onMove);
-    document.addEventListener("mouseup", onUp);
-  }
-
-  function onMove(e) {
-    if (!drag) return;
-    if (!drag.moved) {
-      if (Math.abs(e.clientX - drag.x) < 5 && Math.abs(e.clientY - drag.y) < 5) return;
-      drag.moved = true;
-      drag.card.classList.add("drag-src");
-      document.body.classList.add("order-dragging");
+    function exit(msgAndKind) {
+      st.active = false;
+      btn.classList.remove("order-active");
+      setLabel(false);
+      var c = container();
+      if (c) c.classList.remove("order-mode");
+      if (drag) { drag.card.classList.remove("drag-src"); drag = null; }
+      document.body.classList.remove("order-dragging");
+      if (msgAndKind) toast(msgAndKind[0], msgAndKind[1]);
     }
-    e.preventDefault();
-    var under = document.elementFromPoint(e.clientX, e.clientY);
-    while (under && !(under.classList && under.classList.contains("service-card"))) under = under.parentElement;
-    if (under && under !== drag.card && under.parentNode) {
-      // карточки — дети .service-grid внутри секции: вставляем в их реального родителя
-      var rect = under.getBoundingClientRect();
-      var before = (e.clientY - rect.top) / rect.height < 0.5;
-      under.parentNode.insertBefore(drag.card, before ? under : under.nextSibling);
+    function onDown(e) {
+      if (e.button !== 0 || !st.active) return;
+      var t = e.target;
+      var card = null;
+      while (t && t !== document.body) {
+        if (t.classList && t.classList.contains(cfg.cardClassRaw)) { card = t; break; }
+        t = t.parentElement;
+      }
+      if (!card) return;
+      drag = { card: card, x: e.clientX, y: e.clientY, moved: false };
+      document.addEventListener("mousemove", onMove);
+      document.addEventListener("mouseup", onUp);
     }
+    function onMove(e) {
+      if (!drag) return;
+      if (!drag.moved) {
+        if (Math.abs(e.clientX - drag.x) < 5 && Math.abs(e.clientY - drag.y) < 5) return;
+        drag.moved = true;
+        drag.card.classList.add("drag-src");
+        document.body.classList.add("order-dragging");
+      }
+      e.preventDefault();
+      var under = document.elementFromPoint(e.clientX, e.clientY);
+      while (under && !(under.classList && under.classList.contains(cfg.cardClassRaw))) under = under.parentElement;
+      if (under && under !== drag.card && under.parentNode) {
+        var rect = under.getBoundingClientRect();
+        var before = (e.clientY - rect.top) / rect.height < 0.5;
+        under.parentNode.insertBefore(drag.card, before ? under : under.nextSibling);
+      }
+    }
+    function onUp() {
+      document.removeEventListener("mousemove", onMove);
+      document.removeEventListener("mouseup", onUp);
+      document.body.classList.remove("order-dragging");
+      if (drag) { drag.card.classList.remove("drag-src"); drag = null; }
+      // остаёмся в режиме «sort»: сохранение — повторным нажатием кнопки
+    }
+    function save() {
+      var c = container();
+      if (!c) { exit(null); return; }
+      var vals = cards(c).map(cfg.cardValue).filter(function (v) { return v; });
+      var fd = new FormData();
+      fd.append("order", vals.join(","));
+      fd.append("csrf", csrf);
+      fetch(cfg.url, { method: "POST", body: fd, credentials: "same-origin" })
+        .then(function (r) {
+          if (!r.ok) return r.text().then(function (t) { throw new Error(t || ("HTTP " + r.status)); });
+          exit([btn.dataset.toastOk || "", "ok"]);
+        })
+        .catch(function (e) {
+          exit([(btn.dataset.toastErr || "") + (e && e.message || e), "err"]);
+        });
+    }
+    btn.addEventListener("click", function () {
+      if (st.active) { save(); } else { enter(); }
+    });
+    document.addEventListener("keydown", function (e) {
+      if (st.active && e.key === "Escape") exit("");
+    });
   }
 
-  function onUp() {
-    document.removeEventListener("mousemove", onMove);
-    document.removeEventListener("mouseup", onUp);
-    document.body.classList.remove("order-dragging");
-    if (drag) { drag.card.classList.remove("drag-src"); drag = null; }
-    // остаёмся в режиме «sort»: сохранение — повторным нажатием кнопки
-  }
-
-  function saveOrder() {
-    var c = servicesContainer();
-    if (!c) { exitOrder(null); return; }
-    var ids = cards(c).map(function (card) { return card.id.replace(/^svc-/, ""); });
-    var fd = new FormData();
-    fd.append("order", ids.join(","));
-    fd.append("csrf", csrf);
-    fetch("/ui/order", { method: "POST", body: fd, credentials: "same-origin" })
-      .then(function (r) {
-        if (!r.ok) return r.text().then(function (t) { throw new Error(t || ("HTTP " + r.status)); });
-        exitOrder([orderBtn.dataset.toastOk || "", "ok"]);
-      })
-      .catch(function (e) {
-        exitOrder([(orderBtn.dataset.toastErr || "") + (e && e.message || e), "err"]);
-      });
-  }
-
-  orderBtn.addEventListener("click", function () {
-    if (order.active) { saveOrder(); } else { enterOrder(); }
+  setupSort({
+    btnId: "order-btn", labelId: "order-btn-label",
+    container: function () {
+      return document.getElementById("services-live") || document.getElementById("services-init");
+    },
+    cardClass: ".service-card", cardClassRaw: "service-card",
+    cardValue: function (card) { return card.id.replace(/^svc-/, ""); },
+    url: "/ui/order",
   });
-  document.addEventListener("keydown", function (e) {
-    if (order.active && e.key === "Escape") exitOrder("");
+
+  setupSort({
+    btnId: "models-order-btn", labelId: "models-order-btn-label",
+    container: function () { return document.getElementById("models-list"); },
+    cardClass: ".model-row", cardClassRaw: "model-row",
+    cardValue: function (card) { return card.dataset.model || ""; },
+    url: "/ui/models-order",
   });
 })();
 // --- Config Panel: кнопки «Копировать» в блоке прав добавленного юнита -------

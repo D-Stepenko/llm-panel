@@ -62,37 +62,30 @@ async def _scan(state, force: bool = False) -> dict:
     return data
 
 
-def _sorted_models(data: dict, sort: str) -> dict:
-    """Сортировка копии списка моделей (кэш не трогаем): name | size."""
-    models = list(data.get("models") or [])
-    if sort == "size":
-        models.sort(key=lambda m: (-(getattr(m, "size_bytes", 0) or 0),
-                                   (getattr(m, "name", "") or "").lower()))
-        sort = "size"
-    else:
-        sort = "name"
-        models.sort(key=lambda m: ((getattr(m, "name", "") or "").lower(),
-                                   (getattr(m, "path", "") or "")))
-    return {**data, "models": models, "sort": sort}
+def _apply_saved_order(models: list, state) -> list:
+    """Ручной порядок моделей из settings.models_order (пути); новые — в конец
+    (по имени). Порядок задаётся кнопкой «sort» с перетаскиванием (v0.3.9)."""
+    import json as _json
 
-
-def _sort_ctx(request: Request, form_sort: str = "") -> dict:
-    """Текущий режим сортировки + следующий (для кнопки-переключателя)."""
-    sort = (form_sort or request.query_params.get("sort") or "name").strip()
-    if sort not in ("name", "size"):
-        sort = "name"
-    return {"sort": sort, "next_sort": "size" if sort == "name" else "name"}
+    try:
+        order = _json.loads(state.db.get_setting("models_order") or "[]")
+    except Exception:  # noqa: BLE001 — битый сеттинг не мешает показу
+        order = []
+    pos = {p: i for i, p in enumerate(order) if isinstance(p, str)}
+    models.sort(key=lambda m: (pos.get(getattr(m, "path", ""), len(order) + 1),
+                               (getattr(m, "name", "") or "").lower()))
+    return models
 
 
 @router.get("", response_class=HTMLResponse)
 async def models_page(request: Request):
     state = request.app.state.panel
     data = await _scan(state)
-    sctx = _sort_ctx(request)
+    data = {**data, "models": _apply_saved_order(list(data.get("models") or []), state)}
     return state.render(
         "models.html", request=request, version=__version__,
-        data=_sorted_models(data, sctx["sort"]), roots=state.model_roots,
-        **_ctx(state, request), **sctx,
+        data=data, roots=state.model_roots,
+        **_ctx(state, request),
     )
 
 
@@ -107,11 +100,11 @@ async def models_refresh(request: Request):
     if form.get("csrf") != request.state.csrf:
         return PlainTextResponse(translate(state.i18n_lang, "bad_csrf"), status_code=403)
     data = await _scan(state, force=True)
-    sctx = _sort_ctx(request, str(form.get("sort") or ""))
+    data = {**data, "models": _apply_saved_order(list(data.get("models") or []), state)}
     return state.render(
         "models.html", request=request, version=__version__,
-        data=_sorted_models(data, sctx["sort"]), roots=state.model_roots,
-        **_ctx(state, request), **sctx,
+        data=data, roots=state.model_roots,
+        **_ctx(state, request),
     )
 
 
