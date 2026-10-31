@@ -419,11 +419,15 @@ input:focus, select:focus { outline: 2px solid var(--accent); outline-offset: 1p
 /* ---- выключение/перезагрузка сервера (Config panel, v0.3.12) ---- */
 .power-actions { display: flex; gap: 10px; flex-wrap: wrap; margin-top: 4px; }
 .power-btn { display: flex; gap: 8px; align-items: center; border: 1px solid var(--btn-border); border-radius: 9px; background: var(--btn-bg); padding: 9px 14px; font-weight: 650; font-size: 13px; color: var(--btn-fg); cursor: pointer; white-space: nowrap; }
-.power-btn svg { width: 15px; height: 15px; color: var(--amber); }
-.power-btn:hover { background: var(--btn-bg-hover); border-color: var(--btn-border-hover); }
-.power-btn:disabled { opacity: .55; cursor: default; background: var(--btn-bg); }
-.power-btn-danger { border-color: var(--pill-err-border); color: var(--pill-err-fg); }
-.power-btn-danger svg { color: var(--red); }
+.power-btn svg { width: 15px; height: 15px; }
+.power-btn:hover { border-color: var(--btn-border-hover); }
+.power-btn:disabled { opacity: .55; cursor: default; }
+.power-btn-reboot { border-color: var(--pill-warn-border); color: var(--amber); }
+.power-btn-reboot svg { color: var(--amber); }
+.power-btn-reboot:hover { background: var(--pill-warn-bg); }
+.power-btn-poweroff { border-color: var(--pill-err-border); color: var(--pill-err-fg); }
+.power-btn-poweroff svg { color: var(--red); }
+.power-btn-poweroff:hover { background: var(--pill-err-bg); }
 .power-section .notice { display: flex; align-items: center; gap: 10px; margin-top: 12px; }
 .power-section .notice .btn { flex: none; }
 .kv { display: grid; grid-template-columns: auto 1fr; gap: 6px 18px; margin: 0; }

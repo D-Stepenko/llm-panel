@@ -637,6 +637,7 @@ def test_power_buttons_and_route(authed_client, monkeypatch):
     page = c.get("/config", headers={"host": "localhost"})
     assert 'data-power="reboot"' in page.text
     assert 'data-power="poweroff"' in page.text
+    assert "power-btn-reboot" in page.text and "power-btn-poweroff" in page.text  # общий стиль: янтарная/красная
     assert 'id="power-cancel"' in page.text                       # отмена отсчёта
     csrf = re.search(r'name="csrf" value="([^"]+)"', page.text).group(1)
 

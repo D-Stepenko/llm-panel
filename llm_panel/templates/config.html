@@ -182,13 +182,13 @@ EOF</code></pre>
   <h3 class="cfg-section-title">{{ t('power_section') }}</h3>
   <div class="muted cfg-hint">{{ t('power_hint') }}</div>
   <div class="power-actions">
-    <button type="button" class="power-btn" data-power="reboot"
+    <button type="button" class="power-btn power-btn-reboot" data-power="reboot"
             data-countdown="{{ t('power_count_reboot') }}"
             data-done="{{ t('power_sent_reboot') }}">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M21 12a9 9 0 1 1-2.6-6.4M21 3v6h-6"/></svg>
       {{ t('power_reboot') }}
     </button>
-    <button type="button" class="power-btn power-btn-danger" data-power="poweroff"
+    <button type="button" class="power-btn power-btn-poweroff" data-power="poweroff"
             data-countdown="{{ t('power_count_poweroff') }}"
             data-done="{{ t('power_sent_poweroff') }}">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M12 3v9"/><path d="M6.6 6.2a8 8 0 1 0 10.8 0"/></svg>
