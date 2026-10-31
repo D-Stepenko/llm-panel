@@ -53,9 +53,10 @@ def test_matrix_plan_fact_and_indices():
     assert m["rows"][1].snippet == 'CUDA_VISIBLE_DEVICES="GPU-ccc"'
     assert m["rows"][1].cells["GPU-ccc"] == "plan"
 
-    # конфликт: GPU-ccc запланирован двум сервисам (оба не ram_exclusive → warn)
-    kinds = {(c.kind, c.level) for c in m["conflicts"]}
-    assert ("gpu_planned", "warn") in kinds
+    # несколько плановых привязок на одну карту (GPU-ccc у maya и llama) —
+    # НЕ конфликт (штатная схема станции, v0.3.8): предупреждение убрано
+    kinds = {c.kind for c in m["conflicts"]}
+    assert "gpu_planned" not in kinds
 
 
 def test_matrix_conflict_levels():
@@ -68,9 +69,9 @@ def test_matrix_conflict_levels():
         {"id": "b", "state": "ready", "gpu_actual": [], "listen": []},
     ]
     m = build_matrix(defs, svc_rows, GPU_ROWS)
-    kinds = {(c.kind, c.level) for c in m["conflicts"]}
-    assert ("gpu_planned", "err") in kinds   # оба ram_exclusive и оба работают
-    assert ("ram", "err") in kinds           # два ram_exclusive сервиса работают
+    kinds = {c.kind for c in m["conflicts"]}
+    assert "gpu_planned" not in kinds      # дубль таблицы убран (v0.3.8)
+    assert "ram" in kinds                   # два ram_exclusive сервиса работают
 
 
 def test_matrix_vllm_cvd_index_snippet():

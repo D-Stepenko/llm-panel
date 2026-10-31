@@ -219,8 +219,8 @@ def test_host_cpu_and_units(authed_client):
            "assigned": ["vllm"]}
     c.app.state.panel.collector.snapshot.gpus = [gpu]
     page = c.get("/", headers={"host": "localhost"})
-    assert "31.16 ГБ / 32.77 ГБ" in page.text                             # память GPU в ГБ
-    assert "Вт / 150 Вт" in page.text                                     # мощность с единицей у лимита
+    assert '<span class="nb">31.16 ГБ</span> / <span class="nb">32.77 ГБ</span>' in page.text  # память GPU, неразрывные куски
+    assert '<span class="nb">56.5 Вт</span> / <span class="nb">150 Вт</span>' in page.text    # мощность с единицей у лимита
     assert 'load-pill pill-err">95%' in page.text                         # pill загрузки (красный при >80)
     # строки процессов и UUID из карточки GPU убраны
     assert "PID" not in page.text and "Сервис не определён" not in page.text and "UUID:" not in page.text
@@ -575,3 +575,26 @@ def test_scales_use_sample_style(authed_client):
     assert 'bar-pct">60%</span>' in page.text
     assert 'bar-pct">38%</span>' in page.text
     assert '<div class="mini-track"><span' not in page.text  # старый вид шкал исчез
+
+
+def test_models_numbering_and_sort(authed_client):
+    """Модели: нумерация строк + кнопка-переключатель сортировки (имя/размер)."""
+    import time as _time
+    from types import SimpleNamespace as NS
+
+    c = authed_client
+    state = c.app.state.panel
+
+    def M(name, size):
+        return NS(name=name, path=f"/models/{name}", kind="gguf", quant="",
+                  dtype="", model_type="", size_bytes=size, n_files=1)
+
+    state.models_scan = {"models": [M("bbb", 20), M("aaa", 100)],
+                         "roots": [], "errors": [], "ts": _time.time()}
+    page = c.get("/models", headers={"host": "localhost"})
+    assert 'class="model-num">1</span>' in page.text
+    assert page.text.index('model-name">aaa') < page.text.index('model-name">bbb')
+    assert "/models?sort=size" in page.text                      # кнопка-переключатель
+    page = c.get("/models?sort=size", headers={"host": "localhost"})
+    assert page.text.index('model-name">aaa') < page.text.index('model-name">bbb')  # размер ↓
+    assert "/models?sort=name" in page.text                      # следующий режим — имя

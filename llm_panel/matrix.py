@@ -104,17 +104,10 @@ def build_matrix(defs, svc_rows, gpu_rows) -> dict:
             ram_svc.append(svc.id)
 
     conflicts: list[Conflict] = []
-    # 1) одна карта запланирована двум сервисам
-    for u, ids in gpu_planned.items():
-        if len(ids) > 1:
-            both_ram = all(next(r for r in rows if r.id == i).ram_exclusive for i in ids)
-            both_on = all(next(r for r in rows if r.id == i).running for i in ids)
-            conflicts.append(Conflict(
-                kind="gpu_planned",
-                level="err" if both_ram and both_on else "warn",
-                detail=f"{_gpu_label(u, gpu_names)} запланирован для: {', '.join(ids)}"
-                       + (" — оба сервиса с ram_exclusive" if both_ram else ""),
-            ))
+    # 1) одна карта запланирована двум сервисам — НЕ конфликт: несколько
+    #    плановых привязок на карту — штатная схема станции (очередность
+    #    запусков), фактические привязки видны в таблице; предупреждение
+    #    о дублировании убрано по решению владельца (v0.3.8).
     # 2) одна карта фактически занята процессами нескольких сервисов
     for u, ids in gpu_actual.items():
         uniq = list(dict.fromkeys(ids))

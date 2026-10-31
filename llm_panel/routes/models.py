@@ -62,14 +62,37 @@ async def _scan(state, force: bool = False) -> dict:
     return data
 
 
+def _sorted_models(data: dict, sort: str) -> dict:
+    """Сортировка копии списка моделей (кэш не трогаем): name | size."""
+    models = list(data.get("models") or [])
+    if sort == "size":
+        models.sort(key=lambda m: (-(getattr(m, "size_bytes", 0) or 0),
+                                   (getattr(m, "name", "") or "").lower()))
+        sort = "size"
+    else:
+        sort = "name"
+        models.sort(key=lambda m: ((getattr(m, "name", "") or "").lower(),
+                                   (getattr(m, "path", "") or "")))
+    return {**data, "models": models, "sort": sort}
+
+
+def _sort_ctx(request: Request, form_sort: str = "") -> dict:
+    """Текущий режим сортировки + следующий (для кнопки-переключателя)."""
+    sort = (form_sort or request.query_params.get("sort") or "name").strip()
+    if sort not in ("name", "size"):
+        sort = "name"
+    return {"sort": sort, "next_sort": "size" if sort == "name" else "name"}
+
+
 @router.get("", response_class=HTMLResponse)
 async def models_page(request: Request):
     state = request.app.state.panel
     data = await _scan(state)
+    sctx = _sort_ctx(request)
     return state.render(
         "models.html", request=request, version=__version__,
-        data=data, roots=state.model_roots,
-        **_ctx(state, request),
+        data=_sorted_models(data, sctx["sort"]), roots=state.model_roots,
+        **_ctx(state, request), **sctx,
     )
 
 
@@ -84,10 +107,11 @@ async def models_refresh(request: Request):
     if form.get("csrf") != request.state.csrf:
         return PlainTextResponse(translate(state.i18n_lang, "bad_csrf"), status_code=403)
     data = await _scan(state, force=True)
+    sctx = _sort_ctx(request, str(form.get("sort") or ""))
     return state.render(
         "models.html", request=request, version=__version__,
-        data=data, roots=state.model_roots,
-        **_ctx(state, request),
+        data=_sorted_models(data, sctx["sort"]), roots=state.model_roots,
+        **_ctx(state, request), **sctx,
     )
 
 

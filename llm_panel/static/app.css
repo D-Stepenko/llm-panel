@@ -175,14 +175,15 @@ h1 { margin: 0; font-size: clamp(26px,3vw,34px); line-height: 1.14; letter-spaci
 .section-meta.sub { margin: 5px 0 0 40px; }
 
 /* -------------------------- единый блок системы -------------------------- */
-.host-card { padding: 14px 18px; background: var(--host-card-bg); border: 1px solid var(--line-soft); border-radius: var(--radius); box-shadow: var(--shadow); display: grid; grid-template-columns: max-content minmax(0, 1fr) minmax(150px, 240px); gap: 9px 12px; align-items: center; }
+.host-card { padding: 14px 18px; background: var(--host-card-bg); border: 1px solid var(--line-soft); border-radius: var(--radius); box-shadow: var(--shadow); display: grid; grid-template-columns: max-content minmax(min-content, max-content) minmax(240px, 320px); gap: 9px 12px; align-items: center; }
 /* Строки прозрачны для сетки: метки — колонка 1, значения — колонка 2,
-   шкалы — колонка 3. Все шкалы получают общий левый край (после самой
-   длинной строки) и общий правый край блока. */
+   шкалы — колонка 3. Колонка значений шириной по самой длинной строке:
+   шкалы получают общий левый край сразу после неё. */
 .host-row { display: contents; }
 .host-label { color: var(--muted); font-size: 12px; font-weight: 650; }
 .host-val { color: var(--val-fg); font-size: 13px; font-weight: 620; min-width: 0; overflow-wrap: anywhere; }
 .host-track { min-width: 0; }
+.nb { white-space: nowrap; }
 /* Шкала по образцу «Clean line»: высота 10 px, рамка 1 px — нейтральная
    в обеих темах; заливка с отступом 2 px; фон трека — на пол тона от
    фона блока (--track-bg). Тон (пороги 50/75) красит только заливку. */
@@ -212,8 +213,7 @@ h1 { margin: 0; font-size: clamp(26px,3vw,34px); line-height: 1.14; letter-spaci
 .load-pill { flex: none; padding: 5px 8px; border: 1px solid var(--pill-err-border); color: var(--pill-err-fg); background: var(--pill-err-bg); border-radius: 8px; font-weight: 800; font-size: 12px; }
 .load-pill.pill-ok { color: var(--accent); border-color: var(--pill-ok-border); background: var(--pill-ok-bg); }
 .load-pill.pill-warn { color: var(--amber); border-color: var(--pill-warn-border); background: var(--pill-warn-bg); }
-.gpu-body { padding: 14px 18px 15px; display: grid; grid-template-columns: max-content minmax(0, 1fr) minmax(150px, 240px); gap: 9px 12px; align-items: center; }
-.gpu-body .host-label { min-width: 104px; }
+.gpu-body { padding: 14px 18px 15px; display: grid; grid-template-columns: max-content minmax(min-content, max-content) minmax(120px, 1fr); gap: 9px 10px; align-items: center; }
 .gpu-planned { color: var(--muted); opacity: .75; }
 
 /* ---- матрица GPU (этап 2) ---- */
@@ -246,6 +246,7 @@ table.matrix thead th { font-size: 11px; color: var(--muted); font-weight: 700; 
 /* ---- каталог моделей (этап 3, v0.3.0) ---- */
 .models-root { margin: 6px 0 2px; font-size: 12px; }
 .models-list { margin-top: 12px; display: flex; flex-direction: column; gap: 8px; }
+.model-num { flex: none; min-width: 22px; text-align: right; color: var(--muted); font-size: 12px; font-weight: 650; font-variant-numeric: tabular-nums; }
 .model-row { display: flex; align-items: center; gap: 14px; padding: 10px 14px; border: 1px solid var(--line-soft); border-radius: 10px; background: var(--surface); }
 .model-main { min-width: 0; flex: 1; }
 .model-name { font-weight: 650; color: var(--text); overflow-wrap: anywhere; }
