@@ -14,6 +14,7 @@ import time
 from fastapi import APIRouter, Request
 from fastapi.responses import HTMLResponse, PlainTextResponse, StreamingResponse
 
+from ..helper_client import HelperError, call_power
 from ..i18n import translate
 
 router = APIRouter()
@@ -152,6 +153,41 @@ async def save_models_order(request: Request):
     state.db.audit(ip, request.state.session["username"],
                    "ui_order", "models", "ok", f"порядок: {len(paths)} моделей")
     return PlainTextResponse(translate(state.i18n_lang, "order_saved"))
+
+
+@router.post("/ui/power")
+async def power_server(request: Request):
+    """Выключение/перезагрузка СТАНЦИИ с панели (v0.3.12, Config panel низ).
+
+    Выполняется через root-owned helper: `sudo -n <helper> power <op>`;
+    сам helper разрешает операцию ТОЛЬКО при явной секции "power" в
+    allowlist.json (безопасный дефолт — отказ). На клиенте кнопка
+    требует подтверждения и отсчёта 5 с с отменой (app.js).
+    """
+    state = request.app.state.panel
+    try:
+        form = await request.form()
+    except Exception:  # noqa: BLE001
+        form = {}
+    if form.get("csrf") != request.state.csrf:
+        return PlainTextResponse(translate(state.i18n_lang, "bad_csrf"), status_code=403)
+
+    op = str(form.get("action", "")).strip()
+    if op not in ("poweroff", "reboot"):
+        return PlainTextResponse(translate(state.i18n_lang, "bad_request"), status_code=400)
+
+    ip = request.client.host if request.client else ""
+    user = request.state.session["username"]
+    state.db.audit(ip, user, f"power:{op}", "server", "started",
+                   "команда с панели (подтверждена клиентом, отсчёт 5 с)")
+    try:
+        call_power(state.cfg.helper_path, op)
+    except HelperError as e:
+        state.db.audit(ip, user, f"power:{op}", "server", "helper_error", e.message)
+        return PlainTextResponse(e.message)
+    state.db.audit(ip, user, f"power:{op}", "server", "ok",
+                   "задача принята systemd; хост уйдёт вниз через несколько секунд")
+    return PlainTextResponse(translate(state.i18n_lang, "power_sent"))
 
 
 @router.get("/events")

@@ -33,6 +33,8 @@ ALLOWLIST_PATH = "/etc/llm-panel/allowlist.json"
 UNIT_RE = re.compile(r"^[A-Za-z0-9_.@-]{1,64}\.service$")
 JOURNAL_MAX_LINES = 5000
 ACTIONS = ("start", "stop", "restart", "enable", "disable", "status", "journal", "journal-follow")
+# Хостовые power-операции (не юниты): выключение/перезагрузка СТАНЦИИ.
+POWER_ACTIONS = ("poweroff", "reboot")
 
 SHOW_PROPS = ("ActiveState", "SubState", "Result", "ExecMainPID",
               "ExecMainStartTimestamp", "ExecMainExitTimestamp", "NRestarts", "UnitFileState")
@@ -45,6 +47,7 @@ def die(code: int, msg: str) -> None:
 
 
 def load_allowlist() -> dict:
+    """Полный документ allowlist.json: {"units": {...}, "power": {...}?}."""
     try:
         with open(ALLOWLIST_PATH, "r", encoding="utf-8") as f:
             data = json.load(f)
@@ -60,7 +63,7 @@ def load_allowlist() -> dict:
         st = os.stat(ALLOWLIST_PATH)
         if st.st_uid != 0:
             die(3, "allowlist принадлежит не root — отказ (защита от подмены)")
-    return data["units"]
+    return data
 
 
 def validate_unit(unit: str) -> str:
@@ -106,6 +109,42 @@ def main() -> int:
     if not argv:
         die(2, "нет аргументов; ожидалось: <action> <unit> [extra]")
     action = argv[0]
+
+    # Хостовая power-операция: НЕ юнит, разрешение проверяется по опциональной
+    # секции "power" allowlist ('"power": {"reboot": true, "poweroff": true}').
+    # Секция отсутствует / операция не указана явно — ОТКАЗ (безопасный дефолт).
+    if action == "power":
+        if len(argv) != 2 or argv[1] not in POWER_ACTIONS:
+            die(2, "power принимает ровно один аргумент: poweroff | reboot")
+        data_all = load_allowlist()
+        pcfg = data_all.get("power")
+        if not (isinstance(pcfg, dict) and pcfg.get(argv[1]) is True):
+            syslog.syslog(syslog.LOG_NOTICE,
+                          f"helper: power {argv[1]} не разрешён allowlist — отказ")
+            print("ОТКАЗ: операция power/" + argv[1]
+                  + ' не разрешена (секция "power" в allowlist.json)', file=sys.stderr)
+            return 3
+        plan_argv = ["systemctl", argv[1], "--no-ask-password"]
+        if dry_run:
+            plan = {"action": "power", "unit": argv[1], "allowed": True, "argv": plan_argv}
+            print(json.dumps(plan, ensure_ascii=False))
+            syslog.syslog(syslog.LOG_INFO,
+                          f"helper: DRY-RUN power {argv[1]} — валидация пройдена")
+            return 0
+        try:
+            proc = subprocess.run(plan_argv, capture_output=True, text=True, timeout=60.0)
+        except subprocess.TimeoutExpired:
+            die(4, "systemctl не ответил вовремя")
+        if proc.returncode != 0:
+            syslog.syslog(syslog.LOG_ERR,
+                          f"helper: сбой systemctl {argv[1]}: rc={proc.returncode}")
+            sys.stdout.write(proc.stdout or "")
+            print(proc.stderr or "", file=sys.stderr, end="")
+            return 4
+        sys.stdout.write(proc.stdout or "")
+        syslog.syslog(syslog.LOG_WARNING, f"helper: power {argv[1]} -> rc=0 (хостовая операция)")
+        return 0
+
     if action not in ACTIONS:
         die(2, "неизвестное действие")
 
@@ -114,7 +153,8 @@ def main() -> int:
     unit = validate_unit(argv[1])
 
     allowlist = load_allowlist()
-    entry = allowlist.get(unit)
+    units = allowlist.get("units") or {}
+    entry = units.get(unit)
     if entry is None:
         syslog.syslog(syslog.LOG_NOTICE, f"helper: юнит {unit} вне allowlist — отказ")
         print(f"ОТКАЗ: юнит {unit} не внесён в allowlist", file=sys.stderr)

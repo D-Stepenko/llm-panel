@@ -277,9 +277,24 @@ STRINGS: dict[str, dict[str, str]] = {
         # --- служебные ответы ---
         "bad_csrf": "Invalid CSRF token",
         "bad_action": "Invalid action",
+        "bad_request": "Bad request",
         "auth_required": "Authorization required",
         "bad_host": "Invalid Host",
         "bad_origin": "Invalid Origin",
+        # --- выключение/перезагрузка сервера (Config panel, v0.3.12) ---
+        "power_section": "Server power controls",
+        "power_hint": "Shuts down or reboots the STATION host (the panel goes down too). "
+                      "Requires updated root helper and the «power» section in allowlist.json "
+                      "(docs/DEPLOY.md §6.2). One command is enough to stop it: during the "
+                      "countdown press «Cancel» (or the button again / Esc).",
+        "power_reboot": "Reboot server",
+        "poweroff": "Shut down server",
+        "power_count_reboot": "Server will reboot in {n} s",
+        "power_count_poweroff": "Server will shut down in {n} s",
+        "power_cancel": "Cancel",
+        "power_sent": "Command accepted by systemd — the host goes down in a few seconds",
+        "power_sent_reboot": "Command accepted by systemd — the server reboots in a few seconds",
+        "power_sent_poweroff": "Command accepted by systemd — the server shuts down in a few seconds",
         # --- Config Panel ---
         "page_config_title": "Config Panel — llm-panel",
         "config_eyebrow": "Configuration",
@@ -598,9 +613,24 @@ STRINGS: dict[str, dict[str, str]] = {
         # --- служебные ответы ---
         "bad_csrf": "Недопустимый CSRF-токен",
         "bad_action": "Недопустимое действие",
+        "bad_request": "Некорректный запрос",
         "auth_required": "Требуется авторизация",
         "bad_host": "Недопустимый Host",
         "bad_origin": "Недопустимый Origin",
+        # --- выключение/перезагрузка сервера (Config panel, v0.3.12) ---
+        "power_section": "Выключение и перезагрузка сервера",
+        "power_hint": "Полное выключение или перезагрузка ХОСТА станции (панель тоже погаснет). "
+                      "Нужны обновлённый root-helper и секция «power» в allowlist.json "
+                      "(docs/DEPLOY.md §6.2). Перед выполнением — отсчёт 5 секунд: отменить "
+                      "можно кнопкой «Отмена», повторным нажатием той же кнопки или Esc.",
+        "power_reboot": "Перезагрузить сервер",
+        "poweroff": "Выключить сервер",
+        "power_count_reboot": "Перезагрузка сервера через {n} с",
+        "power_count_poweroff": "Выключение сервера через {n} с",
+        "power_cancel": "Отмена",
+        "power_sent": "Команда принята systemd — хост уйдёт вниз через несколько секунд",
+        "power_sent_reboot": "Команда принята systemd — сервер перезагрузится через несколько секунд",
+        "power_sent_poweroff": "Команда принята systemd — сервер выключится через несколько секунд",
         # --- Config Panel ---
         "page_config_title": "Панель настроек — llm-panel",
         "config_eyebrow": "Конфигурация",

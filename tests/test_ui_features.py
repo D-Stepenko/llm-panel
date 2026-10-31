@@ -626,3 +626,54 @@ def test_matrix_conflicts_notice_below_first_table(authed_client):
     assert "Конфликтов GPU/RAM/портов не обнаружено." in between  # между таблицами
     # перед блоком — конец первой таблицы, после — секция «Without GPU binding»
     assert page.text.index("Конфликтов GPU/RAM/портов не обнаружено.") > page.text.index("</table>")
+
+
+def test_power_buttons_and_route(authed_client, monkeypatch):
+    """Config panel: кнопки выключения/перезагрузки сервера + POST /ui/power (v0.3.12)."""
+    from llm_panel.helper_client import HelperError, HelperResult
+    from llm_panel.routes import dashboard as dashboard_mod
+
+    c = authed_client
+    page = c.get("/config", headers={"host": "localhost"})
+    assert 'data-power="reboot"' in page.text
+    assert 'data-power="poweroff"' in page.text
+    assert 'id="power-cancel"' in page.text                       # отмена отсчёта
+    csrf = re.search(r'name="csrf" value="([^"]+)"', page.text).group(1)
+
+    calls = []
+
+    def fake_call_power(helper_path, op, timeout=90.0):
+        calls.append(op)
+        return HelperResult(ok=True, stdout="", stderr="", code=0)
+
+    monkeypatch.setattr(dashboard_mod, "call_power", fake_call_power)
+
+    # нет CSRF → 403; неизвестное действие → 400
+    r = c.post("/ui/power", data={"action": "reboot"}, headers={"host": "localhost"})
+    assert r.status_code == 403
+    r = c.post("/ui/power", data={"action": "halt", "csrf": csrf},
+               headers={"host": "localhost"})
+    assert r.status_code == 400
+
+    # разрешённые действия уходят в helper, успех пишется в аудит
+    r = c.post("/ui/power", data={"action": "poweroff", "csrf": csrf},
+               headers={"host": "localhost"})
+    assert r.status_code == 200
+    assert calls == ["poweroff"]
+    db = c.app.state.panel.db
+    actions = [a["action"] for a in db.audit_tail(10)]
+    assert "power:poweroff" in actions
+    assert any(a["action"] == "power:poweroff" and a["result"] == "ok" for a in db.audit_tail(10))
+
+    # ошибка helper'а (например, нет секции "power") — понятное сообщение, аудит helper_error
+    def boom(helper_path, op, timeout=90.0):
+        raise HelperError(kind="denied",
+                          message="отказано: юнит или операция вне allowlist (проверено самим helper)",
+                          code=3)
+
+    monkeypatch.setattr(dashboard_mod, "call_power", boom)
+    r = c.post("/ui/power", data={"action": "reboot", "csrf": csrf},
+               headers={"host": "localhost"})
+    assert r.status_code == 200
+    assert "вне allowlist" in r.text
+    assert any(a["result"] == "helper_error" for a in db.audit_tail(10))

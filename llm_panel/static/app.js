@@ -180,3 +180,80 @@
     }).catch(function () { /* нет доступа к буферу — текст можно выделить вручную */ });
   });
 })();
+
+// --- Выключение/перезагрузка СЕРВЕРА (Config panel, v0.3.12) ----------------
+// Подтверждение + отсчёт 5 секунд с отменой: клик по кнопке запускает
+// отсчёт (npm-модалей нет, CSP запрещает inline) — отменить можно кнопкой
+// «Отмена», повторным нажатием той же кнопки или Esc. По истечении —
+// POST /ui/power; право выполняет операцию проверяет root-owned helper
+// по секции "power" в allowlist.json.
+(function () {
+  "use strict";
+  var btns = Array.prototype.slice.call(document.querySelectorAll("[data-power]"));
+  if (!btns.length) return;
+  var box = document.getElementById("power-confirm");     // отсчёт + «Отмена»
+  var boxText = document.getElementById("power-confirm-text");
+  var result = document.getElementById("power-result");   // итог (ok/err)
+  var armed = null;   // { btn, op, left, timer }
+
+  function disarm() {
+    if (armed) { clearInterval(armed.timer); armed = null; }
+    if (box) box.classList.add("hidden");
+    btns.forEach(function (b) { b.disabled = false; });
+  }
+
+  function showResult(ok, text) {
+    if (!result) return;
+    result.classList.remove("hidden");
+    result.classList.toggle("err", !ok);
+    result.classList.toggle("ok", ok);
+    result.textContent = text || "";
+  }
+
+  function fire(op) {
+    disarm();
+    if (result) result.classList.add("hidden");
+    var fd = new FormData();
+    fd.append("action", op);
+    fd.append("csrf", document.body.dataset.csrf || "");
+    fetch("/ui/power", { method: "POST", body: fd, credentials: "same-origin" })
+      .then(function (r) {
+        return r.text().then(function (t) { return { ok: r.ok, text: t }; });
+      })
+      .then(function (r) { showResult(r.ok, r.text); })
+      .catch(function () {
+        // соединение рвануло ДО ответа: при реальном poweroff сервер уходит
+        // вниз раньше HTTP-ответа — команда обычно уже принята systemd
+        showResult(true, (datasetDone(op)) || "");
+      });
+  }
+
+  function datasetDone(op) {
+    var b = btns.filter(function (x) { return x.dataset.power === op; })[0];
+    return b ? b.dataset.done : "";
+  }
+
+  btns.forEach(function (btn) {
+    btn.addEventListener("click", function () {
+      if (armed && armed.btn === btn) { disarm(); return; }   // повторный клик — отмена
+      disarm();
+      if (result) result.classList.add("hidden");
+      armed = { btn: btn, op: btn.dataset.power, left: 5, timer: null };
+      btns.forEach(function (b) { b.disabled = b !== btn; }); // вторую кнопку блокируем
+      if (box) box.classList.remove("hidden");
+      function tick() {
+        if (!armed) return;
+        if (armed.left <= 0) { var op = armed.op; disarm(); fire(op); return; }
+        if (boxText) boxText.textContent = (btn.dataset.countdown || "").replace("{n}", String(armed.left));
+        armed.left -= 1;
+      }
+      tick();
+      armed.timer = setInterval(tick, 1000);
+    });
+  });
+  var cancelBtn = document.getElementById("power-cancel");
+  if (cancelBtn) cancelBtn.addEventListener("click", disarm);
+  document.addEventListener("keydown", function (e) {
+    if (armed && e.key === "Escape") disarm();
+  });
+})();

@@ -269,6 +269,17 @@ services.yaml, allowlist.json, systemd-юниты, sudoers. Редактор к�
   CapabilityBoundingSet в drop-in заменяла весь набор capabilities
   (sudo теряет CAP_SETGID) — из инструкции DEPLOY.md §6.1 убрана,
   предупреждение добавлено также в deploy/llm-panel.service.template.
+  Новое (0.3.12): выключение/перезагрузка СЕРВЕРА с панели — Config
+  Panel, низ страницы: кнопки «Перезагрузить сервер» / «Выключить
+  сервер» с подтверждением и отсчётом 5 секунд с отменой (кнопка
+  «Отмена», повторный клик, Esc; app.js без inline-скриптов по CSP).
+  POST /ui/power (CSRF, аудит power:poweroff/power:reboot) → root-helper
+  `power <poweroff|reboot>` → systemctl от root; разрешение —
+  опциональная секция "power" allowlist.json (false/отсутствие — отказ,
+  безопасный дефолт), sudoers-правил НЕ нужно (helper-путь уже разрешён).
+  Инструкция включения — docs/DEPLOY.md §6.2; пример секции —
+  deploy/allowlist.json.example. Тесты: helper (план/отказ/usage) и роут
+  (кнопки, CSRF/400, аудит, ошибка helper) — 214/214.
 - **Этап 4**: Open WebUI-интеграция.
 
 ## 8. Известные ограничения

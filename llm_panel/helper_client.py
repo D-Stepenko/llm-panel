@@ -96,6 +96,18 @@ def call_helper(helper_path: str, action: str, unit: str, extra: tuple = (), tim
     return result
 
 
+def call_power(helper_path: str, op: str, timeout: float = 90.0) -> HelperResult:
+    """Хостовая операция выключения/перезагрузки СТАНЦИИ (v0.3.12).
+
+    Выполняется как обычное действие через root-owned helper:
+    `sudo -n <helper> power <poweroff|reboot>`; сам helper разрешает
+    операцию только при явной секции "power" в allowlist.json.
+    """
+    if op not in ("poweroff", "reboot"):
+        raise HelperError(kind="usage", message="Недопустимая power-операция")
+    return call_helper(helper_path, "power", op, timeout=timeout)
+
+
 def spawn_helper_follow(helper_path: str, unit: str, lines: int) -> subprocess.Popen:
     """Потоковое чтение журнала (journal-follow) для SSE. Ответственность вызывающего — kill."""
     argv = ["sudo", "-n", helper_path, "journal-follow", unit, str(int(lines))]

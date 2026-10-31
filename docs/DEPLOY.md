@@ -207,6 +207,51 @@ sudo systemctl daemon-reload && sudo systemctl restart llm-panel
 - на CPU без RAPL (не Intel или старое ядро) Вт не показываются вовсе —
   это норма.
 
+## 6.2. Выключение/перезагрузка СЕРВЕРА с панели (v0.3.12)
+
+В Config Panel внизу есть кнопки «Перезагрузить сервер» / «Выключить сервер»:
+подтверждение, отсчёт 5 секунд с отменой (кнопка «Отмена», повторное нажатие
+той же кнопки или Esc), затем POST /ui/power. Панель выполняет операцию
+через тот же root-owned helper: `sudo -n /usr/local/sbin/llm-panel-systemd
+power <poweroff|reboot>` → `systemctl <poweroff|reboot>` от root.
+НОВОЕ sudoers-ПРАВИЛО НЕ НУЖНО (helper-путь уже разрешён sudoers).
+
+Чтобы кнопки заработали, на станции нужно (root-файлы правит владелец):
+
+```bash
+cd /home/dispot/llm-panel
+
+# 1. Обновлённый helper (поддержка power):
+sudo install -o root -g root -m 0755 deploy/helper/llm-panel-systemd \
+     /usr/local/sbin/llm-panel-systemd
+
+# 2. Разрешить power-операции в allowlist (root:root, безопасный дефолт — отказ):
+sudo python3 - <<'EOF'
+import json
+p = "/etc/llm-panel/allowlist.json"
+with open(p, encoding="utf-8") as f:
+    d = json.load(f)
+d["power"] = {"reboot": True, "poweroff": True}
+with open(p, "w", encoding="utf-8") as f:
+    json.dump(d, f, ensure_ascii=False, indent=2)
+EOF
+
+# 3. Проверка РЕАЛЬНОГО allowlist без запуска операции (dry-run от НЕ-root):
+/usr/local/sbin/llm-panel-systemd --dry-run power reboot
+#   ожидание: {"action": "power", "allowed": true, "argv": [...], "unit": "reboot"}
+#   «ОТКАЗ …» — секция не применилась; перепроверьте п.2 и владельца файла.
+```
+
+Примечания:
+
+- отключение операций: `"power": {"reboot": false, "poweroff": false}` или
+  удалить секцию — helper снова откажет;
+- каждая попытка пишется в аудит (`power:reboot` / `power:poweroff`);
+- power-операции погашают И панель — после выполнения страница перестанет
+  отвечать, это ожидаемо; повторный доступ после подъёма хоста;
+- защита: операцию разрешает только явная секция allowlist, проверка дублируется
+  в helper (не только в FastAPI), HTTP-вызов требует CSRF-токена и сессии.
+
 ## 7. Обновление версии
 
 ```bash

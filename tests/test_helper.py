@@ -151,3 +151,31 @@ def test_missing_allowlist_is_refused():
     r = run_helper(["start", "vllm.service"],
                    allowlist={"units": {}})  # пустой allowlist: юнитов нет → отказ
     assert r.returncode == 3
+
+
+# --------------------------------------------------------------- power (v0.3.12)
+def test_power_allowed_plan():
+    """power разрешён секцией allowlist: план systemctl poweroff/reboot."""
+    wl = {**ALLOWLIST, "power": {"poweroff": True, "reboot": True}}
+    r = run_helper(["power", "poweroff"], allowlist=wl)
+    assert r.returncode == 0
+    plan = json.loads(r.stdout)
+    assert plan["argv"] == ["systemctl", "poweroff", "--no-ask-password"]
+    r = run_helper(["power", "reboot"], allowlist=wl)
+    assert r.returncode == 0
+    assert json.loads(r.stdout)["argv"] == ["systemctl", "reboot", "--no-ask-password"]
+
+
+def test_power_denied_without_section():
+    """Секции "power" нет / операция false — отказ (код 3, безопасный дефолт)."""
+    assert run_helper(["power", "poweroff"]).returncode == 3          # секции нет
+    wl = {**ALLOWLIST, "power": {"poweroff": True, "reboot": False}}
+    assert run_helper(["power", "reboot"], allowlist=wl).returncode == 3
+
+
+def test_power_usage_errors():
+    """power требует ровно один аргумент poweroff|reboot (код 2)."""
+    wl = {**ALLOWLIST, "power": {"poweroff": True, "reboot": True}}
+    assert run_helper(["power"], allowlist=wl).returncode == 2
+    assert run_helper(["power", "reboot", "extra"], allowlist=wl).returncode == 2
+    assert run_helper(["power", "halt"], allowlist=wl).returncode == 2
