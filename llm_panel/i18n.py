@@ -33,6 +33,7 @@ STRINGS: dict[str, dict[str, str]] = {
         "order_saved": "Order saved",
         "order_save_err": "Failed to save order: ",
         "order_no_cards": "Service cards not found",
+        "order_no_models": "Model rows not found",
         # --- блок системы ---
         "label_ram": "RAM:",
         "label_swap": "Swap:",
@@ -351,6 +352,7 @@ STRINGS: dict[str, dict[str, str]] = {
         "order_saved": "Порядок сохранён",
         "order_save_err": "Не удалось сохранить порядок: ",
         "order_no_cards": "Карточки сервисов не найдены",
+        "order_no_models": "Строки моделей не найдены",
         # --- блок системы ---
         "label_ram": "RAM:",
         "label_swap": "Swap:",

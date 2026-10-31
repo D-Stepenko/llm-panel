@@ -16,22 +16,6 @@
 </div>
 {% endfor %}
 
-{% if data.conflicts %}
-<div class="matrix-conflicts">
-  {% for c in data.conflicts %}
-  <div class="notice {{ 'err' if c.level == 'err' else 'warn' }}">
-    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><path d="M12 9v4M12 17h.01"/><path d="M10.3 3.9 1.8 18a2 2 0 0 0 1.7 3h17a2 2 0 0 0 1.7-3L13.7 3.9a2 2 0 0 0-3.4 0z"/></svg>
-    <span>{{ c.detail }}</span>
-  </div>
-  {% endfor %}
-</div>
-{% else %}
-<div class="notice">
-  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><path d="M20 6 9 17l-5-5"/></svg>
-  <span>{{ t('matrix_no_conflicts') }}</span>
-</div>
-{% endif %}
-
 {% if data.rows_gpu %}
 <div class="matrix-wrap">
   <table class="matrix">
@@ -92,6 +76,22 @@
 {% endif %}
 {% else %}
 <div class="notice info"><span>{{ t('gpu_no_data') }}</span></div>
+{% endif %}
+
+{% if data.conflicts %}
+<div class="matrix-conflicts">
+  {% for c in data.conflicts %}
+  <div class="notice {{ 'err' if c.level == 'err' else 'warn' }}">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><path d="M12 9v4M12 17h.01"/><path d="M10.3 3.9 1.8 18a2 2 0 0 0 1.7 3h17a2 2 0 0 0 1.7-3L13.7 3.9a2 2 0 0 0-3.4 0z"/></svg>
+    <span>{{ c.detail }}</span>
+  </div>
+  {% endfor %}
+</div>
+{% else %}
+<div class="notice">
+  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><path d="M20 6 9 17l-5-5"/></svg>
+  <span>{{ t('matrix_no_conflicts') }}</span>
+</div>
 {% endif %}
 
 <div class="legend muted">

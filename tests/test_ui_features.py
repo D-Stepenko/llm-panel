@@ -596,6 +596,7 @@ def test_models_numbering_and_manual_sort(authed_client):
     assert 'class="model-num">1</span>' in page.text
     assert 'data-model="/models/aaa"' in page.text
     assert "models-order-btn" in page.text                       # кнопка sort
+    assert 'id="models-list"' in page.text                       # контейнер drag&drop (v0.3.10)
     assert "/models?sort=" not in page.text                      # переключатель убран
     # ручной порядок: aaa в конец → bbb первым
     state.db.set_setting("models_order", _json.dumps(["/models/bbb", "/models/aaa"]))
@@ -606,3 +607,18 @@ def test_models_numbering_and_manual_sort(authed_client):
                          "roots": [], "errors": [], "ts": _time.time()}
     page = c.get("/models", headers={"host": "localhost"})
     assert page.text.index('model-name">ccc') > page.text.index('model-name">aaa')
+
+
+def test_matrix_conflicts_notice_below_table(authed_client):
+    """GPU matrix: блок конфликтов / «нет конфликтов» — ПОД таблицей (v0.3.10)."""
+    c = authed_client
+    gpu = {"index": 0, "uuid": "GPU-9f764cdf-08bd-48a9-c219-a8660a71c1d6",
+           "name": "Tesla V100-SXM2-32GB", "mem_total_mb": 32768,
+           "mem_used_mb": None, "mem_pct": None, "power_w": None,
+           "power_limit_w": None, "power_pct": None, "procs": [], "assigned": []}
+    _set_snapshot(c, [_row("vllm", gpu_info=[gpu])], gpus=[gpu])
+    page = c.get("/matrix", headers={"host": "localhost"})
+    assert "</table>" in page.text                              # таблица отрисована
+    tail = page.text.rsplit("</table>", 1)[1]                   # всё после таблицы
+    assert "Конфликтов GPU/RAM/портов не обнаружено." in tail   # уведомление — под ней
+    assert page.text.index("Конфликтов GPU/RAM/портов не обнаружено.") > page.text.rindex("<table")
