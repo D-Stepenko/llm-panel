@@ -175,21 +175,22 @@ h1 { margin: 0; font-size: clamp(26px,3vw,34px); line-height: 1.14; letter-spaci
 .section-meta.sub { margin: 5px 0 0 40px; }
 
 /* -------------------------- единый блок системы -------------------------- */
-.host-card { padding: 14px 18px; background: var(--host-card-bg); border: 1px solid var(--line-soft); border-radius: var(--radius); box-shadow: var(--shadow); display: flex; flex-direction: column; gap: 9px; }
-.host-row { display: flex; align-items: center; gap: 12px; min-width: 0; }
-.host-label { color: var(--muted); font-size: 12px; font-weight: 650; min-width: 62px; flex: none; }
+.host-card { padding: 14px 18px; background: var(--host-card-bg); border: 1px solid var(--line-soft); border-radius: var(--radius); box-shadow: var(--shadow); display: grid; grid-template-columns: max-content minmax(0, 1fr) minmax(150px, 240px); gap: 9px 12px; align-items: center; }
+/* Строки прозрачны для сетки: метки — колонка 1, значения — колонка 2,
+   шкалы — колонка 3. Все шкалы получают общий левый край (после самой
+   длинной строки) и общий правый край блока. */
+.host-row { display: contents; }
+.host-label { color: var(--muted); font-size: 12px; font-weight: 650; }
 .host-val { color: var(--val-fg); font-size: 13px; font-weight: 620; min-width: 0; overflow-wrap: anywhere; }
-.host-track { flex: 0 1 240px; }
-.host-track .mini-track { margin-top: 0; }
-/* Шкала по образцу «Clean line»: высота 10 px, рамка 1 px, заливка с отступом 2 px.
-   Тон (пороги 50/75) задаётся классом на .mini-track — он красит и рамку, и заливку. */
-.mini-track { position: relative; height: 10px; box-sizing: border-box; padding: 2px; background: var(--track-bg); border: 1px solid rgba(255,255,255,.07); border-radius: 999px; box-shadow: inset 0 2px 5px rgba(0,0,0,.55), 0 0 0 1px rgba(255,255,255,.018); overflow: hidden; }
-.mini-track > span:first-child { display: block; height: 100%; border-radius: 999px; background: linear-gradient(90deg, color-mix(in srgb, var(--accent) 80%, white), var(--accent)); box-shadow: inset 0 0 0 1px rgba(255,255,255,.14); transition: width .6s ease; }
-.mini-track.t-warn { border-color: color-mix(in srgb, var(--amber) 78%, transparent); }
-.mini-track.t-warn > span:first-child { background: linear-gradient(90deg, color-mix(in srgb, var(--amber) 80%, white), var(--amber)); }
-.mini-track.t-err { border-color: color-mix(in srgb, var(--red) 78%, transparent); }
-.mini-track.t-err > span:first-child { background: linear-gradient(90deg, color-mix(in srgb, var(--red) 80%, white), var(--red)); }
-.bar-pct { position: absolute; inset: 0; display: grid; place-items: center; z-index: 2; color: #f5f8fc; font-size: 9px; font-weight: 400; line-height: 1; font-variant-numeric: tabular-nums; letter-spacing: .01em; text-shadow: 0 1px 3px rgba(0,0,0,.92); pointer-events: none; }
+.host-track { min-width: 0; }
+/* Шкала по образцу «Clean line»: высота 10 px, рамка 1 px — нейтральная
+   в обеих темах; заливка с отступом 2 px; фон трека — на пол тона от
+   фона блока (--track-bg). Тон (пороги 50/75) красит только заливку. */
+.mini-track { position: relative; height: 10px; box-sizing: border-box; padding: 2px; background: var(--track-bg); border: 1px solid var(--line-soft); border-radius: 999px; overflow: hidden; }
+.mini-track > span:first-child { display: block; height: 100%; border-radius: 999px; background: var(--accent); transition: width .6s ease; }
+.mini-track.t-warn > span:first-child { background: var(--amber); }
+.mini-track.t-err > span:first-child { background: var(--red); }
+.bar-pct { position: absolute; inset: 0; display: grid; place-items: center; z-index: 2; color: var(--val-fg); font-size: 9px; font-weight: 400; line-height: 1; font-variant-numeric: tabular-nums; letter-spacing: .01em; pointer-events: none; }
 /* Проценты заполнения шкал: CSP style-src self запрещает inline style — ширина классами */
 .p0{width:0%} .p1{width:1%} .p2{width:2%} .p3{width:3%} .p4{width:4%} .p5{width:5%} .p6{width:6%} .p7{width:7%} .p8{width:8%} .p9{width:9%} .p10{width:10%} .p11{width:11%} .p12{width:12%} .p13{width:13%} .p14{width:14%} .p15{width:15%} .p16{width:16%} .p17{width:17%} .p18{width:18%} .p19{width:19%} .p20{width:20%} .p21{width:21%} .p22{width:22%} .p23{width:23%} .p24{width:24%} .p25{width:25%} .p26{width:26%} .p27{width:27%} .p28{width:28%} .p29{width:29%} .p30{width:30%} .p31{width:31%} .p32{width:32%} .p33{width:33%} .p34{width:34%} .p35{width:35%} .p36{width:36%} .p37{width:37%} .p38{width:38%} .p39{width:39%} .p40{width:40%} .p41{width:41%} .p42{width:42%} .p43{width:43%} .p44{width:44%} .p45{width:45%} .p46{width:46%} .p47{width:47%} .p48{width:48%} .p49{width:49%} .p50{width:50%} .p51{width:51%} .p52{width:52%} .p53{width:53%} .p54{width:54%} .p55{width:55%} .p56{width:56%} .p57{width:57%} .p58{width:58%} .p59{width:59%} .p60{width:60%} .p61{width:61%} .p62{width:62%} .p63{width:63%} .p64{width:64%} .p65{width:65%} .p66{width:66%} .p67{width:67%} .p68{width:68%} .p69{width:69%} .p70{width:70%} .p71{width:71%} .p72{width:72%} .p73{width:73%} .p74{width:74%} .p75{width:75%} .p76{width:76%} .p77{width:77%} .p78{width:78%} .p79{width:79%} .p80{width:80%} .p81{width:81%} .p82{width:82%} .p83{width:83%} .p84{width:84%} .p85{width:85%} .p86{width:86%} .p87{width:87%} .p88{width:88%} .p89{width:89%} .p90{width:90%} .p91{width:91%} .p92{width:92%} .p93{width:93%} .p94{width:94%} .p95{width:95%} .p96{width:96%} .p97{width:97%} .p98{width:98%} .p99{width:99%} .p100{width:100%}
 
@@ -211,7 +212,7 @@ h1 { margin: 0; font-size: clamp(26px,3vw,34px); line-height: 1.14; letter-spaci
 .load-pill { flex: none; padding: 5px 8px; border: 1px solid var(--pill-err-border); color: var(--pill-err-fg); background: var(--pill-err-bg); border-radius: 8px; font-weight: 800; font-size: 12px; }
 .load-pill.pill-ok { color: var(--accent); border-color: var(--pill-ok-border); background: var(--pill-ok-bg); }
 .load-pill.pill-warn { color: var(--amber); border-color: var(--pill-warn-border); background: var(--pill-warn-bg); }
-.gpu-body { padding: 14px 18px 15px; display: flex; flex-direction: column; gap: 9px; }
+.gpu-body { padding: 14px 18px 15px; display: grid; grid-template-columns: max-content minmax(0, 1fr) minmax(150px, 240px); gap: 9px 12px; align-items: center; }
 .gpu-body .host-label { min-width: 104px; }
 .gpu-planned { color: var(--muted); opacity: .75; }
 
