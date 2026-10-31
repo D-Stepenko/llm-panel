@@ -221,6 +221,17 @@ power <poweroff|reboot>` → `systemctl <poweroff|reboot>` от root.
 ```bash
 cd /home/dispot/llm-panel
 
+# 0. ОБНОВИТЬ КОД перед установкой helper (урок 2026-11-01: без этого
+#    install копирует старый helper, и кнопки падают с
+#    «ОШИБКА: неизвестное действие» — операция power появилась в 0.3.12):
+git pull origin main
+git log --oneline -1        # ожидание: коммит v0.3.13 или новее
+```
+
+(если каталог станции — не git-клон, скопируйте файлы деплоя вручную, затем все шаги)
+
+```bash
+
 # 1. Обновлённый helper (поддержка power):
 sudo install -o root -g root -m 0755 deploy/helper/llm-panel-systemd \
      /usr/local/sbin/llm-panel-systemd
