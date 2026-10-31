@@ -10,8 +10,6 @@
   <section id="host-init">{{ initial_host | safe }}</section>
   <section id="gpus-init">{{ initial_gpus | safe }}</section>
 
-  <section id="services-init">{{ initial_services | safe }}</section>
-
   <div class="services-head">
     <div class="grid-title">{{ t('services') }}</div>
     <button id="order-btn" type="button" class="order-btn" title="{{ t('sort_title') }}"
@@ -22,5 +20,7 @@
       <span id="order-btn-label">{{ t('sort') }}</span>
     </button>
   </div>
+
+  <section id="services-init">{{ initial_services | safe }}</section>
 </div>
 {% endblock %}

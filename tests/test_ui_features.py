@@ -597,6 +597,8 @@ def test_models_numbering_and_manual_sort(authed_client):
     assert 'data-model="/models/aaa"' in page.text
     assert "models-order-btn" in page.text                       # кнопка sort
     assert 'id="models-list"' in page.text                       # контейнер drag&drop (v0.3.10)
+    # номер — ВНЕ карточки: обёртка .model-item снаружи, .model-row внутри (v0.3.11)
+    assert re.search(r'class="model-item" data-model="/models/aaa">\s*<span class="model-num">\d+</span>\s*<div class="model-row">', page.text)
     assert "/models?sort=" not in page.text                      # переключатель убран
     # ручной порядок: aaa в конец → bbb первым
     state.db.set_setting("models_order", _json.dumps(["/models/bbb", "/models/aaa"]))
@@ -609,8 +611,9 @@ def test_models_numbering_and_manual_sort(authed_client):
     assert page.text.index('model-name">ccc') > page.text.index('model-name">aaa')
 
 
-def test_matrix_conflicts_notice_below_table(authed_client):
-    """GPU matrix: блок конфликтов / «нет конфликтов» — ПОД таблицей (v0.3.10)."""
+def test_matrix_conflicts_notice_below_first_table(authed_client):
+    """GPU matrix: блок конфликтов / «нет конфликтов» — под ПЕРВОЙ таблицей,
+    НАД секцией «Without GPU binding» (v0.3.11)."""
     c = authed_client
     gpu = {"index": 0, "uuid": "GPU-9f764cdf-08bd-48a9-c219-a8660a71c1d6",
            "name": "Tesla V100-SXM2-32GB", "mem_total_mb": 32768,
@@ -619,6 +622,7 @@ def test_matrix_conflicts_notice_below_table(authed_client):
     _set_snapshot(c, [_row("vllm", gpu_info=[gpu])], gpus=[gpu])
     page = c.get("/matrix", headers={"host": "localhost"})
     assert "</table>" in page.text                              # таблица отрисована
-    tail = page.text.rsplit("</table>", 1)[1]                   # всё после таблицы
-    assert "Конфликтов GPU/RAM/портов не обнаружено." in tail   # уведомление — под ней
-    assert page.text.index("Конфликтов GPU/RAM/портов не обнаружено.") > page.text.rindex("<table")
+    between = page.text.split("</table>", 1)[1].split("<table", 1)[0]
+    assert "Конфликтов GPU/RAM/портов не обнаружено." in between  # между таблицами
+    # перед блоком — конец первой таблицы, после — секция «Without GPU binding»
+    assert page.text.index("Конфликтов GPU/RAM/портов не обнаружено.") > page.text.index("</table>")

@@ -178,8 +178,15 @@ sudo systemctl edit llm-panel
 ```ini
 [Service]
 AmbientCapabilities=CAP_DAC_READ_SEARCH
-CapabilityBoundingSet=CAP_DAC_READ_SEARCH
 ```
+
+**Строку `CapabilityBoundingSet=…` НЕ добавлять** (урок станции 2026-10-31):
+она ЗАМЕНЯЕТ весь набор capabilities юнита, после чего `sudo` внутри панели
+не может перейти в root-gid и управление сервисами падает с ошибкой
+«helper завершился с кодом 1: sudo: unable to change to root gid: Operation
+not permitted · sudo: error initializing audit plugin sudoers_audit».
+`AmbientCapabilities=` сам добавляет capability в эффективный/разрешённый
+наборы и ограничений для sudo не создаёт.
 
 ```bash
 # 3. Применить:
@@ -190,8 +197,9 @@ sudo systemctl daemon-reload && sudo systemctl restart llm-panel
 
 - capability даёт **только чтение** файлов, запись не разрешает — песочница
   (`ProtectSystem=strict`, `ReadWritePaths=…`) не ослабляется;
-- `CapabilityBoundingSet` в drop-in заменяет исходный набор capabilities —
-  у панели других нет, поэтому переопределение безопасно;
+- если в drop-in уже есть `CapabilityBoundingSet=CAP_DAC_READ_SEARCH` —
+  удалить её (`sudo systemctl revert llm-panel` откатит drop-in целиком,
+  после чего повторить шаги 2–3 без этой строки);
 - Вт появляются со второго опроса метрик (мощность считается по дельте
   счётчика за интервал) — подождите ~30–60 секунд после рестарта;
 - если Вт всё ещё нет: `systemctl show llm-panel -p NoNewPrivileges`

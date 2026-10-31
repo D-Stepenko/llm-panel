@@ -160,7 +160,7 @@
   setupSort({
     btnId: "models-order-btn", labelId: "models-order-btn-label",
     container: function () { return document.getElementById("models-list"); },
-    cardClass: ".model-row", cardClassRaw: "model-row",
+    cardClass: ".model-item", cardClassRaw: "model-item",
     cardValue: function (card) { return card.dataset.model || ""; },
     url: "/ui/models-order",
   });

@@ -13,6 +13,10 @@
 #   * NoNewPrivileges=yes ЗАПРЕЩЁН: панель вызывает sudo -n <helper>, а этот
 #     флаг делает sudo невозможным (код возврата 1, «Сервисами невозможно
 #     управлять»). Управление сервисами в архитектуре ТЗ §6.3 идёт через sudo.
+#   * CapabilityBoundingSet (в том числе в drop-in) ЗАПРЕЩЁН: sudo после
+#     setuid-root получает permitted = bounding set, и без CAP_SETGID падает
+#     («unable to change to root gid: Operation not permitted»). Для чтения
+#     RAPL использовать ТОЛЬКО AmbientCapabilities — см. docs/DEPLOY.md §6.1.
 #   * ProtectSystem=strict требует явного ReadWritePaths= на каталог данных,
 #     иначе запись БД/аудита будет нарушена. Включайте sandbox-опции ПО ОДНОЙ
 #     с проверкой (nvml, запись БД, sudo -n … status <юнит> от имени пользователя).

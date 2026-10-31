@@ -39,7 +39,7 @@
 {% endfor %}
 
 {% if data.models %}
-<div class="services-head">
+<div class="services-head models-head">
   <div class="grid-title">{{ t('models_catalog') }}</div>
   <button id="models-order-btn" type="button" class="order-btn" title="{{ t('sort_models_title') }}"
           data-label="{{ t('sort') }}" data-label-save="{{ t('save_order') }}"
@@ -51,8 +51,9 @@
 </div>
 <div class="models-list" id="models-list">
   {% for m in data.models %}
-  <div class="model-row" data-model="{{ m.path }}">
+  <div class="model-item" data-model="{{ m.path }}">
     <span class="model-num">{{ loop.index }}</span>
+    <div class="model-row">
     <div class="model-main">
       <div class="model-name">{{ m.name }}</div>
       <div class="muted model-path" title="{{ m.path }}">{{ m.path }}</div>
@@ -66,6 +67,7 @@
     <div class="model-size">
       <span class="model-size-val">{{ m.size_bytes | hb }}</span>
       <span class="muted model-files">{{ m.n_files }} {{ t('models_files') }}</span>
+    </div>
     </div>
   </div>
   {% endfor %}
