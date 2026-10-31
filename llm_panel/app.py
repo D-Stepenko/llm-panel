@@ -192,8 +192,8 @@ def create_app(config: PanelConfig) -> FastAPI:
             if c is None:
                 return translate(lang, "no_data")
             if state.temp_unit == "F":
-                return f"{c * 9 / 5 + 32:.0f} °F"
-            return f"{c} °C"
+                return f"{c * 9 / 5 + 32:g} °F"
+            return f"{c:g} °C"
 
         ctx.setdefault("temp", temp)
         return templates.TemplateResponse(name, ctx)

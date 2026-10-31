@@ -8,8 +8,8 @@
 <div class="gpu-grid">
 {% for g in g_list %}
   {% set mem_pct = g.get('mem_pct') %}
-  {% set pill_tone = 'pill-err' if (mem_pct or 0) > 80 else ('pill-warn' if (mem_pct or 0) > 60 else 'pill-ok') %}
-  {% set tone = 't-err' if (mem_pct or 0) > 80 else ('t-warn' if (mem_pct or 0) > 60) %}
+  {% set pill_tone = 'pill-err' if (mem_pct or 0) > 75 else ('pill-warn' if (mem_pct or 0) > 50 else 'pill-ok') %}
+  {% set tone = 't-err' if (mem_pct or 0) > 75 else ('t-warn' if (mem_pct or 0) > 50) %}
   <article class="gpu-card">
     <div class="gpu-card-head">
       <div class="gpu-ident-txt">
@@ -22,14 +22,14 @@
       <div class="host-row">
         <span class="host-label">{{ t('gpu_mem') }}</span>
         <span class="host-val">{% if g.get('mem_used_mb') is not none %}{{ g.mem_used_mb | mem }} / {{ g.get('mem_total_mb') | mem }}{% else %}{{ t('no_data') }}{% endif %}</span>
-        {% if mem_pct %}<div class="host-track"><div class="mini-track"><span class="{{ tone }} p{{ mem_pct }}"></span></div></div>{% endif %}
+        {% if mem_pct %}{% set mpct = mem_pct | int %}<div class="host-track"><div class="mini-track {{ tone }}"><span class="p{{ mpct }}"></span><span class="bar-pct">{{ mpct }}%</span></div></div>{% endif %}
       </div>
       <div class="host-row">
         <span class="host-label">{{ t('gpu_power') }}</span>
         <span class="host-val">{% if g.get('power_w') is not none %}{{ g.power_w }} {{ t('unit_w') }} / {{ g.get('power_limit_w') | int }} {{ t('unit_w') }}{% else %}{{ t('no_data') }}{% endif %}</span>
         {% if g.get('power_pct') %}
-        {% set ppct = g.power_pct %}
-        <div class="host-track"><div class="mini-track"><span class="{{ 't-err' if ppct > 80 else ('t-warn' if ppct > 60) }} p{{ ppct }}"></span></div></div>
+        {% set ppct = g.power_pct | int %}
+        <div class="host-track"><div class="mini-track {{ 't-err' if ppct > 75 else ('t-warn' if ppct > 50) }}"><span class="p{{ ppct }}"></span><span class="bar-pct">{{ ppct }}%</span></div></div>
         {% endif %}
       </div>
       <div class="host-row">

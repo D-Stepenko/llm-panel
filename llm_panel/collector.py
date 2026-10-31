@@ -308,6 +308,8 @@ class Collector:
                 "cpu_cores": host.cpu_cores,
                 "cpu_threads": host.cpu_threads,
                 "cpu_ghz": host.cpu_ghz,
+                "cpu_temp_c": host.cpu_temp_c,
+                "cpu_power_w": host.cpu_power_w,
                 "disks": [list(d) for d in host.disks],
             },
             warnings=warnings,

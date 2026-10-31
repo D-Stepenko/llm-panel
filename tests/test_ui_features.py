@@ -196,13 +196,15 @@ def test_host_cpu_and_units(authed_client):
         "ram_used_mb": 13784, "ram_total_mb": 64197, "ram_available_mb": 50413,
         "swap_used_mb": 512, "swap_total_mb": 8192, "cpu_percent": 45.7,
         "cpu_model": "Xeon E5-2680 v4", "cpu_cores": 14, "cpu_threads": 28,
-        "cpu_ghz": 2.0, "disks": [],
+        "cpu_ghz": 2.0, "cpu_temp_c": 30.0, "cpu_power_w": 34.9, "disks": [],
     }
     page = c.get("/", headers={"host": "localhost"})
     assert ">RAM:</span>" in page.text and "13.78 ГБ / 64.2 ГБ (доступно 50.4 ГБ)" in page.text  # RAM: красивые ГБ
     assert ">Swap:</span>" in page.text and "512 МБ / 8.19 ГБ" in page.text                      # Swap в ГБ/МБ
-    assert ">CPU:</span>" in page.text and "Xeon E5-2680 v4 · 14 ядер / 28 потоков · 2.0 ГГц — 46 %" in page.text  # модель/ядра/частота/загрузка
-    assert 'p46' in page.text                                                                # track заполнен
+    # модель/ядра/частота + температура/мощность; процент загрузки — только на шкале
+    assert ">CPU:</span>" in page.text and "Xeon E5-2680 v4 · 14 ядер / 28 потоков · 2.0 ГГц 30 °C 35 Вт" in page.text
+    assert "— 46 %" not in page.text
+    assert 'p46' in page.text and 'bar-pct">46%</span>' in page.text   # шкала заполнена, процент по центру
     # диски в одной строке единого блока
     c.app.state.panel.collector.snapshot.host["disks"] = [["/models", 457.0, 72.3], ["/ling", 500.0, 61.0]]
     page = c.get("/", headers={"host": "localhost"})
@@ -452,3 +454,124 @@ def test_default_language_is_en(tmp_path):
     page = c.get("/login", headers={"host": "localhost"})
     assert "Sign in" in page.text and "Username" in page.text
     app.state.panel.db.close()
+
+
+# ---------------- v0.3.6: температура/мощность CPU, шкалы по образцу ----------
+
+def test_read_host_temp_power_fields_none_without_sensors():
+    """В тестовой среде (Windows/нет сенсоров и RAPL) — оба поля None, без падений."""
+    from llm_panel.metrics import HostMetrics, MetricsCollector
+
+    m = MetricsCollector()
+    h = m.read_host(())
+    assert isinstance(h, HostMetrics)
+    assert h.cpu_temp_c is None
+    assert h.cpu_power_w is None
+
+
+def test_cpu_temp_package_id_priority(monkeypatch):
+    """Температура CPU: «Package id 0» в приоритете, иначе максимум по сенсорам."""
+    from types import SimpleNamespace as NS
+
+    from llm_panel import metrics as met
+
+    sensors = {"coretemp": [NS(label="Core 0", current=41.0),
+                            NS(label="Package id 0", current=30.0)]}
+
+    class FakePsutil:
+        @staticmethod
+        def sensors_temperatures():
+            return sensors
+
+    monkeypatch.setattr(met, "psutil", FakePsutil)
+    m = met.MetricsCollector.__new__(met.MetricsCollector)
+    assert m._read_cpu_temp() == 30.0           # Package важнее ядра
+
+    sensors["coretemp"] = [NS(label="Core 0", current=41.0),
+                           NS(label="Core 1", current=37.0)]
+    assert m._read_cpu_temp() == 41.0           # без Package — максимум
+
+    class BadPsutil:
+        @staticmethod
+        def sensors_temperatures():
+            raise RuntimeError("no sensors")
+
+    monkeypatch.setattr(met, "psutil", BadPsutil)
+    assert m._read_cpu_temp() is None
+
+
+def test_cpu_power_rapl_delta(monkeypatch):
+    """RAPL: Вт = дельта energy_uj за интервал; переполнение/нереалистично → None."""
+    from llm_panel import metrics as met
+
+    state = {"uj": 1_500_000_000, "t": 100.0}
+
+    class FakeDom:
+        def __init__(self, name):
+            self.name = name
+
+        def __truediv__(self, other):
+            return self
+
+        def read_text(self):
+            return str(state["uj"])
+
+    class FakePath:
+        def __init__(self, p):
+            pass
+
+        def glob(self, pattern):
+            return [FakeDom("intel-rapl:0")]
+
+    class FakeTime:
+        @staticmethod
+        def monotonic():
+            return state["t"]
+
+    class FakePathlib:
+        Path = FakePath
+
+    monkeypatch.setattr(met, "pathlib", FakePathlib)
+    monkeypatch.setattr(met, "time", FakeTime())
+
+    m = met.MetricsCollector.__new__(met.MetricsCollector)
+    m._rapl_prev = {}
+    assert m._read_cpu_power() is None            # первое чтение — дельты нет
+    state["uj"] = 1_506_000_000
+    state["t"] = 103.0
+    assert m._read_cpu_power() == 2.0             # 6 Дж за 3 c = 2 Вт
+    state["uj"] = 100                             # переполнение счётчика
+    state["t"] = 104.0
+    assert m._read_cpu_power() is None
+    # нереалистично большие значения отбрасываются
+    state["uj"] = 1_500_000_000 + 10_000_000_000  # 10 кВт за секунду
+    state["t"] = 105.0
+    assert m._read_cpu_power() is None
+
+
+def test_snapshot_carries_cpu_temp_power():
+    """Снапшот прокидывает cpu_temp_c/cpu_power_w в host-словарь."""
+    import inspect
+
+    from llm_panel import collector
+
+    src = inspect.getsource(collector)
+    assert '"cpu_temp_c": host.cpu_temp_c' in src
+    assert '"cpu_power_w": host.cpu_power_w' in src
+
+
+def test_scales_use_sample_style(authed_client):
+    """Шкалы по образцу: тон-класс на .mini-track, процент по центру (bar-pct)."""
+    c = authed_client
+    _set_snapshot(c, [], gpus=[])
+    gpu = {"index": 0, "uuid": "GPU-9f764cdf-08bd-48a9-c219-a8660a71c1d6", "name": "V100",
+           "mem_total_mb": 32768, "mem_used_mb": 19660, "mem_pct": 60,
+           "power_w": 56.5, "power_limit_w": 150.0, "power_pct": 38,
+           "procs": [], "assigned": []}
+    c.app.state.panel.collector.snapshot.gpus = [gpu]
+    page = c.get("/", headers={"host": "localhost"})
+    # тон-класс теперь на треке (красит рамку), заливка — первый span
+    assert 'mini-track t-warn"><span class="p60">' in page.text
+    assert 'bar-pct">60%</span>' in page.text
+    assert 'bar-pct">38%</span>' in page.text
+    assert '<div class="mini-track"><span' not in page.text  # старый вид шкал исчез

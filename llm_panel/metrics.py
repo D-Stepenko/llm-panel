@@ -8,8 +8,10 @@
 from __future__ import annotations
 
 import dataclasses
+import pathlib
 import platform
 import re
+import time
 
 import psutil
 
@@ -49,6 +51,8 @@ class HostMetrics:
     cpu_cores: int | None = None  # физические ядра
     cpu_threads: int | None = None  # логические потоки
     cpu_ghz: float | None = None  # текущая частота, ГГц
+    cpu_temp_c: float | None = None  # температура CPU (Package id 0 / max по сенсорам)
+    cpu_power_w: float | None = None  # потребление CPU, Вт (RAPL, дельта за интервал)
     disks: tuple = ()            # ((path, total_gb, free_gb), ...)
 
 
@@ -116,6 +120,8 @@ class MetricsCollector:
         self._init_nvml()
         # Статичные данные CPU (модель/ядра/потоки) читаются один раз
         self._cpu_model, self._cpu_cores, self._cpu_threads = self._read_cpu_static()
+        # RAPL: предыдущее чтение energy_uj (Вт считаются по дельте)
+        self._rapl_prev: dict[str, tuple[float, float]] = {}  # домен → (мкДж, монотонное время)
 
     def _read_cpu_static(self) -> tuple[str, int | None, int | None]:
         model = ""
@@ -229,6 +235,52 @@ class MetricsCollector:
 
     # -- Host --------------------------------------------------------------
 
+    def _read_cpu_temp(self) -> float | None:
+        """Температура CPU (°C): приоритет «Package id 0» (coretemp/k10temp/
+        cpu_thermal), иначе максимум по всем сенсорам. None — если недоступно."""
+        try:
+            data = psutil.sensors_temperatures() or {}
+        except Exception:  # noqa: BLE001 — Linux-only, на ином падаем тихо
+            return None
+        for chip in ("coretemp", "k10temp", "cpu_thermal", "cpu_thermal_zone", "zenthermal"):
+            for entry in data.get(chip, []):
+                label = (getattr(entry, "label", "") or "")
+                if "package" in label.lower():
+                    return float(entry.current)
+        # иначе максимум среди всех значений
+        vals = [float(e.current) for entries in data.values()
+                for e in entries if e.current is not None]
+        return max(vals) if vals else None
+
+    def _read_cpu_power(self) -> float | None:
+        """Потребление CPU (Вт) из RAPL: дельта energy_uj за интервал.
+
+        Достоверность важнее полноты: нечитаемый счётчик (песочница юнита,
+        нет прав), переполнение, странные значения → None (UI просто
+        не покажет Вт).
+        """
+        now = time.monotonic()
+        watts: list[float] = []
+        for dom_dir in pathlib.Path("/sys/class/powercap").glob("intel-rapl:*"):
+            try:
+                uj = int((dom_dir / "energy_uj").read_text().strip())
+            except (OSError, ValueError):
+                continue
+            prev = self._rapl_prev.get(dom_dir.name)
+            self._rapl_prev[dom_dir.name] = (uj, now)
+            if prev is None:
+                continue
+            d_uj = uj - prev[0]
+            if d_uj < 0:            # переполнение счётчика — пропускаем замер
+                continue
+            d_s = now - prev[1]
+            if d_s <= 0:
+                continue
+            w = (d_uj / 1_000_000.0) / d_s
+            if 0 <= w < 10_000:     # правдоподобие: CPU не тянет десятки кВт
+                watts.append(w)
+        return round(max(watts), 1) if watts else None
+
     def read_host(self, model_roots: tuple) -> HostMetrics:
         h = HostMetrics()
         try:
@@ -251,6 +303,8 @@ class MetricsCollector:
                 pass
         except Exception:  # noqa: BLE001 — «нет данных» вместо значений
             pass
+        h.cpu_temp_c = self._read_cpu_temp()
+        h.cpu_power_w = self._read_cpu_power()
         disks = []
         for root in model_roots:
             try:
