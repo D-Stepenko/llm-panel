@@ -216,22 +216,29 @@ sudo systemctl daemon-reload && sudo systemctl restart llm-panel
 power <poweroff|reboot>` → `systemctl <poweroff|reboot>` от root.
 НОВОЕ sudoers-ПРАВИЛО НЕ НУЖНО (helper-путь уже разрешён sudoers).
 
-Чтобы кнопки заработали, на станции нужно (root-файлы правит владелец):
+Чтобы кнопки заработали, на станции нужно (root-файлы правит владелец).
+Порядок обновления станции — копирование ВСЕЙ директории проекта вручную
+(WinSCP/robocopy), без `git pull`:
 
 ```bash
+# 0. Скопировать свежую директорию проекта на станцию (с Windows):
+#    robocopy "C:\...\llm-panel" \\llm\llm-panel /MIR
+#    (или WinSCP: «Keep remote directory up to date»). НЕ заменять .venv!
+#    Урок 2026-11-01: без свежей копии install ставит СТАРЫЙ helper —
+#    кнопки падают («ОШИБКА: неизвестное действие», в панели «ошибка
+#    аргументов helper»), т.к. операция power появилась только в 0.3.12.
+#    Частая причина «cannot stat 'deploy/helper/llm-panel-systemd': No
+#    such file or directory» — команду install выполнили НЕ из каталога
+#    проекта (prompt ~/ вместо ~/llm-panel).
+
 cd /home/dispot/llm-panel
 
-# 0. ОБНОВИТЬ КОД перед установкой helper (урок 2026-11-01: без этого
-#    install копирует старый helper, и кнопки падают с
-#    «ОШИБКА: неизвестное действие» — операция power появилась в 0.3.12):
-git pull origin main
-git log --oneline -1        # ожидание: коммит v0.3.13 или новее
+# 0.1. Проверить, что helper на ФС содержит операцию power:
+grep -c "POWER_ACTIONS" deploy/helper/llm-panel-systemd
+#    ожидание: 1 или больше; если 0 — копия проекта устарела, повторить копирование.
 ```
 
-(если каталог станции — не git-клон, скопируйте файлы деплоя вручную, затем все шаги)
-
 ```bash
-
 # 1. Обновлённый helper (поддержка power):
 sudo install -o root -g root -m 0755 deploy/helper/llm-panel-systemd \
      /usr/local/sbin/llm-panel-systemd
@@ -251,7 +258,11 @@ EOF
 /usr/local/sbin/llm-panel-systemd --dry-run power reboot
 #   ожидание: {"action": "power", "allowed": true, "argv": [...], "unit": "reboot"}
 #   «ОТКАЗ …» — секция не применилась; перепроверьте п.2 и владельца файла.
+#   «ОШИБКА: неизвестное действие» — на /usr/local/sbin остался СТАРЫЙ
+#   helper: повторите п.1, обязательно из каталога ~/llm-panel.
 ```
+
+После обновления кода панели — `sudo systemctl restart llm-panel` + Ctrl+F5.
 
 Примечания:
 
