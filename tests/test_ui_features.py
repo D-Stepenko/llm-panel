@@ -651,6 +651,36 @@ def test_service_grid_layout_css():
     assert ".service-bottom { display: flex; align-items: center; gap: 10px; padding: 10px 16px;" in css
 
 
+# --------------------------------------------------------------- вендоры GPU (v0.3.14)
+def test_gpu_vendor_classification():
+    from llm_panel.metrics import gpu_vendor
+    assert gpu_vendor("Tesla V100-SXM2-32GB") == "nvidia"
+    assert gpu_vendor("NVIDIA GeForce RTX 4090") == "nvidia"
+    assert gpu_vendor(None) == "nvidia"
+    assert gpu_vendor("") == "nvidia"
+    assert gpu_vendor("<НВМЛ ошибка: NVMLError>") == "nvidia"   # не-имя → нейтральный дефолт
+    assert gpu_vendor("AMD Radeon RX 7900 XTX") == "amd"
+    assert gpu_vendor("amd ellesmere [Radeon RX 470/480]") == "amd"
+    assert gpu_vendor("Intel(R) Arc(TM) A770 Graphics") == "intel"
+    assert gpu_vendor("Intel Iris Xe Graphics") == "intel"
+
+
+def test_gpu_vendor_class_in_card(authed_client):
+    """Карточка GPU получает класс gpu-vendor-nvidia (v0.3.14)."""
+    c = authed_client
+    gpu = {"index": 0, "uuid": "GPU-9f764cdf-08bd-48a9-c219-a8660a71c1d6",
+           "name": "Tesla V100-SXM2-32GB", "mem_total_mb": 32768,
+           "mem_used_mb": None, "mem_pct": None, "power_w": None,
+           "power_limit_w": None, "power_pct": None, "procs": [], "assigned": []}
+    _set_snapshot(c, [], gpus=[gpu])
+    page = c.get("/", headers={"host": "localhost"})
+    assert 'gpu-card gpu-vendor-nvidia' in page.text
+    # vendor добавляет _fmt_gpu (build_gpu_rows) — проверяем напрямую
+    from llm_panel.metrics import _fmt_gpu, GpuMetrics
+    row = _fmt_gpu(GpuMetrics(index=0, uuid=gpu["uuid"], name=gpu["name"]), 0)
+    assert row["vendor"] == "nvidia"
+
+
 def test_power_buttons_and_route(authed_client, monkeypatch):
     """Config panel: кнопки выключения/перезагрузки сервера + POST /ui/power (v0.3.12)."""
     from llm_panel.helper_client import HelperError, HelperResult

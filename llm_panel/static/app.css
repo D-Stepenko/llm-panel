@@ -49,6 +49,8 @@
   --host-card-bg: linear-gradient(145deg, rgba(21,29,42,.98), rgba(16,22,32,.98));
   --gpu-card-bg: linear-gradient(150deg, #131d1a, #121720 78%);
   --gpu-border: #285241; --gpu-head-border: rgba(40,82,65,.55);
+  --gpu-border-amd: #5c343d; --gpu-head-border-amd: rgba(92,52,61,.55);
+  --gpu-border-intel: #2d4661; --gpu-head-border-intel: rgba(45,70,97,.55);
   --pill-err-fg: #ff9ba2; --pill-err-border: #64363f; --pill-err-bg: #331f27;
   --pill-ok-border: #2a5c50; --pill-ok-bg: #16251f;
   --pill-warn-border: #64543a; --pill-warn-bg: #35301f;
@@ -111,6 +113,8 @@ html[data-theme="light"] {
   --host-card-bg: linear-gradient(145deg, #ffffff, #f6f8fb);
   --gpu-card-bg: linear-gradient(150deg, #edf6f2, #f7f9fc 78%);
   --gpu-border: #a4dcc9; --gpu-head-border: rgba(12,143,108,.22);
+  --gpu-border-amd: #ddb0b7; --gpu-head-border-amd: rgba(178,58,67,.22);
+  --gpu-border-intel: #a8c0dd; --gpu-head-border-intel: rgba(45,93,168,.22);
   --pill-err-fg: #b23a43; --pill-err-border: #ecc4c9; --pill-err-bg: #fbeff0;
   --pill-ok-border: #a4dcc9; --pill-ok-bg: #e7f5ef;
   --pill-warn-border: #e4d3a8; --pill-warn-bg: #faf3e0;
@@ -208,6 +212,14 @@ h1 { margin: 0; font-size: clamp(26px,3vw,34px); line-height: 1.14; letter-spaci
 /* ------------------------------ GPU-карты ------------------------------- */
 .gpu-grid { display: grid; grid-template-columns: repeat(3, minmax(0,1fr)); gap: 14px; }
 .gpu-card { overflow: hidden; min-width: 0; border: 1px solid var(--gpu-border); border-radius: var(--radius); background: var(--gpu-card-bg); box-shadow: var(--shadow); }
+/* Вендорные рамки (v0.3.14): NVIDIA — зелёная (базовая), AMD/Radeon — красная,
+   Intel/Arc — синяя; в обеих темах приглушённые, под стиль страницы. */
+.gpu-vendor-amd { border-color: var(--gpu-border-amd); }
+.gpu-vendor-amd .gpu-card-head { border-bottom-color: var(--gpu-head-border-amd); }
+.gpu-vendor-amd .load-pill { border-color: var(--gpu-border-amd); }
+.gpu-vendor-intel { border-color: var(--gpu-border-intel); }
+.gpu-vendor-intel .gpu-card-head { border-bottom-color: var(--gpu-head-border-intel); }
+.gpu-vendor-intel .load-pill { border-color: var(--gpu-border-intel); }
 .gpu-card-head { padding: 11px 16px 9px; display: flex; align-items: flex-start; justify-content: space-between; gap: 10px; border-bottom: 1px solid var(--gpu-head-border); }
 .gpu-ident-txt { min-width: 0; }
 .gpu-label { color: var(--muted); font-size: 11px; font-weight: 700; letter-spacing: .08em; text-transform: uppercase; }

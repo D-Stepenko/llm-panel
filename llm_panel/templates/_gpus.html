@@ -9,7 +9,7 @@
 {% for g in g_list %}
   {% set mem_pct = g.get('mem_pct') %}
   {% set tone = 't-err' if (mem_pct or 0) > 75 else ('t-warn' if (mem_pct or 0) > 50) %}
-  <article class="gpu-card">
+  <article class="gpu-card gpu-vendor-{{ gpu_vendor(g.get('name')) }}">
     <div class="gpu-card-head">
       <div class="gpu-ident-txt">
         <div class="gpu-label">GPU {{ g.get('index') }}</div>

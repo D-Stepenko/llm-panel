@@ -17,7 +17,7 @@ from .collector import Collector
 from .config import PanelConfig, UNIT_NAME_RE, load_config
 from .db import Database
 from .i18n import translate
-from .metrics import MetricsCollector, fmt_mem_mb, fmt_uptime
+from .metrics import MetricsCollector, fmt_mem_mb, fmt_uptime, gpu_vendor
 from .registry import ServiceRegistry, load_services, make_display_def
 from .sse import Hub
 from .security import (
@@ -196,6 +196,7 @@ def create_app(config: PanelConfig) -> FastAPI:
             return f"{c:g} °C"
 
         ctx.setdefault("temp", temp)
+        ctx.setdefault("gpu_vendor", gpu_vendor)   # вендор-класс карточки GPU (v0.3.14)
         return templates.TemplateResponse(name, ctx)
 
     state.render = render

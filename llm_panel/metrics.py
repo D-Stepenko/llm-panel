@@ -324,6 +324,21 @@ class MetricsCollector:
             self._nvml_ready = False
 
 
+def gpu_vendor(name: str | None) -> str:
+    """Вендор GPU по имени карты (v0.3.14) — для цветной рамки карточки.
+
+    NVML выдаёт имена только NVIDIA; AMD/Intel используются, если имя
+    пришло из другого источника (класс NVML ошибка → нейтральный nvidia).
+    radeon/amd → "amd", intel/arc → "intel", иначе "nvidia".
+    """
+    n = (name or "").lower()
+    if "radeon" in n or "amd" in n:
+        return "amd"
+    if "intel" in n or "arc" in n:
+        return "intel"
+    return "nvidia"
+
+
 def _fmt_gpu(g: GpuMetrics, index: int) -> dict:
     """Строка GPU для снапшота. None-значения остаются None → «нет данных» в UI."""
     mem_pct = None
@@ -336,6 +351,7 @@ def _fmt_gpu(g: GpuMetrics, index: int) -> dict:
         "index": g.index if g.index is not None else index,
         "uuid": g.uuid,
         "name": g.name,
+        "vendor": gpu_vendor(g.name),
         "mem_total_mb": g.mem_total_mb,
         "mem_used_mb": g.mem_used_mb,
         "mem_pct": mem_pct,
