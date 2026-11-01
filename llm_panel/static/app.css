@@ -378,7 +378,7 @@ textarea.cfg-editor { width: 100%; min-height: 46vh; background: var(--surface-2
 body.order-dragging { cursor: grabbing; user-select: none; -webkit-user-select: none; }
 .service-grid { display: grid; grid-template-columns: repeat(3, minmax(0,1fr)); gap: 12px; }
 .service-card { min-width: 0; background: var(--surface); border: 1px solid var(--line-soft); border-radius: var(--radius); overflow: hidden; box-shadow: var(--shadow); display: flex; flex-direction: column; }
-.service-main { padding: 14px 16px 12px; }
+.service-main { padding: 14px 16px 2px; }
 .service-head { display: flex; align-items: flex-start; justify-content: space-between; gap: 12px; }
 .service-title-wrap { display: flex; align-items: flex-start; gap: 12px; min-width: 0; }
 .head-right { flex: none; display: inline-flex; align-items: center; gap: 8px; }
@@ -390,10 +390,16 @@ body.order-dragging { cursor: grabbing; user-select: none; -webkit-user-select: 
 .status.warn { color: var(--amber); background: var(--amber-dark); border-color: var(--status-warn-border); }
 .status.err { color: var(--red); background: var(--red-dark); border-color: var(--status-err-border); }
 .status.info { color: var(--tur); background: var(--tur-dark); border-color: var(--status-info-border); }
-.service-fields { margin-top: 12px; display: grid; grid-template-columns: repeat(3, minmax(0,1fr)); gap: 11px 14px; }
-.field { min-width: 0; }
+.service-fields { margin-top: 10px; display: flex; flex-wrap: wrap; column-gap: 18px; row-gap: 5px; min-width: 0; }
+.field-inline { display: inline-flex; align-items: baseline; gap: 10px; min-width: 0; }
 .field-label { color: var(--faint); font-size: 10px; letter-spacing: .035em; text-transform: uppercase; font-weight: 700; }
-.field-value { margin-top: 4px; color: var(--val-fg); font-size: 12px; font-weight: 620; overflow-wrap: anywhere; }
+.field-value { color: var(--val-fg); font-size: 12px; font-weight: 620; overflow-wrap: anywhere; }
+/* GPU-карты сервиса: на всю ширину карточки (10px от рамки), чипы целые,
+   5px между соседними (v0.3.15). */
+.service-gpus { margin: 10px 10px 12px; display: flex; align-items: baseline; gap: 10px; min-width: 0; }
+.service-gpus-label { flex: none; color: var(--faint); font-size: 10px; letter-spacing: .035em; text-transform: uppercase; font-weight: 700; }
+.service-gpus-list { display: flex; flex-wrap: wrap; gap: 5px; min-width: 0; align-items: center; }
+.service-gpus-list code { white-space: nowrap; overflow-wrap: normal; }
 .service-bottom { display: flex; align-items: center; gap: 10px; padding: 10px 16px; margin-top: auto; background: var(--card-deep); border-top: 1px solid var(--line-soft); }
 .service-bottom .actions { flex-wrap: wrap; }
 .actions { display: flex; align-items: center; gap: 6px; }
@@ -482,7 +488,6 @@ button.btn { font: inherit; }
      вылезает из карточки и обрезается рамкой (наблюдение 2026-11-01). */
   .gpu-body { grid-template-columns: max-content minmax(min-content, max-content) minmax(64px, 1fr); }
   .service-grid { grid-template-columns: repeat(2, minmax(0,1fr)); }
-  .service-fields { grid-template-columns: repeat(2, minmax(0,1fr)); }
 }
 @media (max-width: 820px) {
   /* шапка остаётся в ОДНУ линию: подпись Config Panel скрывается (иконка), details пользователя скрываются */
@@ -494,7 +499,6 @@ button.btn { font: inherit; }
   .user-details { display: none; }
   .page-head { align-items: flex-start; flex-direction: column; } .snapshot { white-space: normal; }
   .service-grid, .gpu-grid { grid-template-columns: 1fr; }
-  .service-fields { grid-template-columns: repeat(3, minmax(0,1fr)); }
   .section { margin-top: 25px; }
 }
 @media (max-width: 520px) {
@@ -505,9 +509,9 @@ button.btn { font: inherit; }
   .avatar { width: 24px; height: 24px; font-size: 10px; }
   .host-row { flex-wrap: wrap; row-gap: 4px; } .host-track { flex: 1 1 100%; }
   .gpu-card-head, .gpu-body { padding-left: 14px; padding-right: 14px; }
-  .service-main { padding: 15px; } .service-bottom { padding: 11px 12px; align-items: flex-start; flex-direction: column; }
+  .service-main { padding: 15px 15px 2px; } .service-bottom { padding: 11px 12px; align-items: flex-start; flex-direction: column; }
   .actions { width: 100%; } .actions .action-btn { flex: 1; padding: 8px 7px; } .actions .icon-btn { flex: none; }
-  .service-fields { grid-template-columns: repeat(2, minmax(0,1fr)); gap: 12px; }
+  .service-gpus { margin-left: 12px; margin-right: 12px; }
   .status { font-size: 10px; padding: 5px 6px; } .service-title { font-size: 13px; }
   .audit-row { grid-template-columns: 1fr; gap: 5px; }
   .footer { align-items: flex-start; flex-direction: column; }

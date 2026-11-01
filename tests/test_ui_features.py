@@ -637,7 +637,8 @@ def test_matrix_conflicts_notice_below_first_table(authed_client):
 
 
 def test_service_grid_layout_css():
-    """Сервисные карты: 3 в ряд на полной ширине, 2 / 1 на сужении; компактные отступы (v0.3.14)."""
+    """Сервисные карты: 3 в ряд на полной ширине, 2 / 1 на сужении; поля в одну
+    строку, GPU-полоса на всю ширину с чипами-целиками (v0.3.15)."""
     css = (pathlib.Path(__file__).resolve().parent.parent / "llm_panel" / "static" / "app.css").read_text(encoding="utf-8")
     base = css.split(".service-grid {", 1)[1].split("}", 1)[0]
     assert "repeat(3, minmax(0" in base                       # база: 3 колонки
@@ -646,9 +647,13 @@ def test_service_grid_layout_css():
     assert ".service-grid { grid-template-columns: repeat(2, minmax(0,1fr)); }" in m1200
     m820 = css.split("@media (max-width: 820px)", 1)[1].split("@media", 1)[0]
     assert ".service-grid, .gpu-grid { grid-template-columns: 1fr; }" in m820
-    # компактизация: отступы меньше прежних (18px 19px 15px)
-    assert ".service-main { padding: 14px 16px 12px; }" in css
-    assert ".service-bottom { display: flex; align-items: center; gap: 10px; padding: 10px 16px;" in css
+    # поля: метка + значение в одну строку (10px между ними), без сетки
+    assert ".field-inline { display: inline-flex; align-items: baseline; gap: 10px;" in css
+    assert "grid-template-columns" not in css.split(".service-fields {", 1)[1].split("}", 1)[0]
+    # GPU-полоса: на всю ширину (10px от рамки), чипы целые, 5px между
+    assert ".service-gpus { margin: 10px 10px 12px;" in css
+    assert ".service-gpus-list { display: flex; flex-wrap: wrap; gap: 5px;" in css
+    assert ".service-gpus-list code { white-space: nowrap;" in css
 
 
 # --------------------------------------------------------------- вендоры GPU (v0.3.14)
@@ -663,6 +668,24 @@ def test_gpu_vendor_classification():
     assert gpu_vendor("amd ellesmere [Radeon RX 470/480]") == "amd"
     assert gpu_vendor("Intel(R) Arc(TM) A770 Graphics") == "intel"
     assert gpu_vendor("Intel Iris Xe Graphics") == "intel"
+
+
+def test_service_fields_inline_and_gpu_strip(authed_client):
+    """Поля сервис-карты — «метка + значение» в одну строку, без доп-надписей;
+    GPU-карты — отдельной полосой на всю ширину карточки (v0.3.15)."""
+    c = authed_client
+    gpu = {"index": 0, "uuid": "GPU-9f764cdf-08bd-48a9-c219-a8667a71c1d6", "name": "Tesla V100-SXM2-32GB"}
+    row = _row("vllm", gpu_info=[gpu])
+    row["gpu_actual"] = [{"uuid": gpu["uuid"], "index": 0, "name": gpu["name"]}]
+    _set_snapshot(c, [row], gpus=[gpu])
+    page = c.get("/", headers={"host": "localhost"})
+    assert 'class="field-inline"' in page.text               # поля в строку
+    assert 'service-gpus-list' in page.text                  # GPU-полоса
+    assert "снаружи недоступен" not in page.text             # доп-надписи у порта убраны
+    assert "только loopback" not in page.text
+    # title факта привязки — на области GPU (надпись в строку не выносится)
+    assert f'title="{gpu["uuid"]}"' in page.text             # чип: uuid в title, имя целиком
+    assert f'>{gpu["name"]}</code>' in page.text
 
 
 def test_gpu_vendor_class_in_card(authed_client):

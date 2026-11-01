@@ -16,31 +16,34 @@
         </span>
       </div>
 
+      {# Поля в одну строку: «метка + значение» через 10px (v0.3.15).
+         Доп-надписи (loopback/авто/код выхода) убраны — важное в title. #}
       <div class="service-fields">
-        <div class="field">
-          <div class="field-label">{{ t('f_port') }}</div>
-          {% set loopback = ['127.0.0.1', '::1', 'localhost', '::'] %}
+        {% set loopback = ['127.0.0.1', '::1', 'localhost', '::'] %}
+        <span class="field-inline">
+          <span class="field-label">{{ t('f_port') }}</span>
           {% if svc.port and svc.bind_host in loopback %}
-          <div class="field-value">{{ svc.bind_host }}:{{ svc.port }} <span class="muted">{{ t('port_local_only') }}</span></div>
+          <span class="field-value">{{ svc.bind_host }}:{{ svc.port }}</span>
           {% elif svc.port %}
-          <div class="field-value"><a class="port-link" href="http://{{ request.url.hostname }}:{{ svc.port }}/" target="_blank" rel="noopener noreferrer" title="{{ t('port_open_t') }}">{{ svc.bind_host or '?' }}:{{ svc.port }}</a></div>
-          {% elif svc.listen %}<div class="field-value"><code>{{ svc.listen[0] }}</code> <span class="muted">{{ t('port_auto') }}</span></div>{% else %}<div class="field-value">—</div>{% endif %}
-        </div>
-        <div class="field">
-          <div class="field-label">{{ t('f_uptime') }}</div>
-          <div class="field-value">{{ (svc.uptime_s | dur) or '—' }}</div>
-        </div>
-        <div class="field">
-          <div class="field-label">{{ t('f_restarts') }}</div>
-          <div class="field-value">{{ svc.nrestarts if svc.nrestarts is not none else '—' }}</div>
-        </div>
-        <div class="field">
-          <div class="field-label">{{ t('f_systemd') }}</div>
-          <div class="field-value"><code>{{ svc.system_active }}/{{ svc.system_sub }}</code>{% if svc.system_result and svc.system_result != 'success' %} · {{ svc.system_result }}{% endif %}{% if svc.system_active == 'exited' and svc.system_result == 'success' %} · {{ t('exited_ok') }}{% endif %}</div>
-        </div>
-        <div class="field">
-          <div class="field-label">{{ t('f_gpu') }}</div>
-          <div class="field-value">{% if svc.gpu_actual %}{% for g in svc.gpu_actual %}{% if g.name %}<code title="{{ g.uuid }}">{{ g.name }}</code>{% else %}<code title="{{ g.uuid }}">{{ g.uuid[-12:] }}</code>{% endif %}{% endfor %} <span class="muted">{{ t('f_gpu_actual') }}</span>{% elif svc.gpu_info %}{% for g in svc.gpu_info %}{% if g.name %}<code title="{{ g.uuid }}">{{ g.name }}</code>{% elif g.uuid %}<code title="{{ g.uuid }}">{{ g.uuid[-12:] }}</code>{% endif %}{% endfor %}{% else %}—{% endif %}</div>
+          <span class="field-value"><a class="port-link" href="http://{{ request.url.hostname }}:{{ svc.port }}/" target="_blank" rel="noopener noreferrer" title="{{ t('port_open_t') }}">{{ svc.bind_host or '?' }}:{{ svc.port }}</a></span>
+          {% elif svc.listen %}<span class="field-value"><code>{{ svc.listen[0] }}</code></span>{% else %}<span class="field-value">—</span>{% endif %}
+        </span>
+        <span class="field-inline"><span class="field-label">{{ t('f_uptime') }}</span><span class="field-value">{{ (svc.uptime_s | dur) or '—' }}</span></span>
+        <span class="field-inline"><span class="field-label">{{ t('f_restarts') }}</span><span class="field-value">{{ svc.nrestarts if svc.nrestarts is not none else '—' }}</span></span>
+        <span class="field-inline"><span class="field-label">{{ t('f_systemd') }}</span><span class="field-value"><code title="{{ svc.system_result or '' }}">{{ svc.system_active }}/{{ svc.system_sub }}</code></span></span>
+      </div>
+
+      {# GPU-карты — на всю ширину карточки: 10px от рамки слева/справа,
+         5px между чипами; чип НЕ разрывается при переносе (v0.3.15).
+         Факт привязки (NVML) — в title области. #}
+      <div class="service-gpus"{% if svc.gpu_actual %} title="{{ t('f_gpu_actual') }}"{% endif %}>
+        <span class="service-gpus-label">{{ t('f_gpu') }}</span>
+        <div class="service-gpus-list">
+          {% if svc.gpu_actual %}
+            {% for g in svc.gpu_actual %}{% if g.name %}<code title="{{ g.uuid }}">{{ g.name }}</code>{% else %}<code title="{{ g.uuid }}">{{ g.uuid[-12:] }}</code>{% endif %}{% endfor %}
+          {% elif svc.gpu_info %}
+            {% for g in svc.gpu_info %}{% if g.name %}<code title="{{ g.uuid }}">{{ g.name }}</code>{% elif g.uuid %}<code title="{{ g.uuid }}">{{ g.uuid[-12:] }}</code>{% endif %}{% endfor %}
+          {% else %}<span class="field-value">—</span>{% endif %}
         </div>
       </div>
     </div>
