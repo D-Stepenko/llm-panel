@@ -224,6 +224,13 @@ def test_host_cpu_and_units(authed_client):
     assert 'load-pill">95%' in page.text                              # pill нейтральный (v0.3.9)
     # строки процессов и UUID из карточки GPU убраны
     assert "PID" not in page.text and "Сервис не определён" not in page.text and "UUID:" not in page.text
+    # привязки — ВНЕ сетки .gpu-body (v0.3.14): «плановая привязка» и коды
+    # сервисов не разрывают колонки меток/шкал основной сетки
+    binds_pos = page.text.find('class="gpu-binds"')
+    assert binds_pos != -1
+    planned = page.text.find('gpu-planned')
+    assert planned != -1 and planned > binds_pos > page.text.find('class="gpu-body"')
+    assert 'gpu-bind-label' in page.text and 'gpu-bind-codes' in page.text
 
     # пустые данные не должны падать
     c.app.state.panel.collector.snapshot.gpus = [dict(gpu, mem_pct=None, power_w=None, mem_used_mb=None, temp_c=None, procs=[], assigned=[])]
