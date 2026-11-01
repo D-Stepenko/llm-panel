@@ -647,11 +647,14 @@ def test_service_grid_layout_css():
     assert ".service-grid { grid-template-columns: repeat(2, minmax(0,1fr)); }" in m1200
     m820 = css.split("@media (max-width: 820px)", 1)[1].split("@media", 1)[0]
     assert ".service-grid, .gpu-grid { grid-template-columns: 1fr; }" in m820
-    # поля: метка + значение в одну строку (10px между ними), без сетки
+    # поля: сетка ДВЕ КОЛОНКИ (таблица без границ): Порт|Время работы /
+    # Перезапусков|Systemd — колонки держат общий левый край по строкам
+    sfields = css.split(".service-fields {", 1)[1].split("}", 1)[0]
+    assert "grid-template-columns" in sfields and sfields.count("max-content") == 2
     assert ".field-inline { display: inline-flex; align-items: baseline; gap: 10px;" in css
-    assert "grid-template-columns" not in css.split(".service-fields {", 1)[1].split("}", 1)[0]
-    # GPU-полоса: на всю ширину (10px от рамки), чипы целые, 5px между
-    assert ".service-gpus { margin: 10px 10px 12px;" in css
+    # GPU-полоса: метка выровнена по колонке 1 (левый край = padding 16px),
+    # чипы целые, 5px между
+    assert ".service-gpus { margin: 10px 10px 12px 16px;" in css
     assert ".service-gpus-list { display: flex; flex-wrap: wrap; gap: 5px;" in css
     assert ".service-gpus-list code { white-space: nowrap;" in css
 
