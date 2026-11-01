@@ -1,5 +1,6 @@
 """Тесты доработок GUI: порядок карточек (Порядок), авто-CSRF в шаблонах, имена GPU в карточках."""
 
+import pathlib
 import re
 
 import pytest
@@ -633,6 +634,21 @@ def test_matrix_conflicts_notice_below_first_table(authed_client):
     assert "Конфликтов GPU/RAM/портов не обнаружено." in between  # между таблицами
     # перед блоком — конец первой таблицы, после — секция «Without GPU binding»
     assert page.text.index("Конфликтов GPU/RAM/портов не обнаружено.") > page.text.index("</table>")
+
+
+def test_service_grid_layout_css():
+    """Сервисные карты: 3 в ряд на полной ширине, 2 / 1 на сужении; компактные отступы (v0.3.14)."""
+    css = (pathlib.Path(__file__).resolve().parent.parent / "llm_panel" / "static" / "app.css").read_text(encoding="utf-8")
+    base = css.split(".service-grid {", 1)[1].split("}", 1)[0]
+    assert "repeat(3, minmax(0" in base                       # база: 3 колонки
+    # медиа-запрос ≤1200px: 2 колонки; ≤820px: 1 (уже есть «1fr» в правиле со сплоткой)
+    m1200 = css.split("@media (max-width: 1200px)", 1)[1].split("@media", 1)[0]
+    assert ".service-grid { grid-template-columns: repeat(2, minmax(0,1fr)); }" in m1200
+    m820 = css.split("@media (max-width: 820px)", 1)[1].split("@media", 1)[0]
+    assert ".service-grid, .gpu-grid { grid-template-columns: 1fr; }" in m820
+    # компактизация: отступы меньше прежних (18px 19px 15px)
+    assert ".service-main { padding: 14px 16px 12px; }" in css
+    assert ".service-bottom { display: flex; align-items: center; gap: 10px; padding: 10px 16px;" in css
 
 
 def test_power_buttons_and_route(authed_client, monkeypatch):
