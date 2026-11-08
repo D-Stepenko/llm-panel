@@ -37,6 +37,20 @@ def _cmd_init_db(args) -> int:
     return 0
 
 
+def _password_classes(pw: str) -> int:
+    """Число классов символов в пароле (из 4: строчные, прописные, цифры, прочие)."""
+    classes = 0
+    if any(c.islower() for c in pw):
+        classes += 1
+    if any(c.isupper() for c in pw):
+        classes += 1
+    if any(c.isdigit() for c in pw):
+        classes += 1
+    if any((not c.isalnum()) for c in pw):
+        classes += 1
+    return classes
+
+
 def _ask_password() -> str | None:
     # интерактивно, без отображения; не через argv (ТЗ §6.2)
     pw = getpass.getpass("Новый пароль: ")
@@ -44,8 +58,18 @@ def _ask_password() -> str | None:
     if pw != repeat:
         print("Пароли не совпадают.", file=sys.stderr)
         return None
+    # Политика (аудит №11): длина + сложность по составу — не менее 3 из 4
+    # классов символов (строчные/прописные/цифры/прочие).
     if len(pw) < 10:
         print("Пароль должен быть не короче 10 символов.", file=sys.stderr)
+        return None
+    classes = _password_classes(pw)
+    if classes < 3:
+        print(
+            "Слабый пароль: используйте не менее 3 из 4 классов символов "
+            "(строчные, ПРОПИСНЫЕ, цифры, прочие знаки).",
+            file=sys.stderr,
+        )
         return None
     return pw
 

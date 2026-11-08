@@ -179,3 +179,79 @@ def test_power_usage_errors():
     assert run_helper(["power"], allowlist=wl).returncode == 2
     assert run_helper(["power", "reboot", "extra"], allowlist=wl).returncode == 2
     assert run_helper(["power", "halt"], allowlist=wl).returncode == 2
+
+
+# --- аудит №8: биты записи allowlist и его каталога ---------------------------
+#
+# Subprocess-тесты с --dry-run осознанно пропускают stat-проверки (test-env),
+# вне root uid-проверка сработает раньше битовой. Поэтому логику проверки
+# исполняем in-process на исходнике helper'а с подставным os.stat: так
+# покрываются обе новые ветки (биты записи файла и каталога). Реальная
+# root-обвязка проверяется на станции (см. docs/STATION-LLM.md / DEPLOY).
+
+import types  # noqa: E402
+
+
+def _load_helper_ns():
+    src = HELPER.read_text(encoding="utf-8")
+    ns: dict = {"__name__": "helper_under_test", "__file__": str(HELPER)}
+    exec(compile(src, str(HELPER), "exec"), ns)  # noqa: S102 — изолированный прогон исходника
+    return ns
+
+
+def _patch_stat(monkeypatch, file_mode, dir_mode, uid=0, dir_path="", dir_uid=None):
+    """Подставной os.stat: путь каталога → st_dir, всё прочее (файл) → st_file."""
+    st_file = types.SimpleNamespace(st_uid=uid, st_mode=file_mode)
+    st_dir = types.SimpleNamespace(st_uid=(uid if dir_uid is None else dir_uid),
+                                   st_mode=dir_mode)
+
+    def fake_stat(path, *a, **kw):
+        return st_dir if str(path) == dir_path else st_file
+
+    import os
+    monkeypatch.setattr(os, "stat", fake_stat)
+
+
+def _allowlist_case(tmp_path, monkeypatch, file_mode, dir_mode, dir_uid=0):
+    monkeypatch.delenv("LLM_PANEL_ALLOWLIST_TEST", raising=False)
+    p = tmp_path / "allowlist.json"
+    p.write_text(json.dumps(ALLOWLIST), encoding="utf-8")
+    ns = _load_helper_ns()
+    ns["ALLOWLIST_PATH"] = str(p)
+    _patch_stat(monkeypatch, file_mode, dir_mode, uid=0, dir_path=str(p.parent),
+                dir_uid=dir_uid)
+    return ns
+
+
+def test_allowlist_group_other_writable_refused(tmp_path, monkeypatch):
+    """Аудит №8: root-owned allowlist с group/other-write → отказ (код 3)."""
+    import pytest as _pytest
+    ns = _allowlist_case(tmp_path, monkeypatch, 0o100666, 0o040755)
+    with _pytest.raises(SystemExit) as e:
+        ns["load_allowlist"]()
+    assert e.value.code == 3
+
+
+def test_allowlist_dir_not_root_refused(tmp_path, monkeypatch):
+    """Аудит №8: каталог allowlist не от root → отказ (код 3)."""
+    import pytest as _pytest
+    ns = _allowlist_case(tmp_path, monkeypatch, 0o100644, 0o040755, dir_uid=1)
+    with _pytest.raises(SystemExit) as e:
+        ns["load_allowlist"]()
+    assert e.value.code == 3
+
+
+def test_allowlist_dir_group_writable_refused(tmp_path, monkeypatch):
+    """Аудит №8: каталог allowlist с group/other-write → отказ (код 3)."""
+    import pytest as _pytest
+    ns = _allowlist_case(tmp_path, monkeypatch, 0o100644, 0o040777)
+    with _pytest.raises(SystemExit) as e:
+        ns["load_allowlist"]()
+    assert e.value.code == 3
+
+
+def test_allowlist_safe_modes_pass(tmp_path, monkeypatch):
+    """Аудит №8 (позитив): 0644-файл в каталоге 0755 от root — загрузка проходит."""
+    ns = _allowlist_case(tmp_path, monkeypatch, 0o100644, 0o040755)
+    data = ns["load_allowlist"]()
+    assert data["units"]["vllm.service"]["actions"][0] == "start"

@@ -17,12 +17,26 @@ from ..security import (
     get_user,
     verify_password,
     check_lockout,
+    csrf_matches,
     record_login,
 )
 
 router = APIRouter()
 
 _LOGIN_TOKENS: dict[str, float] = {}  # одноразовые токены формы входа → ts (10 мин)
+
+# Аудит №5: несуществующий пользователь раньше отвечал заметно быстрее
+# (verify_password не выполнялся) — перечисление логинов по времени ответа.
+# Прогоняем притворную проверку на ФИКТИВНОМ, но настоящем argon2id-хеше
+# (лениво сгенерированном один раз на процесс), чтобы время ответа совпало.
+_DUMMY_HASH: list[str] = []
+
+
+def _dummy_hash() -> str:
+    if not _DUMMY_HASH:
+        from ..security import hash_password
+        _DUMMY_HASH.append(hash_password("bogus-dummy-password-for-timing-equalization"))
+    return _DUMMY_HASH[0]
 
 
 def _issue_login_token() -> str:
@@ -64,8 +78,9 @@ async def login_submit(request: Request, username: str = Form(default=""),
                             error=translate(state.i18n_lang, "login_stale"),
                             login_token=_issue_login_token())
 
-    # ТЗ §6.1: ограничение попыток, счётчик в БД (переживает рестарт панели)
-    locked, remain_s = check_lockout(db, username, cfg.lockout_failures, cfg.lockout_minutes)
+    # ТЗ §6.1: ограничение попыток, счётчик в БД (переживает рестарт панели);
+    # пара username+ip + глобальный порог на аккаунт (аудит №3)
+    locked, remain_s = check_lockout(db, username, cfg.lockout_failures, cfg.lockout_minutes, ip)
     if locked:
         db.audit(ip, username, "login", "panel", "denied",
                  f"блокировка активна ещё {remain_s} c")
@@ -77,12 +92,20 @@ async def login_submit(request: Request, username: str = Form(default=""),
         )
 
     user = get_user(db, username)
-    ok = bool(user and user["password_hash"] != "!" and verify_password(user["password_hash"], password))
+    if user and user["password_hash"] != "!":
+        ok = verify_password(user["password_hash"], password)
+    else:
+        # Аудит №5: несуществующий пользователь раньше отвечал ЗНАЧИМО быстрее
+        # (verify_password не выполнялся) — перечисление логинов по времени.
+        # Всегда прогоняем притворную проверку на фиктивном хеше: результат
+        # всегда False, время сравнимое.
+        verify_password(_dummy_hash(), password)
+        ok = False
     record_login(db, ip, username, ok)
     if not ok:
         db.audit(ip, username, "login", "panel", "failed", "неверный логин или пароль")
         from ..security import _consecutive_failures
-        n = _consecutive_failures(db, username)
+        n = _consecutive_failures(db, username, ip)
         remaining = max(0, cfg.lockout_failures - n) if not locked else 0
         err = translate(state.i18n_lang, "login_bad")
         if remaining and remaining <= cfg.lockout_failures:
@@ -93,8 +116,13 @@ async def login_submit(request: Request, username: str = Form(default=""),
     token, _csrf = create_session(db, username, cfg.session_minutes)
     db.audit(ip, username, "login", "panel", "ok", "")
     next_url = request.query_params.get("next") or "/"
-    # некорректный next не позволит переход на сторонний источник
-    if not next_url.startswith("/") or next_url.startswith("//"):
+    # некорректный next не позволит переход на сторонний источник.
+    # Аудит №7: раньше отклонялось только "//…" — но "\\<host>" ряд браузеров
+    # трактуют как scheme-relative (тот же домен). Отклоняем оба префикса.
+    if (not next_url.startswith("/")
+            or next_url.startswith("//")
+            or next_url.startswith("/\\")
+            or "\\\\" in next_url):
         next_url = "/"
     resp = RedirectResponse(next_url, status_code=303)
     resp.set_cookie(
@@ -115,7 +143,7 @@ async def logout(request: Request):
     user = request.state.session["username"] if request.state.session else ""
     # CSRF для POST (ТЗ §6.1): форма содержит токен сессии
     form = await request.form()
-    csrf_ok = bool(request.state.session) and form.get("csrf") == request.state.csrf
+    csrf_ok = bool(request.state.session) and csrf_matches(form.get("csrf"), request.state.csrf)
     if not csrf_ok:
         return PlainTextResponse(translate(state.i18n_lang, "bad_csrf"), status_code=403)
     delete_session(state.db, token)

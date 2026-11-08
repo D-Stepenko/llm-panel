@@ -1,5 +1,16 @@
 // Внешний скрипт панели (CSP script-src 'self': inline-скрипты запрещены).
 // SSE-подписка + режим «sort» (перетаскивание карточек сервисов мышью).
+//
+// htmx по умолчанию при инициализации (на DOMContentLoaded) инжектит в <head>
+// свой inline-<style> .htmx-indicator{...}. CSP style-src 'self' (без
+// unsafe-inline) его блокирует → в консоли ошибка «Applying inline style
+// violates the following Content Security Policy directive 'style-src
+// 'self'». Индикаторы htmx в панели не используются, поэтому отключаем
+// авто-инъект. app.js (defer) стартует ПОСЛЕ htmx.min.js и ДО DOMContentLoaded,
+// где htmx читает конфиг — успевается.
+if (window.htmx && window.htmx.config) {
+  window.htmx.config.includeIndicatorStyles = false;
+}
 (function () {
   "use strict";
   if (!document.body) return;

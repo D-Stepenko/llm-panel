@@ -72,7 +72,7 @@ def test_create_and_list_and_passwd(tmp_path, monkeypatch, capsys):
 
     cfg_path = _make_config(tmp_path)
     ei = run_upc(monkeypatch, cfg_path, "create",
-                 ["check-reviewer", "pw-check-123", "pw-check-123"])
+                 ["check-reviewer", "Pw-check-123", "Pw-check-123"])
     assert ei is None                  # нормальное завершение
     db = get_db(tmp_path, cfg_path)
     user = get_user(db, "check-reviewer")
@@ -86,10 +86,10 @@ def test_create_and_list_and_passwd(tmp_path, monkeypatch, capsys):
 
     # смена пароля: новый пароль подтверждается verify_password
     ei = run_upc(monkeypatch, cfg_path, "passwd",
-                 ["check-reviewer", "pw-new-456", "pw-new-456"])
+                 ["check-reviewer", "Pw-new-456a", "Pw-new-456a"])
     assert ei is None
     user = get_user(db, "check-reviewer")
-    assert verify_password(user["password_hash"], "pw-new-456")
+    assert verify_password(user["password_hash"], "Pw-new-456a")
 
 
 def test_delete_protects_admin_and_removes_user(tmp_path, monkeypatch, capsys):
@@ -102,7 +102,7 @@ def test_delete_protects_admin_and_removes_user(tmp_path, monkeypatch, capsys):
 
     # создадим пользователя и удалим
     run_upc(monkeypatch, cfg_path, "create",
-            ["tmp-user", "pw-tmp-12345", "pw-tmp-12345"])
+            ["tmp-user", "Pw-tmp-12345a", "Pw-tmp-12345a"])
     db = get_db(tmp_path, cfg_path)
     assert get_user(db, "tmp-user") is not None
     ei = run_upc(monkeypatch, cfg_path, "delete", ["tmp-user", "yes"])

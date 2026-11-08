@@ -63,6 +63,16 @@ def load_allowlist() -> dict:
         st = os.stat(ALLOWLIST_PATH)
         if st.st_uid != 0:
             die(3, "allowlist принадлежит не root — отказ (защита от подмены)")
+        if st.st_mode & 0o022:
+            die(3, "allowlist доступен на запись группе/прочим — отказ (защита от подмены; "
+                   "ожидается 0644/0640 от root)")
+        # каталог allowlist: root-owned, без записи group/other (аудит №8 —
+        # подмена через перезапись каталога ранее не проверялась)
+        dst = os.stat(os.path.dirname(ALLOWLIST_PATH) or ".")
+        if dst.st_uid != 0:
+            die(3, "каталог allowlist принадлежит не root — отказ (защита от подмены)")
+        if dst.st_mode & 0o022:
+            die(3, "каталог allowlist доступен на запись группе/прочим — отказ (защита от подмены)")
     return data
 
 

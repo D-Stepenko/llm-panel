@@ -1,0 +1,24 @@
+# Security-аудит зависимостей в CI (аудит №1: pip-audit, must-have для
+# security-ориентированного публичного репозитория).
+name: security-audit
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  schedule:
+    - cron: "0 6 * * 1"   # понедельник 06:00 UTC — еженедельный контроль
+
+jobs:
+  pip-audit:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Установка pip-audit
+        run: python -m pip install --upgrade pip pip-audit
+      - name: pip-audit по requirements.txt
+        # --strict: любые найденные уязвимости валят сборку.
+        run: pip-audit -r requirements.txt --strict

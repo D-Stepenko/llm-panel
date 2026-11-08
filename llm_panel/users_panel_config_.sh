@@ -53,8 +53,23 @@ name_re = __import__("re").compile(r"^[a-zA-Z0-9_.-]{1,64}$")
 
 def ask_new_password() -> str | None:
     pw = getpass.getpass("Новый пароль: ")
+    # Политика (аудит №11): длина + сложность по составу — не менее 3 из 4
+    # классов (строчные/ПРОПИСНЫЕ/цифры/прочие); зеркально cli.py::_ask_password.
     if len(pw) < 10:
         print("Пароль должен быть не короче 10 символов.", file=sys.stderr)
+        return None
+    classes = (
+        any(c.islower() for c in pw)
+        + any(c.isupper() for c in pw)
+        + any(c.isdigit() for c in pw)
+        + any(not c.isalnum() for c in pw)
+    )
+    if classes < 3:
+        print(
+            "Слабый пароль: используйте не менее 3 из 4 классов символов "
+            "(строчные, ПРОПИСНЫЕ, цифры, прочие знаки).",
+            file=sys.stderr,
+        )
         return None
     if pw != getpass.getpass("Повторите пароль: "):
         print("Пароли не совпадают.", file=sys.stderr)

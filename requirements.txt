@@ -1,6 +1,17 @@
 # Зафиксированные зависимости (ТЗ §7: не pip install в системный Python).
-# Проверенные версии на момент этапа 1; обновлять осознанно, после проверки на станции.
-fastapi==0.115.12
+# Проверенные версии; обновлять осознанно, после проверки на станции.
+#
+# Безопасность (аудит 2026-11-08, находка №1): fastapi==0.115.12 тянул
+# starlette 0.40..0.47 — затронут CVE-2025-54121 / GHSA-2c2j-9gv5-cj73
+# (DoS через multipart на /login и любых POST-формах). pip-audit показал,
+# что все advisories starlette закрыты только в ветке 1.x (фиксы 1.0.1 /
+# 1.1.0 / 1.3.1), поэтому для starlette pin 1.x (сигнатура TemplateResponse
+# переведена на (request, name, ctx), тесты 222/222). python-multipart
+# поднят до 0.0.31 (PYSEC-2026-3036..3040). Обновлённая пара проверена
+# тестами и на станции до выката. Повторная проверка новых advisories —
+# pip-audit в CI (.github/workflows) и Dependabot (.github/dependabot.yml).
+fastapi==0.162.2
+starlette>=1.3.1,<2
 uvicorn[standard]==0.34.0
 jinja2==3.1.6
 pyyaml==6.0.2
@@ -9,8 +20,8 @@ argon2-cffi-bindings==21.2.0
 psutil==7.0.0
 nvidia-ml-py==12.560.30
 httpx==0.28.1
-python-multipart==0.0.20
+python-multipart==0.0.31
 
 # dev/test
-pytest==8.3.5
-pytest-asyncio==0.26.0
+pytest==9.0.3
+pytest-asyncio==1.4.1

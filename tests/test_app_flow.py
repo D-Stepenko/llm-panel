@@ -9,7 +9,7 @@ from llm_panel.app import create_app
 from llm_panel.config import load_config
 
 
-def _make_config(tmp_path):
+def _make_config(tmp_path, dev_mode=True):
     svc = {
         "services": [
             {"id": "vllm", "name": "vLLM", "type": "vllm", "unit": "vllm.service",
@@ -26,7 +26,7 @@ def _make_config(tmp_path):
             "trusted_hosts": ["localhost", "127.0.0.1", "testserver"],
             "cookie_secure": False,
             "session_minutes": 60,
-            "dev_mode": True,   # тест работает без установленного helper на станции
+            "dev_mode": dev_mode,   # тест работает без установленного helper на станции
         },
         "data": {
             "data_dir": str(tmp_path / "data"),
@@ -35,6 +35,10 @@ def _make_config(tmp_path):
         },
         "systemd": {"helper_path": str(tmp_path / "no-such-helper")},
     }
+    systemd = cfg_data.get("systemd") or {}
+    if not dev_mode:
+        # prod-режим требует существующий helper — ставим заглушку
+        (tmp_path / "no-such-helper").write_text("", encoding="utf-8")
     (tmp_path / "data").mkdir()
     cfg_path = tmp_path / "cfg.yaml"
     cfg_path.write_text(yaml.safe_dump(cfg_data, allow_unicode=True), encoding="utf-8")
@@ -89,6 +93,54 @@ def test_unauthenticated_dashboard_redirects(client):
 def test_bad_host_rejected(client):
     r = client.get("/", headers={"host": "evil.example.com"}, follow_redirects=False)
     assert r.status_code == 403
+
+
+def test_empty_host_rejected_400(tmp_path):
+    """Аудит №6: запрос без Host-заголовка (HTTP/1.0) больше не проходит."""
+    from fastapi.testclient import TestClient
+
+    # prod-режим (dev_mode=False): пустой Host → 400
+    cfg = load_config(_make_config(tmp_path, dev_mode=False))
+    c = TestClient(create_app(cfg))
+    r = c.get("/", headers={"host": ""}, follow_redirects=False)
+    assert r.status_code == 400
+
+    # dev_mode: пустой Host допустим (локальные HTTP/1.0 клиенты в отладке)
+    dev = tmp_path / "dev"
+    dev.mkdir()
+    cfg = load_config(_make_config(dev, dev_mode=True))
+    c = TestClient(create_app(cfg))
+    r = c.get("/", headers={"host": ""}, follow_redirects=False)
+    assert r.status_code != 400
+
+
+def test_login_next_scheme_relative_rejected(authed_client):
+    """Аудит №7: next вида `//host` и `\\<host>` (scheme-relative) → редирект на /."""
+    from urllib.parse import quote
+    client = authed_client
+    # login_token одноразовый, а после успешного входа GET /login редиректит —
+    # наберём токены заранее (4 успешных попытки).
+    tokens = [_login_token_html(client) for _ in range(4)]
+    for bad, token in zip(("//evil.com", "/\\evil.com", "\\\\evil.com"), tokens[:3]):
+        r = client.post(
+            f"/login?next={quote(bad, safe='')}",
+            data={"username": "admin", "password": "correct-password",
+                  "login_token": token},
+            headers={"host": "localhost"},
+            follow_redirects=False,
+        )
+        assert r.status_code == 303, bad
+        assert r.headers["location"] == "/", bad
+    # обычный внутренний путь сохраняется
+    r = client.post(
+        "/login?next=%2Fdashboard2",
+        data={"username": "admin", "password": "correct-password",
+              "login_token": tokens[3]},
+        headers={"host": "localhost"},
+        follow_redirects=False,
+    )
+    assert r.status_code == 303
+    assert r.headers["location"] == "/dashboard2"
 
 
 def test_login_rate_limit(authed_client):

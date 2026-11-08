@@ -35,6 +35,15 @@ def verify_password(password_hash: str, password: str) -> bool:
         return False
 
 
+def csrf_matches(form_value: str | None, expected: str | None) -> bool:
+    """Constant-time сравнение CSRF-токена (аудит №10: одна копия проверки
+    на все POST-роуты вместо 17 разных; сравнение — secrets.compare_digest).
+    Пустой ожидаемый токен (нет сессии) — отказ."""
+    if not expected or not form_value:
+        return False
+    return secrets.compare_digest(str(form_value), expected)
+
+
 def hash_token(token: str) -> str:
     """Токен сессии хранится в БД в хешированном виде."""
     return hashlib.sha256(token.encode()).hexdigest()
@@ -81,12 +90,33 @@ def delete_sessions_for_user(db: Database, username: str) -> None:
 
 
 # -- ограничение попыток входа --------------------------------------------------
+#
+# Аудит №3: раньше считались неудачи ТОЛЬКО по username — любой знающий логин
+# держал учётку заблокированной перманентно (5 POST /login каждые N минут),
+# а успешный вход сбрасывал счётчик со ВСЕХ IP. Теперь два контура:
+#   1) пара (username, ip) — failures_max неудач подряд с одного адреса
+#      блокируют ЭТОТ адрес на lockout_minutes (стандартный сценарий ошибки
+#      пароля у легитимного пользователя);
+#   2) аккаунт в целом — failures_max * GLOBAL_MULT неудач подряд с любых
+#      адресов блокируют логин на lockout_minutes * GLOBAL_WINDOW_MULT
+#      (распределённый перебор требует заметно больше времени; легитимный
+#      вход «рвёт» глобальную цепочку).
 
-def _consecutive_failures(db: Database, username: str) -> int:
-    rows = db.query_all(
-        "SELECT ok FROM login_attempts WHERE username = ? ORDER BY id DESC LIMIT 64",
-        (username,),
-    )
+GLOBAL_MULT = 3          # глобальный порог на аккаунт: failures_max * 3 попыток
+GLOBAL_WINDOW_MULT = 3   # глобальное окно блокировки: lockout_minutes * 3
+
+
+def _consecutive_failures(db: Database, username: str, ip: str | None = None) -> int:
+    if ip is not None:
+        rows = db.query_all(
+            "SELECT ok FROM login_attempts WHERE username = ? AND ip = ? "
+            "ORDER BY id DESC LIMIT 64", (username, ip),
+        )
+    else:
+        rows = db.query_all(
+            "SELECT ok FROM login_attempts WHERE username = ? ORDER BY id DESC LIMIT 64",
+            (username,),
+        )
     n = 0
     for r in rows:
         if r["ok"]:
@@ -95,18 +125,28 @@ def _consecutive_failures(db: Database, username: str) -> int:
     return n
 
 
-def check_lockout(db: Database, username: str, failures_max: int, lockout_minutes: int) -> tuple[bool, int]:
-    """(заблокирован, секунд до разблокировки). Пара username+ip: ip учитывается при записи."""
-    fail = _consecutive_failures(db, username)
-    if fail < failures_max:
-        return False, 0
-    last_fail = db.query_one(
-        "SELECT ts FROM login_attempts WHERE username = ? AND ok = 0 ORDER BY id DESC LIMIT 1",
-        (username,),
-    )
-    if last_fail is None:
-        return False, 0
-    remain = int(last_fail["ts"] + lockout_minutes * 60 - utcnow())
+def check_lockout(db: Database, username: str, failures_max: int, lockout_minutes: int,
+                  ip: str = "") -> tuple[bool, int]:
+    """(заблокирован, секунд до разблокировки). Пара username+ip + глобальный
+    порог на аккаунт с бóльшими порогом и окном (аудит №3)."""
+    remain = 0
+    pair_fail = _consecutive_failures(db, username, ip or "")
+    if pair_fail >= failures_max:
+        row = db.query_one(
+            "SELECT ts FROM login_attempts WHERE username = ? AND ip = ? AND ok = 0 "
+            "ORDER BY id DESC LIMIT 1", (username, ip or ""),
+        )
+        if row is not None:
+            remain = int(row["ts"] + lockout_minutes * 60 - utcnow())
+    global_fail = _consecutive_failures(db, username)
+    if global_fail >= failures_max * GLOBAL_MULT:
+        row = db.query_one(
+            "SELECT ts FROM login_attempts WHERE username = ? AND ok = 0 "
+            "ORDER BY id DESC LIMIT 1", (username,),
+        )
+        if row is not None:
+            g_minutes = lockout_minutes * GLOBAL_WINDOW_MULT
+            remain = max(remain, int(row["ts"] + g_minutes * 60 - utcnow()))
     if remain <= 0:
         return False, 0
     return True, remain
@@ -118,8 +158,12 @@ def record_login(db: Database, ip: str, username: str, ok: bool) -> None:
         (utcnow(), ip or "", username, 1 if ok else 0),
     )
     if ok:
-        # успешный вход сбрасывает счётчик последовательных ошибок
-        db.execute("DELETE FROM login_attempts WHERE username = ? AND ok = 0", (username,))
+        # успешный вход сбрасывает счётчик ТОЛЬКО этого адреса: неудачи с других IP
+        # (перебор) числиться не перестают (аудит №3)
+        db.execute(
+            "DELETE FROM login_attempts WHERE username = ? AND ip = ? AND ok = 0",
+            (username, ip or ""),
+        )
 
 
 def reset_lockout(db: Database, username: str) -> int:
@@ -143,7 +187,7 @@ def get_user(db: Database, username: str):
 
 
 __all__ = [
-    "SESSION_COOKIE", "hash_password", "verify_password", "hash_token",
+    "SESSION_COOKIE", "hash_password", "verify_password", "hash_token", "csrf_matches",
     "create_session", "get_session", "delete_session", "delete_sessions_for_user",
     "check_lockout", "record_login", "reset_lockout", "set_password", "get_user",
     "os",

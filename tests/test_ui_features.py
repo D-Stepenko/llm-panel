@@ -659,6 +659,20 @@ def test_service_grid_layout_css():
     assert ".service-gpus-list code { white-space: nowrap;" in css
 
 
+def test_app_js_disables_htmx_inline_indicator_style():
+    """htmx по умолчанию инжектит inline <style> .htmx-indicator → CSP
+    style-src 'self' (без unsafe-inline) его блокирует (console error). Панель
+    индикаторами htmx не пользуется, поэтому app.js (defer, стартует до
+    DOMContentLoaded, где htmx читает конфиг) отключает авто-инъект."""
+    js = (pathlib.Path(__file__).resolve().parent.parent / "llm_panel" / "static" / "app.js").read_text(encoding="utf-8")
+    assert "window.htmx.config.includeIndicatorStyles = false" in js
+    # защита: строка выполняется только если htmx уже загружен (app.js после htmx.min.js)
+    guard = js.index("includeIndicatorStyles = false")
+    assert "window.htmx && window.htmx.config" in js[:guard]
+    # позиция: ДО использования htmx-инициализации (SSE) — иначе не успеть до DOMContentLoaded
+    assert guard < js.index("new EventSource")
+
+
 # --------------------------------------------------------------- вендоры GPU (v0.3.14)
 def test_gpu_vendor_classification():
     from llm_panel.metrics import gpu_vendor

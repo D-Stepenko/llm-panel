@@ -23,6 +23,7 @@ from fastapi import APIRouter, Request
 from fastapi.responses import HTMLResponse, PlainTextResponse
 
 from ..i18n import translate
+from ..security import csrf_matches
 
 router = APIRouter(prefix="/config/files")
 
@@ -73,9 +74,33 @@ def _read(p: pathlib.Path) -> str:
 
 
 def _write_atomic(p: pathlib.Path, content: str) -> None:
+    """Атомарная запись с сохранением режима (и владельца) исходного файла.
+
+    Аудит №2: open() создавал tmp с правами по umask (обычно 0644); у файла
+    0600 (токены/секреты — типично для конфигов LLM-сервисов) первая же
+    правка через панель делала его world-readable. os.replace меняет inode,
+    поэтому права нужно ставить на tmp ДО замены.
+    """
+    try:
+        st = p.stat()
+    except OSError:
+        st = None
+    euid = getattr(os, "geteuid", None)
+    if st is not None and euid and euid() != 0 and st.st_uid != euid():
+        # файл мог сменить владельца после проверки пути (или быть подан
+        # на запись с already-изменившимся uid) — притворяться не станет
+        raise PermissionError(f"владелец {p} не совпадает с владельцем процесса")
     tmp = p.with_name(p.name + ".tmp-panel")
     with open(tmp, "w", encoding="utf-8", newline="") as f:
         f.write(content)
+    if st is not None:
+        try:
+            os.chmod(tmp, st.st_mode & 0o7777)
+        except OSError:
+            # не-posix (Windows: chmod ограничен read-only битом) или
+            # спец-режим — не роняем сохранение: валидация пути выше уже
+            # отсекла root-owned/чужие; права совпадут с umask.
+            pass
     os.replace(tmp, p)
 
 
@@ -102,7 +127,7 @@ async def files_add(request: Request):
         form = await request.form()
     except Exception:  # noqa: BLE001
         form = {}
-    if form.get("csrf") != request.state.csrf:
+    if not csrf_matches(form.get("csrf"), request.state.csrf):
         return PlainTextResponse(translate(state.i18n_lang, "bad_csrf"), status_code=403)
 
     path, err = _validate_new_path(str(form.get("path", "")))
@@ -137,7 +162,7 @@ async def files_remove(request: Request, fid: int):
         form = await request.form()
     except Exception:  # noqa: BLE001
         form = {}
-    if form.get("csrf") != request.state.csrf:
+    if not csrf_matches(form.get("csrf"), request.state.csrf):
         return PlainTextResponse(translate(state.i18n_lang, "bad_csrf"), status_code=403)
     entry = _entry(state, fid)
     if entry is None:
@@ -189,11 +214,18 @@ async def save(request: Request, fid: int):
         form = await request.form()
     except Exception:  # noqa: BLE001
         form = {}
-    if form.get("csrf") != request.state.csrf:
+    if not csrf_matches(form.get("csrf"), request.state.csrf):
         return PlainTextResponse(translate(state.i18n_lang, "bad_csrf"), status_code=403)
     entry = _entry(state, fid)
     if entry is None:
         return PlainTextResponse(translate(state.i18n_lang, "cfgfile_err_missing"), status_code=404)
+    # ПОВТОРНАЯ валидация пути перед КАЖДОЙ записью (аудит №2): её раньше
+    # проходили только на /add — при смене владельца/доступа после регистрации
+    # панель могла продолжать править файл.
+    path, err = _validate_new_path(entry["path"])
+    if err:
+        return _editor_err(state, request, entry, err)
+    del path
     p = pathlib.Path(entry["path"])
     content = str(form.get("content", ""))
     if len(content.encode("utf-8")) > MAX_FILE_BYTES:
@@ -230,12 +262,16 @@ async def rollback(request: Request, fid: int, vid: int):
         form = await request.form()
     except Exception:  # noqa: BLE001
         form = {}
-    if form.get("csrf") != request.state.csrf:
+    if not csrf_matches(form.get("csrf"), request.state.csrf):
         return PlainTextResponse(translate(state.i18n_lang, "bad_csrf"), status_code=403)
     entry = _entry(state, fid)
     ver = state.db.config_version(vid)
     if entry is None or ver is None or ver["path"] != entry["path"]:
         return PlainTextResponse(translate(state.i18n_lang, "cfgfile_err_missing"), status_code=404)
+    # повторная валидация пути и перед rollback (аудит №2)
+    _, err = _validate_new_path(entry["path"])
+    if err:
+        return _editor_err(state, request, entry, err)
     p = pathlib.Path(entry["path"])
     content = ver["content"]
     try:

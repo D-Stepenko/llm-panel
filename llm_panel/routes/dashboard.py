@@ -16,6 +16,7 @@ from fastapi.responses import HTMLResponse, PlainTextResponse, StreamingResponse
 
 from ..helper_client import HelperError, call_power
 from ..i18n import translate
+from ..security import csrf_matches
 
 router = APIRouter()
 
@@ -107,7 +108,7 @@ async def save_services_order(request: Request):
         form = await request.form()
     except Exception:  # noqa: BLE001
         form = {}
-    if form.get("csrf") != request.state.csrf:
+    if not csrf_matches(form.get("csrf"), request.state.csrf):
         return PlainTextResponse(translate(state.i18n_lang, "bad_csrf"), status_code=403)
 
     ids: list[str] = []
@@ -138,7 +139,7 @@ async def save_models_order(request: Request):
         form = await request.form()
     except Exception:  # noqa: BLE001
         form = {}
-    if form.get("csrf") != request.state.csrf:
+    if not csrf_matches(form.get("csrf"), request.state.csrf):
         return PlainTextResponse(translate(state.i18n_lang, "bad_csrf"), status_code=403)
 
     paths: list[str] = []
@@ -169,7 +170,7 @@ async def power_server(request: Request):
         form = await request.form()
     except Exception:  # noqa: BLE001
         form = {}
-    if form.get("csrf") != request.state.csrf:
+    if not csrf_matches(form.get("csrf"), request.state.csrf):
         return PlainTextResponse(translate(state.i18n_lang, "bad_csrf"), status_code=403)
 
     op = str(form.get("action", "")).strip()

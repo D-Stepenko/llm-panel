@@ -140,6 +140,75 @@ def test_duplicate_version_not_recorded(tmp_path):
     assert len(app.state.panel.db.config_versions(str(f))) == 1
 
 
+IS_WIN = sys.platform == "win32"
+
+
+@pytest.mark.skipif(IS_WIN, reason="POSIX mode не воспроизводим на Windows")
+def test_save_preserves_file_mode0600(tmp_path):
+    """Аудит №2: save НЕ расширяет права — режим 0600 сохраняется (секреты)."""
+    client, app = _authed(tmp_path)
+    _login(client)
+    csrf = _csrf(client)
+    f = tmp_path / "secret-creds.json"
+    f.write_text('{"token": "x"}', encoding="utf-8")
+    f.chmod(0o600)
+    r = _add_file(client, csrf, f)
+    assert E("cfgfile_added") in r.text
+    fid = json.loads(app.state.panel.db.get_setting("config_files"))[0]["id"]
+    r = client.post(f"/config/files/{fid}/save",
+                    data={"content": '{"token": "y"}', "csrf": csrf},
+                    headers={"host": "localhost"})
+    assert E("cfgfile_saved") in r.text
+    assert f.read_text(encoding="utf-8") == '{"token": "y"}'
+    assert (f.stat().st_mode & 0o777) == 0o600
+
+
+@pytest.mark.skipif(IS_WIN, reason="chmod-файл read-only на Windows не эмулирует POSIX")
+def test_save_preserves_mode_after_rollback(tmp_path):
+    """Аудит №2: rollback тоже держит исходный режим файла."""
+    client, app = _authed(tmp_path)
+    _login(client)
+    csrf = _csrf(client)
+    f = tmp_path / "secret-creds2.json"
+    f.write_text('{"a": 1}', encoding="utf-8")
+    f.chmod(0o640)
+    _add_file(client, csrf, f)
+    fid = json.loads(app.state.panel.db.get_setting("config_files"))[0]["id"]
+    vers = app.state.panel.db.config_versions(str(f))
+    client.post(f"/config/files/{fid}/save",
+                data={"content": '{"a": 2}', "csrf": csrf},
+                headers={"host": "localhost"})
+    client.post(f"/config/files/{fid}/rollback/{vers[0]['id']}",
+                data={"csrf": csrf}, headers={"host": "localhost"})
+    assert (f.stat().st_mode & 0o777) == 0o640
+
+
+def test_save_revalidates_path(tmp_path):
+    """Аудит №2: save/rollback повторно валидируют путь — исчезнувший/чужой файл не пишется."""
+    client, app = _authed(tmp_path)
+    _login(client)
+    csrf = _csrf(client)
+    f = tmp_path / "g.json"
+    f.write_text('{"v": 1}', encoding="utf-8")
+    _add_file(client, csrf, f)
+    fid = json.loads(app.state.panel.db.get_setting("config_files"))[0]["id"]
+
+    # файл удалили ПОСЛЕ регистрации → save отказ
+    f.unlink()
+    r = client.post(f"/config/files/{fid}/save",
+                    data={"content": '{"v": 2}', "csrf": csrf},
+                    headers={"host": "localhost"})
+    assert E("cfgfile_err_missing") in r.text
+    assert not f.exists()
+
+    # файл вернули → rollback снова работает (валидация восстановление пути)
+    f.write_text('{"v": 1}', encoding="utf-8")
+    vers = app.state.panel.db.config_versions(str(f))
+    r = client.post(f"/config/files/{fid}/rollback/{vers[0]['id']}",
+                    data={"csrf": csrf}, headers={"host": "localhost"})
+    assert E("cfgfile_rolled") in r.text
+
+
 def test_unknown_file_404(tmp_path):
     client, app = _authed(tmp_path)
     _login(client)

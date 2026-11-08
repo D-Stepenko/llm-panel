@@ -14,6 +14,7 @@ from fastapi.responses import HTMLResponse, PlainTextResponse
 from ..systemd_units import run_user_action, show_unit
 from ..helper_client import HelperError, call_helper
 from ..i18n import translate
+from ..security import csrf_matches
 
 router = APIRouter(prefix="/services")
 
@@ -59,7 +60,7 @@ async def run_action(request: Request, svc_id: str, action: str):
         form = await request.form()
     except Exception:  # noqa: BLE001
         form = {}
-    if form.get("csrf") != request.state.csrf:
+    if not csrf_matches(form.get("csrf"), request.state.csrf):
         return PlainTextResponse(translate(state.i18n_lang, "bad_csrf"), status_code=403)
 
     ip = request.client.host if request.client else ""

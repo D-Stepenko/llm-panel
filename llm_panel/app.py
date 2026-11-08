@@ -94,7 +94,34 @@ def create_app(config: PanelConfig) -> FastAPI:
     state = AppState(cfg=config, db=db, registry=registry, keys=None, metrics=metrics, hub=hub)
     state.collector = Collector(config, registry, metrics, hub)
 
-    app = FastAPI(title="llm-panel", docs_url=None, redoc_url=None, openapi_url=None)
+    from contextlib import asynccontextmanager
+
+    # Аудит №4 (плюс миграция c устаревшего on_event): запуск/остановка
+    # через lifespan. При старте: коллектор, затем чистка БД (executor) и
+    # фоновая задача периодической чистки. При остановке: отмена задачи,
+    # коллектор, закрытие БД.
+    @asynccontextmanager
+    async def lifespan(app: FastAPI):
+        await state.collector.start()
+        # Аудит №4: раньше cleanup() не вызывался вовсе (мёртвый код).
+        loop = asyncio.get_running_loop()
+        await loop.run_in_executor(None, db.cleanup)
+        task = asyncio.create_task(_cleanup_loop(db), name="db-cleanup")
+        app.state.cleanup_task = task
+        try:
+            yield
+        finally:
+            task.cancel()
+            try:
+                await task
+            except asyncio.CancelledError:
+                pass
+            await state.collector.stop()
+            metrics.shutdown()
+            db.close()
+
+    app = FastAPI(title="llm-panel", docs_url=None, redoc_url=None,
+                  openapi_url=None, lifespan=lifespan)
     app.state.panel = state
 
     templates = Jinja2Templates(directory=str(BASE_DIR / "templates"))
@@ -197,7 +224,11 @@ def create_app(config: PanelConfig) -> FastAPI:
 
         ctx.setdefault("temp", temp)
         ctx.setdefault("gpu_vendor", gpu_vendor)   # вендор-класс карточки GPU (v0.3.14)
-        return templates.TemplateResponse(name, ctx)
+        # starlette 1.x (аудит №1: CVE-2025-54121 и иные advisories закрыты
+        # только в 1.x/0.49+): сигнатура — (request, name, context).
+        if req is None:
+            raise LookupError(f"render({name!r}) вызван без 'request' в ctx")
+        return templates.TemplateResponse(req, name, ctx)
 
     state.render = render
 
@@ -222,10 +253,16 @@ def create_app(config: PanelConfig) -> FastAPI:
             resp.headers.setdefault("X-Content-Type-Options", "nosniff")
             return resp
 
-        # Host/Origin проверка: доверенные хосты только (ТЗ §6.1)
+        # Host/Origin проверка: доверенные хосты только (ТЗ §6.1).
+        # Аудит №6: пустой Host-заголовок (HTTP/1.0-запрос без Host) раньше
+        # ПРОХОДИЛ проверку («if host and …») — теперь отклоняется 400.
+        # В dev_mode пустой Host допустим (локальные HTTP/1.0 клиенты).
         raw_host = request.headers.get("host") or ""
         host = raw_host.split(":")[0].lower()   # "host:port" → host; IPv6 без скобок не поддерживаем в hosts
-        if host and host not in state.cfg.trusted_hosts:
+        if not host:
+            if not state.cfg.dev_mode:
+                return PlainTextResponse(translate(state.i18n_lang, "bad_host"), status_code=400)
+        elif host not in state.cfg.trusted_hosts:
             return PlainTextResponse(translate(state.i18n_lang, "bad_host"), status_code=403)
 
         # Origin (если передан) не должен чужим источником
@@ -288,18 +325,23 @@ def create_app(config: PanelConfig) -> FastAPI:
         return Response(svg, media_type="image/svg+xml",
                         headers={"Cache-Control": "public, max-age=86400"})
 
-    @app.on_event("startup")
-    async def _startup():
-        await state.collector.start()
-
-    @app.on_event("shutdown")
-    async def _shutdown():
-        await state.collector.stop()
-        metrics.shutdown()
-        db.close()
-
     return app
 
 
 def create_app_from_config_file(config_path: str) -> FastAPI:
     return create_app(load_config(config_path))
+
+
+# Интервал периодической чистки БД (аудит №4): истёкшие сессии, старые
+# login_attempts и audit (старше RETENTION_DAYS из db.Database).
+CLEANUP_INTERVAL_S = 6 * 3600
+
+
+async def _cleanup_loop(db: Database) -> None:
+    loop = asyncio.get_running_loop()
+    while True:
+        try:
+            await loop.run_in_executor(None, db.cleanup)
+        except Exception:  # noqa: BLE001 — цикл чистки не должен падать
+            pass
+        await asyncio.sleep(CLEANUP_INTERVAL_S)

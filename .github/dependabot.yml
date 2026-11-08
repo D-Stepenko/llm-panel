@@ -1,0 +1,16 @@
+# Dependabot: автоматические security-обновления пайплайна (аудит №1).
+version: 2
+updates:
+  - package-ecosystem: "pip"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+    # laзы security-патчей важнее любых других обновлений
+    groups:
+      security:
+        patterns:
+          - "*"
+  - package-ecosystem: "github-actions"
+    directory: "/"
+    schedule:
+      interval: "monthly"

@@ -323,6 +323,47 @@ services.yaml, allowlist.json, systemd-юниты, sudoers. Редактор к�
   (старт/стоп/логи, health по /health) — достаточно; сквозная
   интеграция моделей/настроек не требуется. Фактически этапы ТЗ
   ЗАВЕРШЕНЫ (1, 2, 3 реализованы; 4 — владельцем снят с плана).
+- **0.3.17 — security-audit (внешний аудит 2026-11-08, 12 находок)**.
+  🔴1 Зависимости: fastapi 0.115.12→0.162.2, starlette pin `>=1.3.1,<2`
+  (все advisories 2026 — CVE-2025-54121/GHSA-2c2j-9gv5-cj73 и
+  сопутствующие — закрыты только в ветке 1.x; TemplateResponse переведён
+  на сигнатуру `(request, name, ctx)`), python-multipart→0.0.31,
+  pytest 9.0.3/pytest-asyncio 1.4.1; `pip_audit -r requirements.txt` —
+  0 уязвимостей; в CI добавлены `.github/workflows/security-audit.yml`
+  (pip-audit --strict, еженедельно) и `.github/dependabot.yml`.
+  🔴2 `_write_atomic` (config_files) сохраняет st_mode исходника
+  (chmod tmp до os.replace), повторная `_validate_new_path` на каждом
+  save/rollback; отказ при смене владельца (0600 больше не «деградирует»
+  в 0644 — режимные тесты skipif win32).
+  🟠3 Lockout: блокировка по паре (username, ip) + глобальный порог по
+  аккаунту (failures×3 за окно minutes×3); успех чистит неудачи только
+  своего IP (per-IP isolation + global threshold тесты).
+  🟠4 db.cleanup() вызывается при старте и каждые 6 ч (фоновая задача
+  cleanup_task, гасится в shutdown); retention 90 дней для
+  login_attempts и audit; on_event мигрирован на lifespan.
+  🟠5 Тайминг: при несуществующем пользователе выполняется фиктивная
+  verify_password на лениво сгенерированном настоящем argon2id-хеше
+  (одинаковое время ответа).
+  🟠6 Пустой Host-заголовок → 400 (в dev_mode — пропуск для отладки).
+  🟠7 Open redirect: next отклоняет `//`, `/\` (scheme-relative) и
+  `\\` внутри — фолбэк на `/`.
+  🟡8 helper: allowlist проверяется на group/other-write биты (0644/0640
+  root), каталог /etc/llm-panel — root-owned без записи group/other.
+  🟡9 deploy/llm-panel.service.template: добавлен комментарий-блок с
+  sandbox-опциями, совместимыми с sudo (ProtectSystem=strict +
+  ReadWritePaths, PrivateTmp, ProtectKernel*, RestrictNamespaces,
+  LockPersonality) — включать по одной с проверкой.
+  🟡10 CSRF: `csrf_matches()` через secrets.compare_digest — единый
+  хелпер вместо 17 копий `form.get("csrf") != request.state.csrf`.
+  🟡11 Политика паролей (cli set-password и users_panel_config_.sh):
+  ≥10 символов И ≥3 из 4 классов (строчные/ПРОПИСНЫЕ/цифры/прочие).
+  🟡12 Pickle-RCE: предупреждение в UI (Models → «Загрузка с Hugging
+  Face», notice.warn hf_pickle_warning) + зафиксированный риск в §8
+  «Известные ограничения».
+  UI-фиксы этой же сборки: убрана строка-подсказка на /login
+  (login_note), CSP-фикс htmx-индикаторов в static/app.js
+  (includeIndicatorStyles=false). docs/ACCEPTANCE.md — план приёмки.
+  Тесты: 233/233 + 2 skip (win32).
 
 ## 8. Известные ограничения
 
@@ -339,3 +380,12 @@ services.yaml, allowlist.json, systemd-юниты, sudoers. Редактор к�
 - Sandbox-опции systemd юнита панели: `NoNewPrivileges` запрещён (ломает sudo до
   helper), остальные — включать по одной с проверкой (урок станции 2026-10-28,
   см. `deploy/llm-panel.service.template` и docs/STATION-LLM.md).
+- Pickle-RCE через HF-загрузки (аудит 2026-11-08, №12): панель скачивает модели
+  из ЛЮБЫХ указанных репозиториев Hugging Face. Некоторые репозитории содержат
+  pickle-файлы (.bin / .pt из transformers), код которых выполняется при загрузке
+  модели обслуживающим сервисом (vLLM и т. п.) — сами файлы панели безопасны,
+  но потребитель может исполнить чужой код. Смягчение: предупреждение в UI
+  (Models → «Загрузка с Hugging Face»); скачивать только доверенные источники,
+  предпочитать safetensors, недоверенные модели запускать под выделенным
+  непривилегированным пользователем (не dispot/root). Автотест safetensors-
+  инспекции загрузок — в TODO этапа 3+.

@@ -4,13 +4,15 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "llm-panel"
-version = "0.3.16"
+version = "0.3.17"
 description = "Локальная веб-панель управления LLM-станцией (ТЗ llm-panel-tz-reviewed.md, этап 1 MVP)"
 readme = "README.md"
 requires-python = ">=3.11"
 license = { text = "MIT" }
 dependencies = [
-    "fastapi>=0.115,<1",
+    "fastapi>=0.162,<1",
+    "starlette>=1.3.1,<2",   # CVE-2025-54121/GHSA-2c2j-9gv5-cj73 + advisories 2026 (аудит №1)
+    "python-multipart>=0.0.31",
     "uvicorn[standard]>=0.34,<1",
     "jinja2>=3.1",
     "pyyaml>=6.0",
@@ -18,7 +20,6 @@ dependencies = [
     "psutil>=6.0",
     "nvidia-ml-py>=12.560",
     "httpx>=0.28",
-    "python-multipart>=0.0.18",
 ]
 
 [project.optional-dependencies]

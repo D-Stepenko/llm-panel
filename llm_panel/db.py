@@ -107,10 +107,17 @@ class Database:
         return self.query_all("SELECT * FROM audit ORDER BY id DESC LIMIT ?", (int(limit),))
 
     # -- housekeeping ------------------------------------------------------
+    # Аудит №4: cleanup() был «мёртвым кодом» — login_attempts (каждый
+    # запрос к /login) и audit росли бесконечно. Теперь вызывается при
+    # старте приложения и раз в CLEANUP_INTERVAL_S (см. app.py).
+    RETENTION_DAYS = 90
+
     def cleanup(self) -> None:
         now = utcnow()
         self.execute("DELETE FROM sessions WHERE expires_at < ?", (now,))
-        self.execute("DELETE FROM login_attempts WHERE ts < ?", (now - 90 * 86400,))
+        self.execute("DELETE FROM login_attempts WHERE ts < ?", (now - self.RETENTION_DAYS * 86400,))
+        # аудит: старше retention_days — удаляется (события свежее остаются)
+        self.execute("DELETE FROM audit WHERE ts < ?", (now - self.RETENTION_DAYS * 86400,))
 
     # -- settings (ключ-значение: порядок сервисов и пр.) ------------------
     def get_setting(self, key: str) -> str | None:

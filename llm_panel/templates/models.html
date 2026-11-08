@@ -94,6 +94,11 @@
 
 <div class="page-card hf-card">
   <h3 class="cfg-section-title">{{ t('hf_section') }}</h3>
+  {# Аудит №12: pickle-RCE — предупреждение о недоверенных репозиториях #}
+  <div class="notice warn hf-pickle-warning">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><path d="M12 9v4M12 17h.01"/><path d="M10.3 3.9 1.8 18a2 2 0 0 0 1.7 3h17a2 2 0 0 0 1.7-3L13.7 3.9a2 2 0 0 0-3.4 0z"/></svg>
+    <span>{{ t('hf_pickle_warning') }}</span>
+  </div>
   {% if hf_tool %}
   <form method="post" action="/models/download" class="cfg-add-unit hf-form">
     <input type="hidden" name="csrf" value="{{ csrf }}">

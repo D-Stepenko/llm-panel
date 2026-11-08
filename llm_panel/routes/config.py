@@ -15,6 +15,7 @@ from fastapi import APIRouter, Request
 from fastapi.responses import HTMLResponse, PlainTextResponse, RedirectResponse
 
 from ..i18n import translate
+from ..security import csrf_matches
 from ..registry import UNIT_RE, make_display_def
 from ..systemd_units import list_loaded_services, show_unit
 
@@ -189,7 +190,7 @@ async def services_add(request: Request):
         form = await request.form()
     except Exception:  # noqa: BLE001
         form = {}
-    if form.get("csrf") != request.state.csrf:
+    if not csrf_matches(form.get("csrf"), request.state.csrf):
         return PlainTextResponse(translate(state.i18n_lang, "bad_csrf"), status_code=403)
     unit = str(form.get("unit", "")).strip()
 
@@ -244,7 +245,7 @@ async def services_display_save(request: Request):
         form = await request.form()
     except Exception:  # noqa: BLE001
         form = {}
-    if form.get("csrf") != request.state.csrf:
+    if not csrf_matches(form.get("csrf"), request.state.csrf):
         return PlainTextResponse(translate(state.i18n_lang, "bad_csrf"), status_code=403)
 
     configured_ids = {s.id for s in state.registry}
@@ -286,7 +287,7 @@ async def config_save(request: Request):
         form = await request.form()
     except Exception:  # noqa: BLE001
         form = {}
-    if form.get("csrf") != request.state.csrf:
+    if not csrf_matches(form.get("csrf"), request.state.csrf):
         return PlainTextResponse(translate(state.i18n_lang, "bad_csrf"), status_code=403)
 
     lang = str(form.get("lang", ""))

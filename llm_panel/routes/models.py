@@ -15,6 +15,7 @@ from fastapi.responses import HTMLResponse, PlainTextResponse
 from .. import __version__
 from .. import hf_downloads as hf
 from ..i18n import translate
+from ..security import csrf_matches
 from ..model_catalog import MAX_DEPTH_DEFAULT, MAX_ENTRIES_DEFAULT, scan_models
 
 router = APIRouter(prefix="/models")
@@ -97,7 +98,7 @@ async def models_refresh(request: Request):
         form = await request.form()
     except Exception:  # noqa: BLE001
         pass
-    if form.get("csrf") != request.state.csrf:
+    if not csrf_matches(form.get("csrf"), request.state.csrf):
         return PlainTextResponse(translate(state.i18n_lang, "bad_csrf"), status_code=403)
     data = await _scan(state, force=True)
     data = {**data, "models": _apply_saved_order(list(data.get("models") or []), state)}
@@ -121,7 +122,7 @@ async def _form(request: Request) -> dict:
 async def download(request: Request):
     state = request.app.state.panel
     form = await _form(request)
-    if form.get("csrf") != request.state.csrf:
+    if not csrf_matches(form.get("csrf"), request.state.csrf):
         return PlainTextResponse(translate(state.i18n_lang, "bad_csrf"), status_code=403)
 
     data = await _scan(state)
@@ -183,7 +184,7 @@ async def _job_action(request: Request, jid: str):
     """Общий хвост stop/clear: CSRF + поиск задачи. Возвращает (state, job, form)."""
     state = request.app.state.panel
     form = await _form(request)
-    if form.get("csrf") != request.state.csrf:
+    if not csrf_matches(form.get("csrf"), request.state.csrf):
         return state, None, form
     job = _jobs(state).get(jid)
     return state, job, form

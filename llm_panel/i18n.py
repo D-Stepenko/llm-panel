@@ -149,8 +149,6 @@ STRINGS: dict[str, dict[str, str]] = {
         "login_user": "Username",
         "login_pass": "Password",
         "login_btn": "Sign in",
-        "login_note": ("Access to the panel is equivalent to access to the station user account (TZ §6). "
-                       "After 5 failed attempts, sign-in is temporarily blocked (counter kept in the DB)."),
         "login_bad": "Wrong username or password.",
         "login_attempts_left": " Attempts left: {n}.",
         "login_locked": "Too many failed attempts. Try again in {m} min.",
@@ -187,6 +185,11 @@ STRINGS: dict[str, dict[str, str]] = {
                           "Add model directories in Config Panel → «Disks summary paths»."),
         # --- HF-загрузки (этап 3, v0.3.1; v0.3.2 — варианты установки + путь) ---
         "hf_section": "Download from Hugging Face",
+        # Аудит №12: pickle-RCE через недоверенные репозитории — предупреждение в UI.
+        "hf_pickle_warning": "Security: models loaded from untrusted repos may contain pickled code "
+                             "that executes when a serving process loads them. Start downloads only "
+                             "from sources you trust; prefer safetensors weights. Run untrusted models "
+                             "under a dedicated unprivileged user, not root.",
         "hf_missing_notice": "Download tool not found (hf / huggingface-cli). Install it in the terminal (one of the options):",
         "hf_install_pipx": "Option 1 — pipx (recommended, outside of conda)",
         "hf_install_conda": "Option 2 — inside your conda environment",
@@ -484,8 +487,6 @@ STRINGS: dict[str, dict[str, str]] = {
         "login_user": "Логин",
         "login_pass": "Пароль",
         "login_btn": "Войти",
-        "login_note": ("Доступ к панели эквивалентен доступу к пользовательскому аккаунту станции (ТЗ §6). "
-                       "После 5 неудачных попыток вход временно блокируется (счётчик в БД)."),
         "login_bad": "Неверный логин или пароль.",
         "login_attempts_left": " Осталось попыток: {n}.",
         "login_locked": "Слишком много неудачных попыток. Повторите через {m} мин.",
@@ -522,6 +523,12 @@ STRINGS: dict[str, dict[str, str]] = {
                           "в Панели настроек → «Пути дисковой сводки»."),
         # --- HF-загрузки (этап 3, v0.3.1; v0.3.2 — варианты установки + путь) ---
         "hf_section": "Загрузка с Hugging Face",
+        # Аудит №12: pickle-RCE через недоверенные репозитории — предупреждение в UI.
+        "hf_pickle_warning": "Безопасность: модели из недоверенных репозиториев могут содержать "
+                             "pickled-код, который выполнится при их загрузке обслуживающим "
+                             "процессом (vLLM и т. п.). Скачивайте только источники, которым "
+                             "доверяете; предпочитайте веса safetensors. Недоверенные модели "
+                             "запускайте под непривилегированным выделенным пользователем, не root.",
         "hf_missing_notice": "Инструмент загрузки не найден (hf / huggingface-cli). Установите его в терминале (один из вариантов):",
         "hf_install_pipx": "Вариант 1 — pipx (рекомендуется, вне conda)",
         "hf_install_conda": "Вариант 2 — внутри вашего conda-окружения",

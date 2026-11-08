@@ -15,6 +15,7 @@ from fastapi.responses import HTMLResponse, PlainTextResponse
 from .. import __version__
 from .. import model_service as ms
 from ..i18n import translate
+from ..security import csrf_matches
 from .models import _scan
 
 router = APIRouter(prefix="/wizard")
@@ -62,7 +63,7 @@ async def wizard_select(request: Request):
     """Шаг 2: движок, карты, порт, имя юнита (предзаполнены «разумно»)."""
     state = request.app.state.panel
     form = await _form(request)
-    if form.get("csrf") != request.state.csrf:
+    if not csrf_matches(form.get("csrf"), request.state.csrf):
         return PlainTextResponse(translate(state.i18n_lang, "bad_csrf"), status_code=403)
     data = await _scan(state)
     entry = _model_by_path(data, str(form.get("model", "")))
@@ -87,7 +88,7 @@ async def wizard_generate(request: Request):
     """Шаг 3: сгенерировать сниппет services.yaml + шаблон юнита."""
     state = request.app.state.panel
     form = await _form(request)
-    if form.get("csrf") != request.state.csrf:
+    if not csrf_matches(form.get("csrf"), request.state.csrf):
         return PlainTextResponse(translate(state.i18n_lang, "bad_csrf"), status_code=403)
     data = await _scan(state)
     entry = _model_by_path(data, str(form.get("model", "")))
