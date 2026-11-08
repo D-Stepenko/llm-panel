@@ -1,120 +1,126 @@
-# Приёмочные тесты llm-panel (браузер, станция)
+# llm-panel acceptance tests (browser, station)
 
-Ручной сценарий приёмки через браузер. Окружение: станция 10.10.100.44,
-панель v0.3.16+, доступ — браузер по SSH-туннелю `http://127.0.0.1:8443/`
-(trusted_hosts содержит 127.0.0.1). Учётка: выделенный тестовый
-пользователь (создаётся через `llm_panel/users_panel_config_.sh`).
+> **A note from the author.** This project was developed by a Russian-speaking
+> author; the code comments and the `*_RU.md` documents are in Russian — please
+> treat them with understanding and forbearance. English documents are
+> sense-faithful translations; a fully localized English variant may follow if
+> the project attracts interest.
 
-Принято владельцем (2026-11-01): выключение/перезагрузку СЕРВЕРА НЕ
-проверяем (dry-run в helper-тестах уже покрывает валидацию). Опасные
-действия (старт/стоп/рестарт реальных сервисов, удаление пользователя)
-— только после явного одобрения владельца.
+A manual browser-based acceptance scenario. Environment: station 10.10.100.44,
+panel v0.3.16+, access via browser over an SSH tunnel
+`http://127.0.0.1:8443/` (trusted_hosts contains 127.0.0.1). Account: a
+dedicated test user (created via `llm_panel/users_panel_config_.sh`).
 
-## 1. Вход и защита
+Accepted by the owner (2026-11-01): server SHUTDOWN/REBOOT are NOT tested
+(dry-run in the helper tests already covers the validation). Dangerous
+actions (start/stop/restart of real services, user deletion) — only after
+the owner's explicit approval.
 
-| # | Шаг | Ожидание |
-|---|-----|----------|
-| 1.1 | Открыть `/login` (выйти заранее) | Форма без пояснений о блокировке (текст убран в 0.3.17); нет ошибки |
-| 1.2 | Логин с НЕВЕРНЫМ паролем (1 раз) | «Неверный логин или пароль.» + «Осталось попыток: 4.» |
-| 1.3 | Логин с верным паролем | Редирект на `/`; topbar, шапка карточек |
-| 1.4 | «Выйти» | Редирект на `/login`; назад на `/` не попасть (302) |
-| 1.5 | Проверить cookie | `llm_panel_session` — HttpOnly; CSP-заголовок в devtools отсутствуют ошибки |
+## 1. Login and security
 
-## 2. Главная (/): сервис-карты
+| # | Step | Expected |
+|---|------|----------|
+| 1.1 | Open `/login` (log out first) | Form without lockout explanations (the text was removed in 0.3.17); no error |
+| 1.2 | Login with a WRONG password (once) | "Wrong username or password." + "Attempts left: 4." |
+| 1.3 | Login with the correct password | Redirect to `/`; topbar, card header |
+| 1.4 | "Log out" | Redirect to `/login`; going back to `/` is not possible (302) |
+| 1.5 | Check the cookie | `llm_panel_session` — HttpOnly; CSP header in devtools, no errors |
 
-| # | Шаг | Ожидание |
-|---|-----|----------|
-| 2.1 | Полная ширина окна (≥1200px) | Сервис-карты в 3 ряда; GPU-карточки 3 колонки равной ширины; 3-я и 4-я карты НЕ растянуты |
-| 2.2 | Строки полей на карточке | «Порт 0.0.0.0:8000   Время работы —» №1; «Перезапусков 0   Systemd inactive/dead» №2; колонки по вертикали ровно, без границ; надписи «только loopback…», «определён автоматически», «· отработал (код 0)» — отсутствуют |
-| 2.3 | GPU-полоса карточки | Метка GPU по колонке 1 (одна вертикаль с «Порт»); чипы карт целиком (имя «Tesla V100-SXM2-32GB» не разрывается); 5px между чипами |
-| 2.4 | Сузить окно до ~1000px | Сервис-карты 2 колонки, GPU-карточки 2 колонки |
-| 2.5 | Сузить до ~760px | Всё в 1 колонку; GPU-полоса сохраняет 10+px от рамки |
-| 2.6 | Проверить pill | Нейтральная рамка; затенение по теме |
-| 2.7 | Привязки в GPU-карточке | «Сервисы:»/«плановая привязка» — отдельными строками ПОД сеткой (gpu-binds), не в колонках шкал |
+## 2. Main page (/): service cards
 
-## 3. GPU-карточки (главная)
+| # | Step | Expected |
+|---|------|----------|
+| 2.1 | Full window width (≥1200px) | Service cards in 3 columns; GPU tiles in 3 equal-width columns; the 3rd and 4th cards are NOT stretched |
+| 2.2 | Field rows on a card | "Port 0.0.0.0:8000   Uptime —" #1; "Restarts 0   Systemd inactive/dead" #2; columns vertically aligned, no borders; the labels "loopback only…", "detected automatically", "· finished (code 0)" — absent |
+| 2.3 | GPU strip of the card | GPU label aligned with column 1 (one vertical with "Port"); card chips whole (the name "Tesla V100-SXM2-32GB" does not wrap); 5px between chips |
+| 2.4 | Narrow the window to ~1000px | Service cards in 2 columns, GPU tiles in 2 columns |
+| 2.5 | Narrow to ~760px | Everything in 1 column; the GPU strip keeps 10+px from the border |
+| 2.6 | Check the pill | Neutral border; theme-aware shading |
+| 2.7 | Bindings in a GPU tile | "Services:"/"planned binding" as separate rows UNDER the grid (gpu-binds), not in the gauge columns |
 
-| # | Шаг | Ожидание |
-|---|-----|----------|
-| 3.1 | Шкалы «Clean line» | Высота 10px, рамка 1px; выравнивание по самой длинной строке; проценты с затенением по теме |
-| 3.2 | VRAM/Temp | Компактные строки; при сжатии шкала сжимается и не вылезает из рамки |
-| 3.3 | Вендорные рамки | NVIDIA — зелёная (базовая); AMD — красная; Intel — синяя; в обеих темах |
-| 3.4 | Часы UTC/обновление | SSE: значения/время обновляются без перезагрузки (наблюдение 10-15 с) |
+## 3. GPU tiles (main page)
 
-## 4. Темы и язык
+| # | Step | Expected |
+|---|------|----------|
+| 3.1 | "Clean line" gauges | Height 10px, 1px border; aligned to the longest label; percentages with theme-aware shading |
+| 3.2 | VRAM/Temp | Compact rows; when squeezed, the gauge compresses and does not escape the border |
+| 3.3 | Vendor borders | NVIDIA — green (base); AMD — red; Intel — blue; in both themes |
+| 3.4 | UTC clock / refresh | SSE: values/time update without a reload (observe 10–15 s) |
 
-| # | Шаг | Ожидание |
-|---|-----|----------|
-| 4.1 | Config Panel → тема light | Все карты/шкалы/power-кнопки корректны и в светлой теме |
-| 4.2 | Вернуть dark | Без артефактов |
-| 4.3 | Смена языка EN | Строки полей/GPU/кнопок переводятся; power-отсчёт в EN |
-| 4.4 | Вернуть RU | Без артефактов |
+## 4. Themes and language
 
-## 5. Матрица (/matrix)
+| # | Step | Expected |
+|---|------|----------|
+| 4.1 | Config Panel → light theme | All cards/gauges/power buttons correct in the light theme too |
+| 4.2 | Back to dark | No artifacts |
+| 4.3 | Switch language to EN | Field/GPU/button rows are translated; the power countdown in EN |
+| 4.4 | Back to RU | No artifacts |
 
-| # | Шаг | Ожидание |
-|---|-----|----------|
-| 5.1 | Открыть | Основная таблица — только сервисы с картами; остальные в «Без привязки GPU»; конфликты/«нет конфликтов» — между таблицами |
-| 5.2 | Сниппеты привязки | UUID-сниппеты CVD/`gpu[]`, кнопка копирования |
-| 5.3 | Имена карт | Полные имена NVML (не UUID-хвосты) |
+## 5. Matrix (/matrix)
 
-## 6. Модели (/models)
+| # | Step | Expected |
+|---|------|----------|
+| 5.1 | Open | The main table — only services with cards; the rest under "Without GPU binding"; conflicts/"no conflicts" — between the tables |
+| 5.2 | Binding snippets | UUID snippets of CVD/`gpu[]`, a copy button |
+| 5.3 | Card names | Full NVML names (not UUID tails) |
 
-| # | Шаг | Ожидание |
-|---|-----|----------|
-| 6.1 | Каталог | GGUF-шарды сгруппированы; HF-каталоги с quant/dtype; одна запись на каталог (дедуп по realpath) |
-| 6.2 | Нумерация + sort | Ручной порядок drag&drop: включить режим, перетаскивать, «Сохранить порядок» (меняет сохранённый порядок отображения — БЕЗОПАСНО) |
-| 6.3 | HF-загрузки | Наличие hf из Config Panel; БЕЗ запуска загрузки (опасно); кнопки побед видны/переведены |
+## 6. Models (/models)
 
-## 7. Мастер (/wizard) — только до последнего шага
+| # | Step | Expected |
+|---|------|----------|
+| 6.1 | Catalog | GGUF shards grouped; HF directories with quant/dtype; one entry per directory (dedup by realpath) |
+| 6.2 | Ordering + sort | Manual drag&drop order: enable the mode, drag, "Save order" (changes the saved display order — SAFE) |
+| 6.3 | HF downloads | hf availability from Config Panel; do NOT start a download (dangerous); the stop buttons are visible/translated |
 
-| # | Шаг | Ожидание |
-|---|-----|----------|
-| 7.1 | Шаг 1 | Модель из каталога выбирается |
-| 7.2 | Шаг 2 | Движок прдвбран по kind (GGUF→llamacpp, safetensors→vllm); карты с метками «план/занята» |
-| 7.3 | Шаг 3 | Свободный порт с проверкой занятости; НЕ нажимать финальную генерацию дважды (безопасно: пишет только в аудит, YAML показывается) |
-| 7.4 | Выход без сохранения | Кнопка «Назад»/закрытие страницы — никаких изменений |
+## 7. Wizard (/wizard) — up to the last step only
 
-## 8. Логи (карточка → «Журнал»)
+| # | Step | Expected |
+|---|------|----------|
+| 7.1 | Step 1 | A model is selectable from the catalog |
+| 7.2 | Step 2 | The engine is preselected by kind (GGUF→llamacpp, safetensors→vllm); cards labeled "planned/busy" |
+| 7.3 | Step 3 | A free port with an occupancy check; do NOT press the final generation twice (safe: it only writes to the audit, the YAML is displayed) |
+| 7.4 | Exit without saving | The "Back" button/closing the page — no changes |
 
-| # | Шаг | Ожидание |
-|---|-----|----------|
-| 8.1 | Открыть журнал stopped-юнита | Читаемая причина/пусто; поток Красный «нет события» не вешает страницу |
-| 8.2 | Лимиты строк | Поле «строк» работает |
-| 8.3 | Закрыть вкладку журнала | Без зависших соединений в devtools |
+## 8. Logs (card → "Journal")
+
+| # | Step | Expected |
+|---|------|----------|
+| 8.1 | Open the journal of a stopped unit | A readable reason/empty; the red "no event" flow does not hang the page |
+| 8.2 | Line limits | The "lines" field works |
+| 8.3 | Close the journal tab | No dangling connections in devtools |
 
 ## 9. Config Panel (/config)
 
-| # | Шаг | Ожидание |
-|---|-----|----------|
-| 9.1 | Язык/интервал/лимит аудита | Сохранение возвращает notice «Сохранено»; меняет поведение |
-| 9.2 | Пути дисковой сводки | Меняются без писания root-файлов (своё хранилище) |
-| 9.3 | Путь к hf | Валидация: несуществующий путь → err-редирект; рабочий — ок |
-| 9.4 | Добавление юнита по имени | Отдаёт блок прав с копируемой командой и для пользователя admin инструкция; НЕ дублирует запуск |
-| 9.5 | Power-кнопки (НЕ ВЫПОЛНЯТЬ) | Отсчёт «… через 5 с»: виден тик-тап; САМ разряд НЕ ждём — нажать «Отмена» и повторное нажатие и Esc; команды systemctl НЕ отправляется (проверять только отмену) |
+| # | Step | Expected |
+|---|------|----------|
+| 9.1 | Language/interval/audit limit | Saving returns a "Saved" notice; changes behavior |
+| 9.2 | Disk summary paths | Changed without writing root files (own storage) |
+| 9.3 | Path to hf | Validation: a non-existent path → err redirect; a working one — ok |
+| 9.4 | Adding a unit by name | Returns a permissions block with a copyable command and, for the admin user, instructions; does NOT duplicate the start |
+| 9.5 | Power buttons (DO NOT EXECUTE) | The countdown "… in 5 s": the tick is visible; do NOT wait for the countdown itself to fire — press "Cancel", then a repeat press and Esc; the systemctl commands are NOT sent (test the cancellation only) |
 
-## 10. Конфиг-файлы (/config/files) — только чтение
+## 10. Config files (/config/files) — read-only
 
-| # | Шаг | Ожидание |
-|---|-----|----------|
-| 10.1 | Открыть | Список dispot-owned файлов; редактор НЕ открывает root-файлы (services.yaml недоступен) |
-| 10.2 | diff/версии | Просмотр версий БЕЗ rollback (безопасно) |
+| # | Step | Expected |
+|---|------|----------|
+| 10.1 | Open | List of dispot-owned files; the editor does NOT open root files (services.yaml is unavailable) |
+| 10.2 | diff/versions | Viewing versions WITHOUT rollback (safe) |
 
-## 11. Аудит
+## 11. Audit
 
-| # | Шаг | Ожидание |
-|---|-----|----------|
-| 11.1 | Открыть аудит | Последние действия логин/logout см. в записях; пароль НЕ записан |
+| # | Step | Expected |
+|---|------|----------|
+| 11.1 | Open the audit | Recent actions login/logout visible in the entries; the password is NOT recorded |
 
-## 12. Пользователи (`llm_panel/users_panel_config_.sh`) — по отдельному запросу
+## 12. Users (`llm_panel/users_panel_config_.sh`) — on a separate request
 
-| # | Шаг | Ожидание |
-|---|-----|----------|
-| 12.1 | П.4 списком | Учитка `check` (владелец смотрит сам) |
-| 12.2 | Create/delete — ЗАПРЕЩЕНО без одобрения | Тестируется тест-версией (offline), НЕ на живой базе |
+| # | Step | Expected |
+|---|------|----------|
+| 12.1 | §4 as a list | The `check` account (the owner looks at it themselves) |
+| 12.2 | Create/delete — FORBIDDEN without approval | Tested with a test version (offline), NOT on the live database |
 
-## 13. Консольные ошибки
+## 13. Console errors
 
-| # | Шаг | Ожидание |
-|---|-----|----------|
-| 13.1 | Пройти все страницы, devtools console | Нет JS-ошибок (кроме ожидаемых SSE-переподключений при рестарте) |
+| # | Step | Expected |
+|---|------|----------|
+| 13.1 | Walk through all pages, devtools console | No JS errors (except expected SSE reconnects during a restart) |

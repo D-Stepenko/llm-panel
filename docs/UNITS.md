@@ -1,49 +1,61 @@
-# Добавление сервисов: systemd-юниты и панель
+# Adding services: systemd units and the panel
 
-Как оформить новый LLM-сервис как systemd-юнит и показать его на панели — для
-system-юнитов и user-юнитов. На примере станции-LLM (`docs/STATION-LLM.md`);
-имена пользователя (`dispot`), пути и юниты замените на свои.
+> **A note from the author.** This project was developed by a Russian-speaking
+> author; the code comments and the `*_RU.md` documents are in Russian — please
+> treat them with understanding and forbearance. English documents are
+> sense-faithful translations; a fully localized English variant may follow if
+> the project attracts interest.
 
-Три способа показать сервис на панели (по возрастанию данных):
+How to package a new LLM service as a systemd unit and show it in the panel —
+for system units and user units. Uses the LLM station as an example
+(`docs/STATION-LLM.md`); replace the user name (`dispot`), paths and units
+with your own.
 
-| Способ | Что даёт | Когда использовать |
+Three ways to show a service in the panel (in ascending order of detail):
+
+| Method | What you get | When to use |
 |---|---|---|
-| «Поиск сервисов» в Config Panel | карточка с состоянием и действиями | юнит уже загружен хотя бы раз |
-| «Добавить юнит по имени» (там же) | то же, в т.ч. для ни разу не стартовавших юнитов | быстрое добавление без правки файлов |
-| Запись в `services.yaml` | карточка + имя, порт, health, GPU, notes | основной сервис с известной конфигурацией |
+| "Search services" in the Config Panel | a card with state and actions | the unit has been loaded at least once |
+| "Add unit by name" (same place) | the same, including units never started | quick addition without editing files |
+| An entry in `services.yaml` | card + name, port, health, GPUs, notes | a primary service with a known configuration |
 
-Все три способа дают карточку на странице Статус с действиями
-(start/stop/restart/enable/disable): system-юниты — через root-owned helper
-(см. §3), user-юниты — напрямую `systemctl --user`. Никакой из них не требует
-рестарта панели (кроме правки `services.yaml` — он перечитывается при рестарте
-панели или drop-in'ом `SIGHUP`, см. ниже).
+All three methods produce a card on the Status page with actions
+(start/stop/restart/enable/disable): system units — through the root-owned
+helper (see §3), user units — directly with `systemctl --user`. None of them
+requires a panel restart (except editing `services.yaml` — it is re-read on
+panel restart or with a `SIGHUP` drop-in, see below).
 
 ---
 
-## 1. Как оформить юнит: system или user
+## 1. How to package a unit: system or user
 
-**System-юнит** (`/etc/systemd/system/*.service`) — по умолчанию для LLM-сервисов:
+**System unit** (`/etc/systemd/system/*.service`) — the default for LLM
+services:
 
-- переживает выход пользователя из системы, стартует при загрузке;
-- ограничения ресурсов (`OOMScoreAdjust`, `ManagedOOM*`) задаются в самом юните;
-- управление из панели — через helper + allowlist (root, см. §3);
-- редактирование юнита — только `sudo` (панель юниты не редактирует, ТЗ §5.5).
+- survives user logout, starts at boot;
+- resource limits (`OOMScoreAdjust`, `ManagedOOM*`) are set inside the unit
+  itself;
+- control from the panel — through the helper + allowlist (root, see §3);
+- editing the unit — only via `sudo` (the panel does not edit units, spec
+  §5.5).
 
-**User-юнит** (`~/.config/systemd/user/*.service`) — для личных сервисов
-пользователя панели (чаты-шлюзы, прокси и т.п.):
+**User unit** (`~/.config/systemd/user/*.service`) — for the panel user's
+personal services (chat gateways, proxies, etc.):
 
-- управляется `systemctl --user` от имени того же пользователя, что и панель;
-- helper и allowlist НЕ нужны (панель выполняет systemctl напрямую);
-- для старта при загрузке нужен linger: `loginctl enable-linger dispot`;
-- не виден системному менеджеру: в `services.yaml` — `scope: user`, а в системных
-  `systemctl ... show` такого юнита нет.
+- controlled with `systemctl --user` as the same user the panel runs as;
+- the helper and allowlist are NOT needed (the panel runs systemctl
+  directly);
+- starting at boot requires linger: `loginctl enable-linger dispot`;
+- not visible to the system manager: in `services.yaml` use `scope: user`,
+  and the system-wide `systemctl ... show` has no such unit.
 
-> Замечание systemd-oomd: user-менеджер (`user@.service`) часто имеет
-> `ManagedOOMMemoryPressure=kill` — сервис, пиннующий почти всю RAM (например,
-> Maya), в user-юните рискует быть убит oomd. У system-юнита такие свойства по
-> умолчанию выключены. Ещё одна причина предпочесть system-юнит.
+> A note on systemd-oomd: the user manager (`user@.service`) often has
+> `ManagedOOMMemoryPressure=kill` — a service pinning almost all of RAM
+> (Maya, for example) in a user unit risks being killed by oomd. A system
+> unit has such properties off by default. One more reason to prefer a
+> system unit.
 
-### 1.1 System-юнит — шаблон
+### 1.1 System unit — template
 
 ```bash
 sudo tee /etc/systemd/system/myservice.service >/dev/null <<'EOF'
@@ -58,9 +70,9 @@ WorkingDirectory=/home/dispot/src/my-service
 ExecStart=/home/dispot/src/my-service/.venv/bin/python serve.py --port 8100
 Restart=on-failure
 RestartSec=10
-TimeoutStartSec=600      # если сервис долго грузит модель
-TimeoutStopSec=180       # сколько ждать graceful-остановки
-OOMScoreAdjust=-500      # при нехватке памяти OOM-killer уберёт его последним
+TimeoutStartSec=600      # if the service takes long to load a model
+TimeoutStopSec=180       # how long to wait for a graceful stop
+OOMScoreAdjust=-500      # on memory shortage the OOM killer takes it last
 
 [Install]
 WantedBy=multi-user.target
@@ -68,11 +80,13 @@ EOF
 sudo systemctl daemon-reload
 ```
 
-Проверка: `sudo systemctl start myservice.service`, `systemctl status myservice.service`,
-`journalctl -u myservice.service -f`. **Enable** (`sudo systemctl enable ...`) —
-только если ясно, что сервис не конфликтует за GPU/RAM с другими при загрузке.
+Check: `sudo systemctl start myservice.service`,
+`systemctl status myservice.service`,
+`journalctl -u myservice.service -f`. **Enable**
+(`sudo systemctl enable ...`) — only if it is clear the service does not
+contend for GPU/RAM with others at boot.
 
-### 1.2 User-юнит — шаблон
+### 1.2 User unit — template
 
 ```bash
 mkdir -p ~/.config/systemd/user
@@ -90,95 +104,99 @@ RestartSec=10
 WantedBy=default.target
 EOF
 systemctl --user daemon-reload
-loginctl enable-linger $USER   # чтобы юнит жил без открытой сессии
+loginctl enable-linger $USER   # so the unit lives without an open session
 systemctl --user start myservice.service
 ```
 
-### 1.3 Смена концепции: user-юнит → system-юнит (пример Maya)
+### 1.3 Concept change: user unit → system unit (the Maya example)
 
 ```bash
-# 1) остановить и удалить user-юнит
+# 1) stop and remove the user unit
 systemctl --user stop maya-maya-m.service
 rm ~/.config/systemd/user/maya-maya-m.service
 systemctl --user daemon-reload
 
-# 2) создать system-юнит (содержимое — по шаблону §1.1; полный пример Maya — §5)
+# 2) create the system unit (contents — per the §1.1 template; the full
+#    Maya example — §5)
 #    ...
-# 3) перечитать конфигурацию systemd
+# 3) re-read the systemd configuration
 sudo systemctl daemon-reload
 ```
 
-Если юнит уже был добавлен в панель как user-юнит, удалите его в Config Panel
-(снимите галочку / удалите из `extra_units`) и добавьте заново — scope
-определится автоматически (system).
+If the unit was already added to the panel as a user unit, remove it in the
+Config Panel (uncheck it / remove it from `extra_units`) and add it again —
+the scope will be determined automatically (system).
 
 ---
 
-## 2. Показать юнит на панели
+## 2. Show the unit in the panel
 
-### 2.1 «Поиск сервисов» (Config Panel)
+### 2.1 "Search services" (Config Panel)
 
-`/config` → «Поиск сервисов» → список загруженных юнитов обоих менеджеров
-(system и user) → отметить нужные → «Сохранить». Сохранённые юниты хранятся в
-настройках панели (SQLite), правки yaml не требуют; карточки появляются на
-Статусе со state/uptime и действиями.
+`/config` → "Search services" → a list of loaded units of both managers
+(system and user) → check the needed ones → "Save". Saved units are kept in
+the panel settings (SQLite), no yaml edits required; cards appear on Status
+with state/uptime and actions.
 
-### 2.2 «Добавить юнит по имени»
+### 2.2 "Add unit by name"
 
-Тот же блок в Config Panel, поле под списком. Работает и для юнитов, которых в
-`list-units` нет — ни разу не стартовавших или остановленных и выгруженных:
-панель проверяет имя через `systemctl show` сначала в user-менеджере, затем в
-системном, определяет scope и сохраняет юнит. Имя — точное, с суффиксом:
-`maya-maya-m.service`.
+The same block in the Config Panel, the field below the list. Works for
+units missing from `list-units` too — ones never started, or stopped and
+unloaded: the panel checks the name via `systemctl show` first in the user
+manager, then the system one, determines the scope and saves the unit. The
+name must be exact, with the suffix: `maya-maya-m.service`.
 
-### 2.3 Запись в `services.yaml` (полные данные)
+### 2.3 An entry in `services.yaml` (full details)
 
-Для основных сервисов добавьте блок в `/etc/llm-panel/services.yaml`
-(шаблон — `deploy/services.yaml.example`, реальные примеры — `deploy/examples/`):
+For primary services add a block to `/etc/llm-panel/services.yaml`
+(template — `deploy/services.yaml.example`, real examples —
+`deploy/examples/`):
 
 ```yaml
 services:
-  - id: my-service                    # латиница/цифры/дефис, уникален
-    name: "My service (человекочитаемо)"
+  - id: my-service                    # latin letters/digits/dash, unique
+    name: "My service (human-readable)"
     type: generic                     # vllm | llamacpp | generic
-    unit: myservice.service           # ТОЧНОЕ имя юнита (регистр сохраняется)
-    scope: system                     # для user-юнитов: user
+    unit: myservice.service           # EXACT unit name (case preserved)
+    scope: system                     # for user units: user
     managed: adopted
     edit_mode: manage_only
     port: 8100
     bind_host: 127.0.0.1
     health:
-      kind: http                      # или tcp (port)
+      kind: http                      # or tcp (port)
       url: http://127.0.0.1:8100/health
       timeout_s: 3
       interval_s: 15
-    startup_timeout: 600              # 30..3600, сколько ждать готовности
-    stop_timeout: 60                  # 1..300, согласовать с TimeoutStopSec юнита
-    gpus: []                          # плановая привязка по ПОЛНЫМ UUID (nvidia-smi -L)
-    cuda_addressing: uuid             # или index (как сервис фактически адресует карты)
+    startup_timeout: 600              # 30..3600, how long to wait for readiness
+    stop_timeout: 60                  # 1..300, align with the unit's TimeoutStopSec
+    gpus: []                          # planned binding by FULL UUIDs (nvidia-smi -L)
+    cuda_addressing: uuid             # or index (how the service actually addresses cards)
     notes: >-
-      ExecStart, env, особенности.
+      ExecStart, env, specifics.
 ```
 
-После правки — `sudo systemctl restart llm-panel` (или проверить конфиг:
-`.venv/bin/python -m llm_panel --config /etc/llm-panel/config.yaml check-config`).
-Поля GPU и health-эндпоинт — этап 2, для простой карточки достаточно
-`id/unit/scope`.
+After editing — `sudo systemctl restart llm-panel` (or check the config:
+`.venv/bin/python -m llm_panel --config /etc/llm-panel/config.yaml
+check-config`). The GPU fields and the health endpoint — stage 2; a simple
+card only needs `id/unit/scope`.
 
-> YAML-блок и юниты, добавленные через UI (§2.1/§2.2), не мешают друг другу:
-> реестр приоритетен — юнит, уже описанный в `services.yaml`, повторно добавить
-> из UI нельзя.
+> The YAML block and units added through the UI (§2.1/§2.2) do not conflict
+> with each other: the registry takes priority — a unit already described in
+> `services.yaml` cannot be added again from the UI.
 
 ---
 
-## 3. Allowlist для system-юнитов
+## 3. Allowlist for system units
 
-Управление system-юнитами из панели идёт через root-owned helper
-`/usr/local/sbin/llm-panel-systemd`; без записи юнита в allowlist кнопки
-start/stop/restart отклоняются с подсказкой «внесите юнит в allowlist»
-(чтение статуса работает и без него — панель читает systemctl напрямую).
+Control of system units from the panel goes through the root-owned helper
+`/usr/local/sbin/llm-panel-systemd`; without an allowlist entry for the unit,
+the start/stop/restart buttons are declined with a hint "add the unit to the
+allowlist" (status reading works without it — the panel reads systemctl
+directly).
 
-Внесение — только от root. Удобно объединить с уже существующей записью:
+Adding an entry — from root only. It is convenient to merge it with an
+existing entry:
 
 ```bash
 sudo python3 - <<'EOF'
@@ -189,38 +207,42 @@ with open(p, encoding="utf-8") as f:
 d["units"]["myservice.service"] = {
     "actions": ["start", "stop", "restart", "enable", "disable",
                 "status", "journal", "journal-follow"],
-    # «только просмотр»: ["status", "journal"] + "note": "почему"
+    # "view only": ["status", "journal"] + "note": "why"
 }
 with open(p, "w", encoding="utf-8") as f:
     json.dump(d, f, ensure_ascii=False, indent=2)
 EOF
 ```
 
-Проверка: `sudo -n /usr/local/sbin/llm-panel-systemd status myservice.service`
-(код 0), затем кнопки на карточке. User-юниты в allowlist вносить не нужно.
+Check: `sudo -n /usr/local/sbin/llm-panel-systemd status myservice.service`
+(exit code 0), then the buttons on the card. User units do not need to be
+added to the allowlist.
 
 ---
 
-## 4. Чек-лист добавления нового сервиса
+## 4. Checklist for adding a new service
 
-1. Создать юнит (§1.1 или §1.2), `daemon-reload`, тестовый старт, журнал.
-2. Решить вопрос с GPU/памятью: не пересекается ли юнит с работающими
-   (`ss -ltnp`, `nvidia-smi`, сводка RAM)? Не включать `enable` до решения.
-3. Внести в allowlist (§3) — для system-юнитов с кнопками.
-4. Добавить в панель: «Поиск сервисов» или «по имени» (§2.1/§2.2), для
-   постоянных сервисов — блок в `services.yaml` (§2.3).
-5. Оформить порты/health/gpus по фактическому поведению; notes — для потомков.
+1. Create the unit (§1.1 or §1.2), `daemon-reload`, a test start, the
+   journal.
+2. Settle the GPU/memory question: does the unit overlap running ones
+   (`ss -ltnp`, `nvidia-smi`, the RAM summary)? Do not `enable` before it is
+   settled.
+3. Add to the allowlist (§3) — for system units with buttons.
+4. Add to the panel: "Search services" or "by name" (§2.1/§2.2); for
+   permanent services — a block in `services.yaml` (§2.3).
+5. Fill in ports/health/gpus according to the actual behavior; notes — for
+   posterity.
 
 ---
 
-## 5. Пример: Maya (system-юнит, 2026-10-28)
+## 5. Example: Maya (system unit, 2026-10-28)
 
-Контекст: Maya-M (GLM-5.3-Flash) в `/home/dispot/src/project-maya`, конфиг
-`maya-maya-m.json`, веб-морда и API на одном порту 8010 (loopback), движок
-пиннует почти всю свободную RAM (`MAYA_GLM_RAM_HEADROOM_GB=10`), старт ~6,5 мин,
-graceful-остановка до 150 с (QUIT движку, освобождение VRAM/RAM).
+Context: Maya-M (GLM-5.3-Flash) in `/home/dispot/src/project-maya`, config
+`maya-maya-m.json`, web UI and API on one port 8010 (loopback), the engine
+pins almost all free RAM (`MAYA_GLM_RAM_HEADROOM_GB=10`), start ~6.5 min,
+graceful stop up to 150 s (QUIT to the engine, VRAM/RAM release).
 
-### 5.1 Юнит
+### 5.1 The unit
 
 ```bash
 sudo tee /etc/systemd/system/maya-maya-m.service >/dev/null <<'EOF'
@@ -246,7 +268,7 @@ EOF
 sudo systemctl daemon-reload
 ```
 
-### 5.2 Allowlist (system-юнит — действия через helper)
+### 5.2 Allowlist (system unit — actions through the helper)
 
 ```bash
 sudo python3 - <<'EOF'
@@ -263,21 +285,22 @@ with open(p, "w", encoding="utf-8") as f:
 EOF
 ```
 
-### 5.3 Тестовый старт
+### 5.3 A test start
 
 ```bash
-sudo systemctl stop vllm.service          # vllm держит карты 0,1 — без этого
-                                          # Maya упадёт «pack: out of memory»
+sudo systemctl stop vllm.service          # vllm holds cards 0,1 — without this
+                                          # Maya dies with "pack: out of memory"
 sudo systemctl start maya-maya-m.service
-journalctl -u maya-maya-m.service -f      # «ready: http://127.0.0.1:8010/v1»
+journalctl -u maya-maya-m.service -f      # "ready: http://127.0.0.1:8010/v1"
 ```
 
-`enable` отложен до решения о политике одновременности (этап 2): при загрузке
-станции Maya и vllm сцепятся за карты 0/1.
+`enable` is deferred until a concurrency-policy decision (stage 2): at
+station boot Maya and vllm would contend for cards 0/1.
 
-### 5.4 Панель
+### 5.4 The panel
 
-`/config` → «Поиск сервисов» или «Добавить юнит по имени» → `maya-maya-m.service`.
-Постоянный блок реестра — `deploy/examples/services.yaml.station-llm.yaml`
-(id `maya`: порт 8010, tcp-health, startup_timeout 900, stop_timeout 180,
-все три GPU по UUID, `cuda_addressing: index`, `ram_exclusive: true`).
+`/config` → "Search services" or "Add unit by name" → `maya-maya-m.service`.
+A permanent registry block —
+`deploy/examples/services.yaml.station-llm.yaml` (id `maya`: port 8010,
+tcp-health, startup_timeout 900, stop_timeout 180, all three GPUs by UUID,
+`cuda_addressing: index`, `ram_exclusive: true`).

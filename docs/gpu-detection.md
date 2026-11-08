@@ -1,99 +1,107 @@
-# Обнаружение и идентификация GPU (v0.3.14)
+# GPU detection and identification (v0.3.14)
 
-Как llm-panel находит видеокарты станции и определяет их вендора
-(NVIDIA / AMD Radeon / Intel Arc) — источник данных, цепочка до UI,
-ограничения.
+> **A note from the author.** This project was developed by a Russian-speaking
+> author; the code comments and the `*_RU.md` documents are in Russian — please
+> treat them with understanding and forbearance. English documents are
+> sense-faithful translations; a fully localized English variant may follow if
+> the project attracts interest.
 
-## 1. Источник данных: NVML
+How llm-panel finds the station's video cards and determines their vendor
+(NVIDIA / AMD Radeon / Intel Arc) — the data source, the chain up to the UI,
+limitations.
 
-Единственный источник GPU-данных — **NVML** (NVIDIA Management Library)
-через пакет `nvidia-ml-py` (`import pynvml`), см. `llm_panel/metrics.py`.
+## 1. Data source: NVML
 
-Инициализация (`MetricsCollector._init_nvml`):
+The single source of GPU data is **NVML** (NVIDIA Management Library) via the
+`nvidia-ml-py` package (`import pynvml`), see `llm_panel/metrics.py`.
 
-- `pynvml` не установлен → NVML считается недоступным, `nvml_error =`
-  «модуль nvidia-ml-py не установлен в этом окружении»;
-- `pynvml.nvmlInit()` падает (нет драйвера/не Linux) → `nvml_error`
-  «NVML недоступен (<тип исключения>)».
+Initialization (`MetricsCollector._init_nvml`):
 
-Если NVML недоступен, в колонке GPU на главной появляется предупреждение
-и карточки карт не рисуются — панель НЕ деградирует (`read_gpus()`
-возвращает `None`).
+- `pynvml` not installed → NVML is considered unavailable,
+  `nvml_error =` "the nvidia-ml-py module is not installed in this
+  environment";
+- `pynvml.nvmlInit()` fails (no driver / not Linux) → `nvml_error`
+  "NVML unavailable (<exception type>)".
 
-## 2. Перечень карт и метрики
+If NVML is unavailable, the GPU column on the main page shows a warning and
+no card tiles are drawn — the panel does NOT degrade (`read_gpus()` returns
+`None`).
+
+## 2. Card list and metrics
 
 `MetricsCollector.read_gpus()` (`metrics.py`):
 
-1. `nvmlDeviceGetCount()` — число карт;
-2. для каждой: `nvmlDeviceGetHandleByIndex(i)`, затем:
+1. `nvmlDeviceGetCount()` — the number of cards;
+2. for each one: `nvmlDeviceGetHandleByIndex(i)`, then:
 
-| поле          | вызов NVML                                   |
+| field         | NVML call                                    |
 |---------------|----------------------------------------------|
-| uuid          | `nvmlDeviceGetUUID(h)` — ПОЛНЫЙ UUID         |
-| name          | `nvmlDeviceGetName(h)` — как в `nvidia-smi`  |
+| uuid          | `nvmlDeviceGetUUID(h)` — FULL UUID           |
+| name          | `nvmlDeviceGetName(h)` — as in `nvidia-smi`  |
 | mem_used/total| `nvmlDeviceGetMemoryInfo(h).used/.total`     |
 | util_gpu_pct  | `nvmlDeviceGetUtilizationRates(h).gpu`       |
 | temp_c        | `nvmlDeviceGetTemperature(h, NVML_TEMPERATURE_GPU)` |
 | power_w       | `nvmlDeviceGetPowerUsage(h) / 1000`          |
 | power_limit_w | `nvmlDeviceGetEnforcedPowerLimit(h) / 1000`  |
-| procs         | `nvmlDeviceGetComputeRunningProcesses` + `...Graphics...` (pid, имя, память) |
+| procs         | `nvmlDeviceGetComputeRunningProcesses` + `...Graphics...` (pid, name, memory) |
 
-Любое поле может отсутствовать (карта не поддерживает) — остаётся `None`
-и в UI показывает «нет данных»; ошибка чтения одной карты не рушит
-остальные.
+Any field may be missing (the card does not support it) — it stays `None`
+and the UI shows "no data"; a read error on one card does not break the
+others.
 
-Форматирование значений в словари снапшота — `build_gpu_rows()` →
-`_fmt_gpu()` (`metrics.py`): добавление `mem_pct`/`power_pct`,
-человекочитаемый порядок полей и **`vendor`** (см. §3).
+Formatting of the values into snapshot dictionaries — `build_gpu_rows()` →
+`_fmt_gpu()` (`metrics.py`): adds `mem_pct`/`power_pct`, a human-readable
+field order and **`vendor`** (see §3).
 
-## 3. Идентификация вендора (v0.3.14)
+## 3. Vendor identification (v0.3.14)
 
-`gpu_vendor(name)` в `metrics.py` — классификация по имени карты:
+`gpu_vendor(name)` in `metrics.py` — classification by card name:
 
-- подстроки `radeon` / `amd` → `"amd"`;
-- подстроки `intel` / `arc` → `"intel"`;
-- иначе → `"nvidia"` (дефолт, в т.ч. для пустого имени и текста
-  «<НВМЛ ошибка: …>»).
+- substrings `radeon` / `amd` → `"amd"`;
+- substrings `intel` / `arc` → `"intel"`;
+- otherwise → `"nvidia"` (the default, including for an empty name and the
+  text "<NVML error: …>").
 
-Вендор попадает в снапшот как ключ `"vendor"` и используется шаблоном
-`_gpus.html` для класса карточки: `gpu-card gpu-vendor-{vendor}`.
-Цвет рамки в `app.css` (переменные в обеих темах):
+The vendor goes into the snapshot as the `"vendor"` key and is used by the
+`_gpus.html` template for the card class: `gpu-card gpu-vendor-{vendor}`.
+Border colors in `app.css` (variables in both themes):
 
-| вендор | тёмные/светлые переменные          | цвет                     |
-|--------|------------------------------------|--------------------------|
-| nvidia | `--gpu-border` (базовая, зелёная)  | `#285241` / `#a4dcc9`    |
-| amd    | `--gpu-border-amd` (красная)       | `#5c343d` / `#ddb0b7`    |
-| intel  | `--gpu-border-intel` (синяя)       | `#2d4661` / `#a8c0dd`    |
+| vendor | dark/light variables                | color                    |
+|--------|-------------------------------------|--------------------------|
+| nvidia | `--gpu-border` (base, green)        | `#285241` / `#a4dcc9`    |
+| amd    | `--gpu-border-amd` (red)            | `#5c343d` / `#ddb0b7`    |
+| intel  | `--gpu-border-intel` (blue)         | `#2d4661` / `#a8c0dd`    |
 
-Правила `.gpu-vendor-amd` / `.gpu-vendor-intel` красят рамку карточки,
-подчёркивание шапки и pill загрузки; NVIDIA — базовое правило.
+The `.gpu-vendor-amd` / `.gpu-vendor-intel` rules color the card border, the
+header underline and the load pill; NVIDIA is the base rule.
 
-**Ограничение:** NVML видит ТОЛЬКО NVIDIA-карты. Если станция стоит на
-гибридной конфигурации (например, NVIDIA + iGPU), имена AMD/Intel могут
-прийти из другого источника — классификация сработает по имени; метрики
-AMD/Intel панель сама НЕ собирает (нет интеграции с sysfs/radeontop).
+**Limitation:** NVML sees ONLY NVIDIA cards. If the station runs a hybrid
+configuration (e.g. NVIDIA + an iGPU), AMD/Intel names may come from another
+source — the classification will still work by name; the panel does NOT
+collect AMD/Intel metrics itself (no sysfs/radeontop integration).
 
-## 4. Цепочка данных до UI
+## 4. Data chain up to the UI
 
 ```
 MetricsCollector.read_gpus()            # NVML → GpuMetrics
-  → build_gpu_rows() / _fmt_gpu()       # словари + mem_pct/vendor (executor)
+  → build_gpu_rows() / _fmt_gpu()       # dicts + mem_pct/vendor (executor)
 Collector._tick() (collector.py):
   → _gpu_attribution(gpu_rows, pid_owner)
-      - procs[].owner  → id сервиса по pid (с учётом дочерних процессов)
-      - g["services"]  → ФАКТИЧЕСКИЕ владельцы карты (работает и без привязки в yaml)
-  → g["assigned"] = [s.id for s in defs if uuid in s.gpus]   # ПЛАНОВАЯ привязка из services.yaml
+      - procs[].owner  → service id by pid (including child processes)
+      - g["services"]  → ACTUAL owners of the card (works even without a yaml binding)
+  → g["assigned"] = [s.id for s in defs if uuid in s.gpus]   # PLANNED binding from services.yaml
   → Snapshot(ts, services, gpus, host, ...)
 routes/dashboard.py:
-  → GET /          : state.render("_gpus.html", snapshot=…) внутри #gpus-init
-  → GET /status    : SSE event «gpus» — те же фрагменты при каждом обновлении
+  → GET /          : state.render("_gpus.html", snapshot=…) inside #gpus-init
+  → GET /status    : SSE event "gpus" — the same fragments on every refresh
 ```
 
-## 5. UUID и привязки
+## 5. UUID and bindings
 
-- В `services.yaml` карты адресуются **полными UUID** (`cuda_addressing:
-  uuid`); `uuid_name` в collector.py подставляет «человеческие» имена
-  карт в карточки сервисов и матрицу GPU (как в `nvidia-smi`).
-- Матрица (`/matrix`) сверяет план (gpus в yaml) и факт (processes
-  NVML), конфликты RAM/портов/GPU показываются между таблицами.
-- Проверить UUID с нуля: `nvidia-smi --query-gpu=index,name,uuid --format=csv`.
+- In `services.yaml` cards are addressed by **full UUIDs** (`cuda_addressing:
+  uuid`); `uuid_name` in collector.py substitutes human-readable card names
+  into service cards and the GPU matrix (as in `nvidia-smi`).
+- The matrix (`/matrix`) cross-checks the plan (gpus in yaml) against the
+  facts (NVML processes); RAM/port/GPU conflicts are shown between the
+  tables.
+- To check UUIDs from scratch: `nvidia-smi --query-gpu=index,name,uuid --format=csv`.

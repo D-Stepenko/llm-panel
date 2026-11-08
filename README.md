@@ -1,83 +1,103 @@
-# llm-panel — локальная веб-панель управления LLM-станцией
+# llm-panel — local web control panel for an LLM server
 
-Веб-панель для сервера с LLM-сервисами: статусы и управление systemd-юнитами
-(vLLM, llama.cpp, TTS/STT, вспомогательные), сводка GPU/RAM/CPU/дисков, журналы
-с маскированием секретов, аудит действий. **Универсальна**: конкретные юниты,
-GPU, диски и пользователь задаются конфигурацией и параметрами установщика, а не
-кодом — проект ставится на любой сервер с systemd (NVIDIA GPU опционален).
+> **A note from the author.** This project was developed by a Russian-speaking
+> author. The code comments and the `*_RU.md` documents are in Russian — please
+> treat them with understanding and forbearance. The English documents you are
+> reading are sense-faithful translations (meaning matters more than
+> word-for-word accuracy). If the project attracts interest, a fully localized
+> English variant — translated code comments and all — will be made.
 
-![Дашборд llm-panel: карточки сервисов, сводка хоста и GPU](docs/screenshot-dashboard.png)
+A web panel for a server running LLM services: status and control of systemd
+units (vLLM, llama.cpp, TTS/STT, auxiliary services), a GPU/RAM/CPU/disk
+summary, journals with secret masking, and an audit log of actions.
+**Universal**: the specific units, GPUs, disks and user are defined by
+configuration and installer parameters rather than by code — the project
+installs on any server with systemd (an NVIDIA GPU is optional).
 
-**Статус: этап 3 (из 4) ЗАКРЫТ, версия 0.3.6.** Готовы: этап 1 (MVP) целиком,
-этап 2 частично (матрица GPU, редактор конфигураций с версиями/diff/rollback),
-этап 3 целиком — каталог моделей, HF-загрузки (conda-путь к `hf`, работа в
-песочнице systemd-юнита) и мастер «модель → сервис» (/wizard: движок + GPU +
-свободный порт → готовый сниппет services.yaml + шаблон юнита). Далее:
-этап 4 — Open WebUI-интеграция.
+![llm-panel dashboard: service cards, host and GPU summary](docs/screenshot-dashboard.png)
 
-## Документация
+**Status: stage 3 (of 4) CLOSED, version 0.3.6.** Done: stage 1 (MVP) in full,
+stage 2 partially (GPU matrix, configuration editor with versions/diff/rollback),
+and stage 3 in full — model catalog, HF downloads (conda path to `hf`, running
+inside a systemd-unit sandbox) and the "model → service" wizard (`/wizard`:
+engine + GPU + free port → a ready `services.yaml` snippet + a unit template).
+Next: stage 4 — Open WebUI integration. For the current status see
+[docs/PROJECT.md](docs/PROJECT.md) (Russian original: `docs/PROJECT_RU.md`).
 
-| Документ | Содержание |
+## Documentation
+
+| Document | Contents |
 |---|---|
-| [docs/PROJECT.md](docs/PROJECT.md) | описание проекта: возможности, архитектура, безопасность, конфигурация, Панель настроек, этапы |
-| [docs/DEPLOY.md](docs/DEPLOY.md) | развертывание на любом сервере: install.sh / вручную, настройка юнитов/GPU/дисков, Caddy, обновление, аварийные процедуры |
-| [docs/STATION-LLM.md](docs/STATION-LLM.md) | факты обследования и история первой станции (конкретный сервер) |
-| [docs/UNITS.md](docs/UNITS.md) | добавление systemd-юнитов в панель (системные и user-юниты) |
+| [docs/PROJECT.md](docs/PROJECT.md) | project description: features, architecture, security, configuration, Config Panel, stages |
+| [docs/DEPLOY.md](docs/DEPLOY.md) | deployment on any server: install.sh / manual setup, unit/GPU/disk configuration, Caddy, updates, emergency procedures |
+| [docs/STATION-LLM.md](docs/STATION-LLM.md) | survey facts and the history of the first station (a specific server) |
+| [docs/UNITS.md](docs/UNITS.md) | adding systemd units to the panel (system and user units) |
 
-## Возможности этапа 1
+Russian originals of all documents: `docs/*_RU.md` and `README_RU.md`.
 
-- Вход по паролю (Argon2), блокировка после 5 неудач, CSRF, строгий CSP (без inline script/style).
-- Дашборд: карточки сервисов (статус systemd, health, автозапуск, uptime, GPU-привязка),
-  блок хоста (RAM/swap/CPU/диски), карточки GPU (загрузка, память, температура, питание, процессы).
-- Управление start/stop/restart и автозапуском — только через root-owned helper
-  с allowlist (sudoers даёт право ровно на один путь; юнит вне allowlist = отказ).
-- Журналы юнитов: просмотр/скачивание с маскированием `hf_…`/JWT/Bearer/sk-ключей;
-  живой поток (SSE) с фильтром по строке.
-- Ручной порядок карточек (перетаскивание мышью, сохраняется в БД).
-- SSE-обновления от одного общего коллектора (интервал 2–10 с, настраивается в UI).
-- Панель настроек `/config`: язык EN/RU, °C/°F, интервал обновления, лимит аудита,
-  пути дисковой сводки — всё применяется на ходу, без рестарта.
-- Добавление юнитов из UI (системные и user-юниты, «Поиск сервисов»), скрытие карточек.
-- Фактические данные без yaml: GPU по процессам (NVML-атрибуция), слушающие порты,
-  авто-TCP-health — для юнитов без описания привязок (v0.1.12).
-- GPU/CPU/RAM определяются автоматически (NVML + psutil); «нет данных» вместо выдумок.
+## Stage 1 features
 
-## Возможности этапа 2 (реализовано частично)
+- Password login (Argon2), lockout after 5 failures, CSRF, strict CSP
+  (no inline script/style).
+- Dashboard: service cards (systemd status, health, autostart, uptime, GPU
+  binding), a host block (RAM/swap/CPU/disks), GPU cards (load, memory,
+  temperature, power, processes).
+- start/stop/restart control and autostart — only through a root-owned helper
+  with an allowlist (sudoers grants the right to exactly one path; a unit
+  outside the allowlist = refusal).
+- Unit journals: view/download with masking of `hf_…`/JWT/Bearer/sk- keys;
+  live stream (SSE) with a per-line filter.
+- Manual card ordering (drag & drop, persisted in the database).
+- SSE updates from a single shared collector (interval 2–10 s, configurable
+  in the UI).
+- Config Panel `/config`: language EN/RU, °C/°F, refresh interval, audit limit,
+  disk summary paths — everything applies on the fly, without a restart.
+- Adding units from the UI (system and user units, "Search services"),
+  hiding cards.
+- Ground-truth data without yaml: GPUs by processes (NVML attribution),
+  listening ports, automatic TCP health — for units without declared bindings
+  (v0.1.12).
+- GPU/CPU/RAM are detected automatically (NVML + psutil); "no data" instead of
+  made-up values.
 
-- **Матрица GPU** (`/matrix`, только просмотр): плановые привязки карт из
-  services.yaml против фактической занятости (NVML-процессы); сниппеты привязки
-  по конвенции владельца (`CUDA_VISIBLE_DEVICES` по индексам/UUID, `"gpu": [...]`
-  для Maya); сервисы без привязки — отдельная приглушённая секция.
-- **Конфликты** (advisory): карта запланирована нескольким сервисам; фактическое
-  совладение карты; одновременная работа ≥2 сервисов с `ram_exclusive`; один порт
-  у работающих сервисов.
-- **Редактор конфигураций** (`/config/files`): правка dispot-owned конфигов
-  движков (например `maya-maya-m.json`) прямо из панели — JSON-валидация до
-  записи, атомарная запись, история версий в SQLite, diff против текущего,
-  откат (тоже версией). Root-owned файлы (`/etc/llm-panel`, systemd-юниты)
-  не редактируются — по ТЗ. Все действия в аудит.
-- Порт юнита в карточке — ссылка в новой вкладке (хост панели : порт юнита);
-  для loopback-only привязок ссылка не даётся.
+## Stage 2 features (partially implemented)
 
-## Структура
+- **GPU matrix** (`/matrix`, view-only): planned card bindings from
+  services.yaml versus actual occupancy (NVML processes); binding snippets in
+  the owner's convention (`CUDA_VISIBLE_DEVICES` by indices/UUIDs,
+  `"gpu": [...]` for Maya); services without binding in a separate muted
+  section.
+- **Conflicts** (advisory): a card planned for several services; actual sharing
+  of a card; ≥2 services with `ram_exclusive` running at the same time; one
+  port used by running services.
+- **Configuration editor** (`/config/files`): editing dispot-owned engine
+  configs (e.g. `maya-maya-m.json`) right from the panel — JSON validation
+  before writing, atomic writes, version history in SQLite, diff against the
+  current version, rollback (also as a new version). Root-owned files
+  (`/etc/llm-panel`, systemd units) are not editable — per the specification.
+  All actions are audited.
+- Unit port in the card is a link opening in a new tab (panel host : unit
+  port); for loopback-only bindings no link is given.
+
+## Structure
 
 ```
 llm-panel/
-├── llm_panel/                  код панели (FastAPI, Jinja2, SQLite, NVML+psutil)
+├── llm_panel/                  panel code (FastAPI, Jinja2, SQLite, NVML+psutil)
 ├── deploy/
-│   ├── install.sh              универсальный установщик (--user/--dir/--config-dir/...)
-│   ├── llm-panel.service.template  шаблон systemd-юнита панели
+│   ├── install.sh              universal installer (--user/--dir/--config-dir/...)
+│   ├── llm-panel.service.template  panel systemd-unit template
 │   ├── helper/llm-panel-systemd    root-owned helper
-│   ├── *.example               шаблоны config/services/allowlist
-│   ├── sudoers.llm-panel       предложение sudoers (одна строка на helper)
-│   └── examples/               реальные примеры заполнения (станция-LLM)
-├── scripts/survey*.sh          read-only обследование сервера
+│   ├── *.example               config/services/allowlist templates
+│   ├── sudoers.llm-panel       sudoers suggestion (one line per helper)
+│   └── examples/               real filled-in examples (LLM station)
+├── scripts/survey*.sh          read-only server survey
 ├── docs/                       PROJECT.md, DEPLOY.md, STATION-LLM.md, UNITS.md
 ├── tests/                      pytest
-└── config.dev.yaml             конфиг машины разработки
+└── config.dev.yaml             development-machine config
 ```
 
-## Локальная разработка (Windows/Linux без systemd)
+## Local development (Windows/Linux without systemd)
 
 ```bash
 python -m venv .venv
@@ -85,17 +105,17 @@ python -m venv .venv
 .venv/Scripts/python -m llm_panel --config config.dev.yaml init-db
 .venv/Scripts/python -m llm_panel --config config.dev.yaml set-password
 .venv/Scripts/python -m llm_panel --config config.dev.yaml serve
-# открывать http://localhost:8000  (SSE/статусы systemd будут «нет данных»)
+# open http://localhost:8000  (SSE/systemd statuses will show "no data")
 ```
 
-Тесты: `.venv/Scripts/python -m pytest tests -q` (208 тестов).
+Tests: `.venv/Scripts/python -m pytest tests -q` (208 tests).
 
-## Установка на сервер
+## Server installation
 
 ```bash
-sudo bash deploy/install.sh --user <пользователь-панели>
+sudo bash deploy/install.sh --user <panel-user>
 ```
 
-Полная инструкция — [docs/DEPLOY.md](docs/DEPLOY.md): обследование сервера,
-заполнение `services.yaml`/`allowlist.json` под свои юниты, sudoers (отдельное
-подтверждение), Caddy, обновления, аварийные процедуры.
+Full instructions — [docs/DEPLOY.md](docs/DEPLOY.md): server survey, filling in
+`services.yaml`/`allowlist.json` for your units, sudoers (a separate
+confirmation step), Caddy, updates, emergency procedures.
