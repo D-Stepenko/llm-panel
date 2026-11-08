@@ -12,3 +12,8 @@ secrets/
 .cache/
 survey*.out
 *.log
+
+# build artifacts
+dist/
+build/
+*.egg-info/

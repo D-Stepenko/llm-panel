@@ -5,12 +5,23 @@ build-backend = "setuptools.build_meta"
 [project]
 name = "llm-panel"
 version = "0.3.17"
-description = "Локальная веб-панель управления LLM-станцией (ТЗ llm-panel-tz-reviewed.md, этап 1 MVP)"
+description = "Local web panel for an LLM server: systemd service status and control, GPU/RAM/CPU/disk summary, journals with secret masking, action audit"
 readme = "README.md"
 requires-python = ">=3.11"
 license = { text = "GPL-3.0-or-later" }
+authors = [
+    { name = "D-Stepenko" },
+]
+keywords = ["llm", "systemd", "nvidia", "vllm", "llama-cpp", "web-panel", "fastapi"]
 classifiers = [
     "License :: OSI Approved :: GNU General Public License v3 or later (GPLv3+)",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Environment :: Web Environment",
+    "Environment :: Console",
+    "Topic :: System :: Systems Administration",
+    "Operating System :: POSIX :: Linux",
 ]
 dependencies = [
     "fastapi>=0.162,<1",
@@ -36,6 +47,13 @@ llm-panel = "llm_panel.cli:main"
 
 [tool.setuptools.packages.find]
 include = ["llm_panel*"]
+
+[tool.setuptools.package-data]
+llm_panel = [
+    "templates/*.html",
+    "static/*",
+    "*.sh",
+]
 
 [tool.pytest.ini_options]
 asyncio_mode = "auto"

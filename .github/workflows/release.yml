@@ -1,0 +1,56 @@
+# Build the package and attach sdist+wheel to a GitHub Release.
+# Trigger: push a tag v* (e.g. v0.3.17). Tests must already be green —
+# the security-audit workflow and local runs cover them; this workflow
+# only builds and publishes.
+name: release
+
+on:
+  push:
+    tags:
+      - "v*"
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install build tools
+        run: python -m pip install --upgrade build twine
+
+      - name: Build sdist and wheel
+        run: python -m build
+
+      - name: Check metadata
+        run: python -m twine check dist/*
+
+      # Sanity check: the wheel must carry templates, static and the script.
+      - name: Verify wheel contents
+        run: |
+          python - <<'EOF'
+          import glob, zipfile
+          wheel = glob.glob("dist/*.whl")[0]
+          names = zipfile.ZipFile(wheel).namelist()
+          required = ["llm_panel/templates/base.html", "llm_panel/static/app.js", "llm_panel/users_panel_config_.sh"]
+          missing = [r for r in required if r not in names]
+          assert not missing, f"missing from wheel: {missing}"
+          print(f"OK: {wheel} contains templates/static/script ({len(names)} files)")
+          EOF
+
+      - name: Create GitHub Release and upload artifacts
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          TAG="${GITHUB_REF_NAME}"
+          gh release create "$TAG" dist/* \
+            --title "$TAG" \
+            --generate-notes \
+            --verify-tag
