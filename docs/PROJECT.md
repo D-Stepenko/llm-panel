@@ -393,6 +393,32 @@ sudoers. The service configuration editor — stage 2.
   (login_note), the CSP fix of htmx indicators in static/app.js
   (includeIndicatorStyles=false). docs/ACCEPTANCE.md — the acceptance plan.
   Tests: 233/233 + 2 skip (win32).
+- **0.3.18 — new service actions: reset-failed and daemon-reload**
+  (2026-11-10). At the owner's request — two buttons on the service settings
+  page (`/services/<id>/settings`, POST + CSRF, like the card buttons):
+  "Reset failed status" (`systemctl reset-failed <unit>` — per-unit, to use
+  after the failure has been dealt with) and "Daemon reload"
+  (`systemctl daemon-reload` — an operation over the WHOLE MANAGER, the unit
+  is not involved: it re-reads ALL unit files; use after manually editing
+  unit files outside the panel). Scope handling: system units — through the
+  helper (reset-failed — a regular per-unit allowlist action; daemon-reload
+  — a NEW permission level: the optional allowlist key
+  `"daemon_reload": true`, absent/false = refusal, a safe default by the
+  example of the "power" section); user units — directly with
+  `systemctl --user` (no helper needed, like the other user actions).
+  Helper: "reset-failed" added to ACTIONS (takes no extra arguments),
+  a daemon-reload branch without a unit argument (any argument = code 2),
+  dry-run plan `["systemctl","daemon-reload","--no-ask-password"]`. Audit:
+  `reset-failed[:user]` / `daemon-reload[:user]` with the actual unit state
+  in the result. i18n: buttons/titles/messages EN+RU. Templates: buttons in
+  service_settings.html; allowlist examples (universal and station) —
+  reset-failed in the actions list + the daemon_reload section;
+  llm_panel/helper_client.py — call_daemon_reload; systemd_units.py —
+  daemon_reload_user, reset-failed in run_user_action.
+  Tests: 249/249 + 2 skip (win32) — +12 (helper: plan/refusal/extra
+  arguments; routes: system via call_helper/call_daemon_reload mocks, user
+  via run_user_action/daemon_reload_user mocks, CSRF 403, button render,
+  audit entries). Live check on the station — after copying.
 
 ## 8. Known limitations
 

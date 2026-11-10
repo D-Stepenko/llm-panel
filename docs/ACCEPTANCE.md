@@ -37,6 +37,7 @@ the owner's explicit approval.
 | 2.5 | Narrow to ~760px | Everything in 1 column; the GPU strip keeps 10+px from the border |
 | 2.6 | Check the pill | Neutral border; theme-aware shading |
 | 2.7 | Bindings in a GPU tile | "Services:"/"planned binding" as separate rows UNDER the grid (gpu-binds), not in the gauge columns |
+| 2.8 | Service settings (v0.3.18) | "Reset failed status" and "Daemon reload" buttons present; system unit without allowlist entry for the action → clear refusal, no errors in the console |
 
 ## 3. GPU tiles (main page)
 

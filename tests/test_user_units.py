@@ -278,6 +278,76 @@ def test_action_user_scope_failure(user_client, monkeypatch):
     assert any(a["result"] == "failed" for a in tail)
 
 
+# -------------------------------------- reset-failed / daemon-reload (v0.3.18) --
+
+def test_user_reset_failed(user_client, monkeypatch):
+    """reset-failed для user-юнита — тот же прямой путь systemctl --user, без helper."""
+    c = user_client
+    import llm_panel.routes.services as svc_mod
+
+    calls = []
+
+    def fake_action(action, unit, timeout=90.0):
+        calls.append((action, unit))
+        return True, "ok"
+
+    monkeypatch.setattr(svc_mod, "run_user_action", fake_action)
+    monkeypatch.setattr(svc_mod, "show_unit",
+                        lambda unit, timeout=5.0, scope="system": UnitInfo(
+                            active="failed", sub="failed", result="exit-code",
+                            pid=0, since="", nrestarts=0, unit_file_state=""))
+    r = c.post("/services/openclaw/reset-failed", data={"csrf": _csrf(c)},
+               headers={"host": "localhost"})
+    assert r.status_code == 200
+    assert calls == [("reset-failed", "openclaw-gateway.service")]
+    assert "failed/failed" in r.text
+    state = c.app.state.panel
+    tail = state.db.audit_tail(5)
+    assert any(a["action"] == "reset-failed:user" and a["result"] == "ok"
+               for a in tail)
+
+
+def test_user_daemon_reload_no_helper(user_client, monkeypatch):
+    """daemon-reload для user-юнита — напрямую systemctl --user daemon-reload."""
+    c = user_client
+    import llm_panel.routes.services as svc_mod
+
+    called = []
+
+    def fake_reload(timeout=60.0):
+        called.append(True)
+        return True, ""
+
+    monkeypatch.setattr(svc_mod, "daemon_reload_user", fake_reload)
+    monkeypatch.setattr(svc_mod, "show_unit",
+                        lambda unit, timeout=5.0, scope="system": UnitInfo(
+                            active="active", sub="running", result="success",
+                            pid=1, since="", nrestarts=0, unit_file_state=""))
+    r = c.post("/services/openclaw/daemon-reload", data={"csrf": _csrf(c)},
+               headers={"host": "localhost"})
+    assert r.status_code == 200
+    assert called == [True]
+    assert "daemon-reload" in r.text
+    state = c.app.state.panel
+    tail = state.db.audit_tail(5)
+    assert any(a["action"] == "daemon-reload:user" and a["result"] == "ok"
+               for a in tail)
+
+
+def test_user_daemon_reload_failure(user_client, monkeypatch):
+    c = user_client
+    import llm_panel.routes.services as svc_mod
+    monkeypatch.setattr(svc_mod, "daemon_reload_user",
+                        lambda timeout=60.0: (False, "Failed to connect to bus."))
+    r = c.post("/services/openclaw/daemon-reload", data={"csrf": _csrf(c)},
+               headers={"host": "localhost"})
+    assert r.status_code == 200
+    assert "Failed to connect to bus" in r.text
+    tail = c.app.state.panel.db.audit_tail(5)
+    assert any(a["action"] == "daemon-reload:user" and a["result"] == "failed"
+               for a in tail)
+
+
 def test_logs_user_scope(user_client, monkeypatch):
     """Журнал user-юнита: прямой journalctl --user + маскирование секретов."""
     c = user_client

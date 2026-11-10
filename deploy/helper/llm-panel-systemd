@@ -32,7 +32,8 @@ except ImportError:  # Windows при тестировании
 ALLOWLIST_PATH = "/etc/llm-panel/allowlist.json"
 UNIT_RE = re.compile(r"^[A-Za-z0-9_.@-]{1,64}\.service$")
 JOURNAL_MAX_LINES = 5000
-ACTIONS = ("start", "stop", "restart", "enable", "disable", "status", "journal", "journal-follow")
+ACTIONS = ("start", "stop", "restart", "enable", "disable", "reset-failed",
+           "status", "journal", "journal-follow")
 # Хостовые power-операции (не юниты): выключение/перезагрузка СТАНЦИИ.
 POWER_ACTIONS = ("poweroff", "reboot")
 
@@ -155,6 +156,41 @@ def main() -> int:
         syslog.syslog(syslog.LOG_WARNING, f"helper: power {argv[1]} -> rc=0 (хостовая операция)")
         return 0
 
+    # Менеджер-целая операция daemon-reload (v0.3.18): systemctl daemon-reload
+    # перечитывает ВСЕ файлы юнитов в менеджер — юнит не участвует вовсе.
+    # Разрешение — опциональным ключом allowlist '"daemon_reload": true'
+    # (отсутствует / не true — ОТКАЗ, безопасный дефолт), по образцу "power".
+    if action == "daemon-reload":
+        if len(argv) != 1:
+            die(2, "daemon-reload не принимает аргументов (операция над менеджером целиком)")
+        data_all = load_allowlist()
+        if data_all.get("daemon_reload") is not True:
+            syslog.syslog(syslog.LOG_NOTICE,
+                          "helper: daemon-reload не разрешён allowlist — отказ")
+            print('ОТКАЗ: daemon-reload не разрешён (ожидается "daemon_reload": true '
+                  "в allowlist.json)", file=sys.stderr)
+            return 3
+        plan_argv = ["systemctl", "daemon-reload", "--no-ask-password"]
+        if dry_run:
+            plan = {"action": "daemon-reload", "unit": "", "allowed": True, "argv": plan_argv}
+            print(json.dumps(plan, ensure_ascii=False))
+            syslog.syslog(syslog.LOG_INFO,
+                          "helper: DRY-RUN daemon-reload — валидация пройдена")
+            return 0
+        try:
+            proc = subprocess.run(plan_argv, capture_output=True, text=True, timeout=60.0)
+        except subprocess.TimeoutExpired:
+            die(4, "systemctl не ответил вовремя")
+        if proc.returncode != 0:
+            syslog.syslog(syslog.LOG_ERR,
+                          f"helper: сбой systemctl daemon-reload: rc={proc.returncode}")
+            sys.stdout.write(proc.stdout or "")
+            print(proc.stderr or "", file=sys.stderr, end="")
+            return 4
+        sys.stdout.write(proc.stdout or "")
+        syslog.syslog(syslog.LOG_INFO, "helper: daemon-reload -> rc=0 (все юниты перечитаны)")
+        return 0
+
     if action not in ACTIONS:
         die(2, "неизвестное действие")
 
@@ -194,8 +230,11 @@ def main() -> int:
             no_block = True
         elif extra:
             die(2, "изменяющие действия принимают максимум один флаг --no-block")
-    elif extra:  # status
-        die(2, "status не принимает дополнительных аргументов")
+    elif action in ("status", "reset-failed"):
+        if extra:  # status, reset-failed
+            die(2, f"действие {action} не принимает дополнительных аргументов")
+    elif extra:
+        die(2, "дополнительные аргументы для этого действия не разрешены")
 
     if dry_run:
         plan = {"action": action, "unit": unit, "allowed": True}

@@ -108,6 +108,40 @@ def call_power(helper_path: str, op: str, timeout: float = 90.0) -> HelperResult
     return call_helper(helper_path, "power", op, timeout=timeout)
 
 
+def call_daemon_reload(helper_path: str, timeout: float = 60.0) -> HelperResult:
+    """systemctl daemon-reload (v0.3.18) — операция над МЕНЕДЖЕРОМ целиком.
+
+    `sudo -n <helper> daemon-reload` — без аргумента-юнита: перечитываются ВСЕ
+    файлы юнитов системного менеджера. Helper разрешает операцию только при
+    явном ключе allowlist '"daemon_reload": true' (отсутствие ключа — отказ,
+    безопасный дефолт по образцу секции "power").
+    """
+    p = pathlib.Path(helper_path)
+    if not p.is_file():
+        raise HelperError(
+            kind="launch_error",
+            message=f"Helper не установлен: {helper_path} (см. README «Привилегированный helper»)",
+        )
+    argv = ["sudo", "-n", str(p), "daemon-reload"]
+    try:
+        proc = subprocess.run(argv, capture_output=True, text=True, timeout=timeout)
+    except FileNotFoundError as e:
+        raise HelperError(kind="launch_error", message=f"sudo недоступен: {e}") from e
+    except subprocess.TimeoutExpired as e:
+        raise HelperError(kind="systemd_error",
+                          message=f"Тайм-аут операции helper ({timeout}с)") from e
+    if proc.returncode != 0:
+        raise HelperError(
+            kind={2: "usage", 3: "denied"}.get(proc.returncode, "systemd_error"),
+            message=_map_exit(proc.returncode, proc.stderr or ""),
+            stdout=proc.stdout or "",
+            stderr=proc.stderr or "",
+            code=proc.returncode,
+        )
+    return HelperResult(ok=True, stdout=proc.stdout or "",
+                        stderr=proc.stderr or "", code=0)
+
+
 def spawn_helper_follow(helper_path: str, unit: str, lines: int) -> subprocess.Popen:
     """Потоковое чтение журнала (journal-follow) для SSE. Ответственность вызывающего — kill."""
     argv = ["sudo", "-n", helper_path, "journal-follow", unit, str(int(lines))]

@@ -77,6 +77,14 @@ STRINGS: dict[str, dict[str, str]] = {
         "btn_start": "Start",
         "btn_stop": "Stop",
         "btn_restart": "Restart",
+        # --- v0.3.18: reset-failed / daemon-reload ---
+        "btn_reset_failed": "Reset failed status",
+        "reset_failed_title": ("systemctl reset-failed: clear the failed state of the unit "
+                               "(use after the failure has been dealt with)"),
+        "btn_daemon_reload": "Daemon reload",
+        "daemon_reload_title": ("systemctl daemon-reload: re-read ALL unit files of the manager "
+                                "(not only this unit; for system units — through the helper, "
+                                'requires "daemon_reload": true in allowlist.json)'),
         "no_services": "No services: fill in services.yaml (see deploy/services.yaml.example).",
         # --- матрица GPU (этап 2) ---
         "page_matrix_title": "GPU matrix — llm-panel",
@@ -276,6 +284,9 @@ STRINGS: dict[str, dict[str, str]] = {
         "res_done": "Done",
         "action_done": ("systemd: action \"{action}\" completed (code 0). Actual unit state: {actual}. "
                         "The status display will update within a few seconds (SSE)."),
+        "daemon_reload_done": ("systemctl daemon-reload completed (code 0): unit files re-read. "
+                               "Actual unit state: {actual}. "
+                               "The status display will update within a few seconds (SSE)."),
         "sys_unavailable": "state unavailable",
         # --- служебные ответы ---
         "bad_csrf": "Invalid CSRF token",
@@ -414,6 +425,14 @@ STRINGS: dict[str, dict[str, str]] = {
         "btn_start": "Старт",
         "btn_stop": "Стоп",
         "btn_restart": "Рестарт",
+        # --- v0.3.18: reset-failed / daemon-reload ---
+        "btn_reset_failed": "Сбросить статус failed",
+        "reset_failed_title": ("systemctl reset-failed: сбросить статус «failed» юнита "
+                               "(когда причина сбоя уже разобрана)"),
+        "btn_daemon_reload": "Daemon reload",
+        "daemon_reload_title": ("systemctl daemon-reload: перечитать ВСЕ файлы юнитов менеджера "
+                                "(не только этого юнита; для системных юнитов — через helper, "
+                                'требуется "daemon_reload": true в allowlist.json)'),
         "no_services": "Сервисов нет: заполните services.yaml (см. deploy/services.yaml.example).",
         # --- матрица GPU (этап 2) ---
         "page_matrix_title": "Матрица GPU — llm-panel",
@@ -616,6 +635,9 @@ STRINGS: dict[str, dict[str, str]] = {
         "res_done": "Готово",
         "action_done": ("systemd: действие «{action}» выполнено (код 0). Фактическое состояние юнита: {actual}. "
                         "Отображение статуса обновится в течение пары секунд (SSE)."),
+        "daemon_reload_done": ("systemctl daemon-reload выполнена (код 0): файлы юнитов перечитаны. "
+                               "Фактическое состояние юнита: {actual}. "
+                               "Отображение статуса обновится в течение пары секунд (SSE)."),
         "sys_unavailable": "состояние недоступно",
         # --- служебные ответы ---
         "bad_csrf": "Недопустимый CSRF-токен",

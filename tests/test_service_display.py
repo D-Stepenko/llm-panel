@@ -247,6 +247,114 @@ def test_display_csrf_required(authed_client):
     assert r.status_code == 403
 
 
+# ----------------------------------------------- reset-failed / daemon-reload (v0.3.18)
+
+def test_reset_failed_via_helper(authed_client, monkeypatch):
+    """system reset-failed: per-unit действие через тот же helper-путь, БЕЗ флагов."""
+    c = authed_client
+    import llm_panel.routes.services as svc_mod
+
+    calls = []
+
+    def fake_call(helper_path, action, unit, extra=(), timeout=60.0):
+        calls.append((action, unit, extra))
+        from llm_panel.helper_client import HelperResult
+        return HelperResult(ok=True, stdout="", stderr="", code=0)
+
+    monkeypatch.setattr(svc_mod, "call_helper", fake_call)
+    monkeypatch.setattr(svc_mod, "show_unit",
+                        lambda unit, timeout=5.0, scope="system": None)
+    r = c.post("/services/vllm/reset-failed", data={"csrf": _csrf(c)},
+               headers={"host": "localhost"})
+    assert r.status_code == 200
+    assert calls == [("reset-failed", "vllm.service", ())]
+    state = c.app.state.panel
+    tail = state.db.audit_tail(5)
+    assert any(a["action"] == "reset-failed" and a["object"] == "vllm.service"
+               and a["result"] == "ok" for a in tail)
+
+
+def test_reset_failed_helper_error_rendered(authed_client, monkeypatch):
+    c = authed_client
+    import llm_panel.routes.services as svc_mod
+    from llm_panel.helper_client import HelperError
+
+    monkeypatch.setattr(svc_mod, "call_helper",
+                        lambda *a, **k: (_ for _ in ()).throw(
+                            HelperError(kind="denied", message="отказано: allowlist")))
+    r = c.post("/services/vllm/reset-failed", data={"csrf": _csrf(c)},
+               headers={"host": "localhost"})
+    assert r.status_code == 200
+    assert "отказано" in r.text
+    tail = c.app.state.panel.db.audit_tail(5)
+    assert any(a["action"] == "reset-failed" and a["result"] == "helper_error"
+               for a in tail)
+
+
+def test_daemon_reload_system_scope(authed_client, monkeypatch):
+    """system daemon-reload: отдельный вызов helper без аргумента-юнита."""
+    c = authed_client
+    import llm_panel.routes.services as svc_mod
+
+    calls = []
+
+    def fake_reload(helper_path, timeout=60.0):
+        calls.append((helper_path, timeout))
+        from llm_panel.helper_client import HelperResult
+        return HelperResult(ok=True, stdout="", stderr="", code=0)
+
+    monkeypatch.setattr(svc_mod, "call_daemon_reload", fake_reload)
+    monkeypatch.setattr(svc_mod, "show_unit",
+                        lambda unit, timeout=5.0, scope="system": None)
+    r = c.post("/services/vllm/daemon-reload", data={"csrf": _csrf(c)},
+               headers={"host": "localhost"})
+    assert r.status_code == 200
+    assert calls and calls[0][0] == c.app.state.panel.cfg.helper_path
+    assert "daemon-reload" in r.text
+    tail = c.app.state.panel.db.audit_tail(5)
+    assert any(a["action"] == "daemon-reload" and a["object"] == "vllm.service"
+               and a["result"] == "ok" for a in tail)
+
+
+def test_daemon_reload_denied_no_call(authed_client, monkeypatch):
+    """Отказ helper (нет "daemon_reload": true в allowlist) — отказ рендерится, аудит есть."""
+    c = authed_client
+    import llm_panel.routes.services as svc_mod
+    from llm_panel.helper_client import HelperError
+
+    monkeypatch.setattr(svc_mod, "call_daemon_reload",
+                        lambda *a, **k: (_ for _ in ()).throw(
+                            HelperError(kind="denied",
+                                        message="отказано: daemon-reload вне allowlist")))
+    r = c.post("/services/vllm/daemon-reload", data={"csrf": _csrf(c)},
+               headers={"host": "localhost"})
+    assert r.status_code == 200
+    assert "отказано" in r.text
+    tail = c.app.state.panel.db.audit_tail(5)
+    assert any(a["action"] == "daemon-reload" and a["result"] == "helper_error"
+               for a in tail)
+
+
+def test_new_actions_rendered_in_settings(authed_client):
+    """Кнопки «Сбросить статус failed» и daemon-reload — на странице настроек, с CSRF-полем."""
+    c = authed_client
+    page = c.get("/services/vllm/settings", headers={"host": "localhost"})
+    assert page.status_code == 200
+    assert 'action="/services/vllm/reset-failed"' in page.text
+    assert 'action="/services/vllm/daemon-reload"' in page.text
+    assert 'name="csrf"' in page.text
+
+
+def test_new_actions_csrf_required(authed_client):
+    c = authed_client
+    r = c.post("/services/vllm/reset-failed", data={"csrf": "WRONG"},
+               headers={"host": "localhost"})
+    assert r.status_code == 403
+    r2 = c.post("/services/vllm/daemon-reload", data={"csrf": "WRONG"},
+                headers={"host": "localhost"})
+    assert r2.status_code == 403
+
+
 # ----------------------------------------------- самоперезапуск панели (0.1.6) --
 
 def test_panel_self_restart_uses_no_block(authed_client, monkeypatch):

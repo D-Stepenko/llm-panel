@@ -203,11 +203,30 @@ def run_user_action(action: str, unit: str, timeout: float = 90.0) -> tuple[bool
     валидируется вызывающей стороной (action из _ACTIONS, unit по UNIT_RE),
     вызов — argv-список без shell.
     """
-    if action not in ("start", "stop", "restart", "enable", "disable"):
+    if action not in ("start", "stop", "restart", "enable", "disable", "reset-failed"):
         return False, "unsupported action"
     if not unit or "/" in unit or "\x00" in unit:
         return False, "bad unit"
     argv = ["systemctl", "--user", action, "--no-ask-password", "--", unit]
+    try:
+        proc = subprocess.run(argv, capture_output=True, text=True, timeout=timeout,
+                              env=_user_env())
+    except FileNotFoundError:
+        return False, "systemctl --user недоступен (dev-среда?)"
+    except subprocess.TimeoutExpired:
+        return False, "timeout"
+    out = (proc.stdout or "") + (proc.stderr or "")
+    return proc.returncode == 0, out.strip()[:2000]
+
+
+def daemon_reload_user(timeout: float = 60.0) -> tuple[bool, str]:
+    """systemctl --user daemon-reload (v0.3.18): перечитать юниты user-менеджера.
+
+    user-менеджер принадлежит тому же пользователю, от которого работает
+    панель, — helper/allowlist не нужны (как run_user_action). Возврат
+    (успех, текст вывода).
+    """
+    argv = ["systemctl", "--user", "daemon-reload", "--no-ask-password"]
     try:
         proc = subprocess.run(argv, capture_output=True, text=True, timeout=timeout,
                               env=_user_env())

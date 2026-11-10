@@ -16,7 +16,8 @@ HELPER = pathlib.Path(__file__).resolve().parent.parent / "deploy" / "helper" / 
 ALLOWLIST = {
     "units": {
         "vllm.service": {
-            "actions": ["start", "stop", "restart", "enable", "disable", "status", "journal", "journal-follow"],
+            "actions": ["start", "stop", "restart", "enable", "disable", "reset-failed",
+                        "status", "journal", "journal-follow"],
         },
         "gpu-power-limit.service": {"actions": ["status", "journal"]},
     }
@@ -131,6 +132,58 @@ def test_no_block_not_allowed_for_status():
 def test_status_with_extra_rejected():
     r = run_helper(["status", "vllm.service", "anything"])
     assert r.returncode == 2
+
+
+# ------------------------------------------------- reset-failed (v0.3.18) ----
+
+def test_reset_failed_plan():
+    """reset-failed разрешён как обычное per-unit действие; extra не принимает."""
+    r = run_helper(["reset-failed", "vllm.service"])
+    assert r.returncode == 0
+    plan = json.loads(r.stdout)
+    assert plan["argv"] == ["systemctl", "reset-failed", "--no-ask-password", "vllm.service"]
+
+
+def test_reset_failed_with_extra_rejected():
+    assert run_helper(["reset-failed", "vllm.service", "--no-block"]).returncode == 2
+    assert run_helper(["reset-failed", "vllm.service", "anything"]).returncode == 2
+
+
+def test_reset_failed_not_allowed_for_unit():
+    r = run_helper(["reset-failed", "gpu-power-limit.service"])
+    assert r.returncode == 3
+    assert "не разрешено" in r.stderr
+
+
+def test_reset_failed_unknown_unit_denied():
+    r = run_helper(["reset-failed", "stranger.service"])
+    assert r.returncode == 3
+
+
+# --------------------------------------------- daemon-reload (v0.3.18) -------
+
+def test_daemon_reload_allowed_plan():
+    """daemon-reload разрешён ключом "daemon_reload": true; юнит не участвует."""
+    wl = {**ALLOWLIST, "daemon_reload": True}
+    r = run_helper(["daemon-reload"], allowlist=wl)
+    assert r.returncode == 0
+    plan = json.loads(r.stdout)
+    assert plan["argv"] == ["systemctl", "daemon-reload", "--no-ask-password"]
+    assert plan["action"] == "daemon-reload"
+
+
+def test_daemon_reload_denied_by_default():
+    """Ключа нет / false — отказ (код 3, безопасный дефолт)."""
+    assert run_helper(["daemon-reload"]).returncode == 3
+    wl = {**ALLOWLIST, "daemon_reload": False}
+    assert run_helper(["daemon-reload"], allowlist=wl).returncode == 3
+
+
+def test_daemon_reload_takes_no_arguments():
+    """daemon-reload — менеджер-целая операция: любой аргумент = ошибка (код 2)."""
+    wl = {**ALLOWLIST, "daemon_reload": True}
+    assert run_helper(["daemon-reload", "vllm.service"], allowlist=wl).returncode == 2
+    assert run_helper(["daemon-reload", "extra"], allowlist=wl).returncode == 2
 
 
 def test_broken_allowlist_is_refused():

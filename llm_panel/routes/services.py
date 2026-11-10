@@ -11,14 +11,15 @@ import asyncio
 from fastapi import APIRouter, Request
 from fastapi.responses import HTMLResponse, PlainTextResponse
 
-from ..systemd_units import run_user_action, show_unit
-from ..helper_client import HelperError, call_helper
+from ..systemd_units import daemon_reload_user, run_user_action, show_unit
+from ..helper_client import HelperError, call_daemon_reload, call_helper
 from ..i18n import translate
 from ..security import csrf_matches
 
 router = APIRouter(prefix="/services")
 
-_ACTIONS = ("start", "stop", "restart", "enable", "disable")
+_ACTIONS = ("start", "stop", "restart", "enable", "disable",
+            "reset-failed", "daemon-reload")
 
 
 def _find_def(state, svc_id: str):
@@ -67,6 +68,36 @@ async def run_action(request: Request, svc_id: str, action: str):
     user = request.state.session["username"]
     db = state.db
     scope = getattr(svc, "scope", "system")
+    lang = state.i18n_lang
+
+    # daemon-reload (v0.3.18): операция над МЕНЕДЖЕРОМ целиком, юнит не участвует.
+    # scope="system" — sudo+helper (allowlist: "daemon_reload": true, без
+    # ключа — отказ); scope="user" — напрямую systemctl --user daemon-reload.
+    if action == "daemon-reload":
+        if scope == "user":
+            ok, output = daemon_reload_user()
+            db.audit(ip, user, "daemon-reload:user", svc.unit,
+                     "ok" if ok else "failed", output[:200])
+            if not ok:
+                body = await _render_action_result(
+                    request, svc_id, False, output or "systemctl --user error")
+                return HTMLResponse(body, status_code=200)
+        else:
+            try:
+                call_daemon_reload(state.cfg.helper_path)
+            except HelperError as e:
+                db.audit(ip, user, "daemon-reload", svc.unit, "helper_error", e.message)
+                body = await _render_action_result(request, svc_id, False, e.message)
+                return HTMLResponse(body, status_code=200)
+            db.audit(ip, user, "daemon-reload", svc.unit, "ok", "")
+        info = await asyncio.to_thread(show_unit, svc.unit, 5.0, scope)
+        actual = f"{info.active}/{info.sub}" if info else translate(lang, "sys_unavailable")
+        body = await _render_action_result(
+            request, svc_id, True,
+            translate(lang, "daemon_reload_done", actual=actual),
+            status=actual,
+        )
+        return HTMLResponse(body, status_code=200)
 
     if scope == "user":
         # user-юнит (~/.config/systemd/user пользователя панели): управление

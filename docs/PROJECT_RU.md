@@ -364,6 +364,31 @@ services.yaml, allowlist.json, systemd-юниты, sudoers. Редактор к�
   (login_note), CSP-фикс htmx-индикаторов в static/app.js
   (includeIndicatorStyles=false). docs/ACCEPTANCE_RU.md — план приёмки.
   Тесты: 233/233 + 2 skip (win32).
+- **0.3.18 — новые действия сервиса: reset-failed и daemon-reload** (10.11.2026).
+  По запросу владельца — две кнопки на странице настроек сервиса
+  (`/services/<id>/settings`, POST + CSRF, как у карточек):
+  «Сбросить статус failed» (`systemctl reset-failed <unit>` — пер-unit,
+  когда причина сбоя разобрана) и «Daemon reload» (`systemctl daemon-reload`
+  — операция над МЕНЕДЖЕРОМ целиком, юнит не участвует: перечитывает ВСЕ
+  файлы юнитов; включать после ручной правки юнит-файлов вне панели).
+  Scope-обработка: system-юниты — через helper (reset-failed — обычное
+  per-unit allowlist-действие; daemon-reload — НОВЫЙ уровень разрешения:
+  опциональный ключ allowlist `"daemon_reload": true`, отсутствие/false =
+  отказ, безопасный дефолт по образцу секции "power"); user-юниты —
+  напрямую systemctl --user (helper не нужен, как остальные user-действия).
+  Helper: "reset-failed" добавлен в ACTIONS (extra не принимает),
+  ветка daemon-reload без аргумента-юнита (любой аргумент = код 2), dry-run
+  план `["systemctl","daemon-reload","--no-ask-password"]`. Аудит:
+  `reset-failed[:user]` / `daemon-reload[:user]` с фактическим состоянием
+  юнита в результате. i18n: кнопки/тайтлы/сообщения EN+RU.
+  Шаблоны: кнопки в service_settings.html; примеры allowlist (универсальный
+  и станции) — reset-failed в списке действий + секция daemon_reload;
+  llm_panel/helper_client.py — call_daemon_reload; systemd_units.py —
+  daemon_reload_user, reset-failed в run_user_action.
+  Тесты: 249/249 + 2 skip (win32) — +12 (helper: план/отказ/лишние
+  аргументы; роуты: system через моки call_helper/call_daemon_reload,
+  user через моки run_user_action/daemon_reload_user, CSRF 403, рендер
+  кнопок, аудит-записи). Живая проверка на станции — после копии.
 
 ## 8. Известные ограничения
 

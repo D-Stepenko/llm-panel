@@ -187,7 +187,7 @@ p = "/etc/llm-panel/allowlist.json"
 with open(p, encoding="utf-8") as f:
     d = json.load(f)
 d["units"]["myservice.service"] = {
-    "actions": ["start", "stop", "restart", "enable", "disable",
+    "actions": ["start", "stop", "restart", "enable", "disable", "reset-failed",
                 "status", "journal", "journal-follow"],
     # «только просмотр»: ["status", "journal"] + "note": "почему"
 }
@@ -198,6 +198,14 @@ EOF
 
 Проверка: `sudo -n /usr/local/sbin/llm-panel-systemd status myservice.service`
 (код 0), затем кнопки на карточке. User-юниты в allowlist вносить не нужно.
+
+Два дополнительных действия из настроек сервиса (v0.3.18): `reset-failed`
+(«Сбросить статус failed») — обычное per-unit действие, добавляется в
+`actions` как выше; `daemon-reload` («Daemon reload») — операция над
+менеджером ЦЕЛИКОМ (перечитывает все юнит-файлы), в per-unit `actions` не
+входит: разрешается опциональным ключом allowlist верхнего уровня
+`"daemon_reload": true` (отсутствие/false = отказ). User-юнитам это не
+нужно — `systemctl --user daemon-reload` выполняется панелью напрямую.
 
 ---
 
@@ -255,7 +263,7 @@ p = "/etc/llm-panel/allowlist.json"
 with open(p, encoding="utf-8") as f:
     d = json.load(f)
 d["units"]["maya-maya-m.service"] = {
-    "actions": ["start", "stop", "restart", "enable", "disable",
+    "actions": ["start", "stop", "restart", "enable", "disable", "reset-failed",
                 "status", "journal", "journal-follow"],
 }
 with open(p, "w", encoding="utf-8") as f:

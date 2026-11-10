@@ -205,7 +205,7 @@ p = "/etc/llm-panel/allowlist.json"
 with open(p, encoding="utf-8") as f:
     d = json.load(f)
 d["units"]["myservice.service"] = {
-    "actions": ["start", "stop", "restart", "enable", "disable",
+    "actions": ["start", "stop", "restart", "enable", "disable", "reset-failed",
                 "status", "journal", "journal-follow"],
     # "view only": ["status", "journal"] + "note": "why"
 }
@@ -217,6 +217,14 @@ EOF
 Check: `sudo -n /usr/local/sbin/llm-panel-systemd status myservice.service`
 (exit code 0), then the buttons on the card. User units do not need to be
 added to the allowlist.
+
+Two extra actions from the service settings (v0.3.18): `reset-failed`
+("Reset failed status") — a regular per-unit action, add it to `actions`
+as above; `daemon-reload` ("Daemon reload") — an operation over the ENTIRE
+manager (re-reads all unit files), it does NOT go into per-unit `actions`:
+it is permitted by the optional top-level allowlist key
+`"daemon_reload": true` (absent/false = refusal). User units need none of
+this — `systemctl --user daemon-reload` is run by the panel directly.
 
 ---
 
@@ -277,7 +285,7 @@ p = "/etc/llm-panel/allowlist.json"
 with open(p, encoding="utf-8") as f:
     d = json.load(f)
 d["units"]["maya-maya-m.service"] = {
-    "actions": ["start", "stop", "restart", "enable", "disable",
+    "actions": ["start", "stop", "restart", "enable", "disable", "reset-failed",
                 "status", "journal", "journal-follow"],
 }
 with open(p, "w", encoding="utf-8") as f:
