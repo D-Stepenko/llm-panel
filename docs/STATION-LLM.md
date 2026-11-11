@@ -99,6 +99,29 @@ index-services are re-derived from NVML at start time.
   2026-10-28 with the owner's confirmation, `visudo -c` — OK.
 - Version 0.1.1: universalization (install.sh, deploy templates, disks in the
   Config Panel, i18n fixes), docs/.
+- **2026-11-11, lesson "deploy commands only from the PROJECT ROOT"**: while
+  installing the updated helper (`install: cannot stat
+  'deploy/helper/llm-panel-systemd'`), the cause was the shell NOT being in
+  the project root: first an attempt to `cd ~/llm-panel/llm-panel` (the
+  nested folder must NOT exist — the 2026-11-01 WinSCP drag&drop lesson),
+  then entering the package directory `cd ~/llm_panel/` (`llm_panel/` is the
+  CODE PACKAGE, not the project root) — and the relative path
+  `deploy/helper/...` stopped existing. Rule: sudo install / install.sh /
+  check-config commands run only from the `~/llm-panel$` prompt (a check
+  before the command: `ls deploy/helper/llm-panel-systemd` — the file must
+  exist). Keep the `~/llm-panel/артефакты` folder (downloaded wheel/tar.gz)
+  OUTSIDE the project directory — the next full directory copy (/MIR) will
+  wipe it.
+- **2026-11-11, "reset-failed not allowed (allowlist)" after the helper
+  update — EXPECTED**: the new helper is installed, but the allowlist
+  (`/etc/llm-panel/allowlist.json`) was not updated: the new per-unit action
+  `reset-failed` must be ADDED to the `actions` of the needed units
+  (root editing, as in docs/UNITS.md §3), and for `daemon-reload` on system
+  units — the top-level key `"daemon_reload": true`. A helper update
+  permits NOTHING by itself — action rights are always checked against the
+  current allowlist (the safe default: refusal). After editing — a dry-run
+  WITHOUT sudo (`/usr/local/sbin/llm-panel-systemd --dry-run reset-failed
+  <unit>`) and `sudo systemctl restart llm-panel`.
 
 ## 4. Updating the station from the repository
 
@@ -106,4 +129,7 @@ git push is unavailable on the server without a PAT — files are copied
 manually from the repository (on the developer's PC) into
 `/home/dispot/llm-panel` (do NOT replace `.venv`), then
 `sudo systemctl restart llm-panel` and Ctrl+F5 in the browser. After the
-`git pull`-based updates are set up — see docs/DEPLOY.md §7.
+`git pull`-based updates are set up — see docs/DEPLOY.md §7. All subsequent
+installation commands (helper, install.sh, check-config) run ONLY from the
+project root `~/llm-panel`; inside `llm_panel/` (the code package) the
+relative `deploy/...` paths do not work (the 2026-11-11 lesson).

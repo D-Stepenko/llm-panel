@@ -81,10 +81,35 @@ NVML на момент запуска.
   2026-10-28 с подтверждения владельца, `visudo -c` — OK.
 - Версия 0.1.1: универсализация (install.sh, шаблоны деплоя, диски в Панели
   настроек, i18n-фиксы), docs/.
+- **2026-11-11, урок «команды деплоя — только из КОРНЯ проекта»**: при установке
+  обновлённого helper (`install: cannot stat 'deploy/helper/llm-panel-systemd'`)
+  причина — командная строка НЕ в корне проекта: сначала попытка `cd
+  ~/llm-panel/llm-panel` (вложенной папки быть НЕ должно — старый урок
+  2026-11-01 о WinSCP drag&drop), затем заход внутрь пакета `cd ~/llm_panel/`
+  (`llm_panel/` — это ПАКЕТ КОДА, не корень проекта) — и относительный путь
+  `deploy/helper/...` перестал существовать. Правило: команды sudo install /
+  install.sh / check-config выполняются только из `~/llm-panel$` (проверка
+  перед командой: `ls deploy/helper/llm-panel-systemd` — файл должен
+  существовать). Каталог `~/llm-panel/артефакты` (скачанные wheel/tar.gz)
+  держать ВНЕ директории проекта — очередная копия каталога (/MIR) его
+  сотрёт.
+- **2026-11-11, «reset-failed не разрешено (allowlist)» после обновления
+  helper — ОЖИДАЕМО**: новый helper установлен, но allowlist
+  (`/etc/llm-panel/allowlist.json`) обновлён не был: новое per-unit действие
+  `reset-failed` надо ДОБАВИТЬ в `actions` нужных юнитов (root-редактирование,
+  как в docs/UNITS_RU.md §3), а для `daemon-reload` на системных юнитах —
+  ключ верхнего уровня `"daemon_reload": true`. Обновление helper НИЧЕГО не
+  разрешает само по себе — права действий всегда проверяются по актуальному
+  allowlist (безопасный дефолт: отказ). После правки — dry-run БЕЗ sudo
+  (`/usr/local/sbin/llm-panel-systemd --dry-run reset-failed <unit>`) и
+  `sudo systemctl restart llm-panel`.
 
 ## 4. Обновление станции из репозитория
 
 git-push на сервере недоступен без PAT — файлы копируются вручную из репозитория
 (на ПК разработчика) в `/home/dispot/llm-panel` (`.venv` НЕ заменять), затем
 `sudo systemctl restart llm-panel` и Ctrl+F5 в браузере. После настройки
-`git pull`-обновления — см. docs/DEPLOY_RU.md §7.
+`git pull`-обновления — см. docs/DEPLOY_RU.md §7. Все последующие команды
+установки (helper, install.sh, check-config) — ТОЛЬКО из корня проекта
+`~/llm-panel`; внутри `llm_panel/` (пакет кода) относительные пути
+`deploy/...` не работают (урок 2026-11-11).
