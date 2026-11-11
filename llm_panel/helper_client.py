@@ -142,6 +142,56 @@ def call_daemon_reload(helper_path: str, timeout: float = 60.0) -> HelperResult:
                         stderr=proc.stderr or "", code=0)
 
 
+def _sudo_run(helper_path: str, args: list[str], timeout: float = 60.0,
+              input_text: str | None = None) -> HelperResult:
+    """Общий вызов `sudo -n <helper> <args...>` с обработкой кодов возврата."""
+    p = pathlib.Path(helper_path)
+    if not p.is_file():
+        raise HelperError(
+            kind="launch_error",
+            message=f"Helper не установлен: {helper_path} (см. README «Привилегированный helper»)",
+        )
+    argv = ["sudo", "-n", str(p), *args]
+    try:
+        proc = subprocess.run(argv, capture_output=True, text=True, timeout=timeout,
+                              input=input_text)
+    except FileNotFoundError as e:
+        raise HelperError(kind="launch_error", message=f"sudo недоступен: {e}") from e
+    except subprocess.TimeoutExpired as e:
+        raise HelperError(kind="systemd_error",
+                          message=f"Тайм-аут операции helper ({timeout}с)") from e
+    result = HelperResult(ok=proc.returncode == 0, stdout=proc.stdout or "",
+                          stderr=proc.stderr or "", code=proc.returncode)
+    if not result.ok:
+        raise HelperError(
+            kind={2: "usage", 3: "denied", 4: "systemd_error"}.get(proc.returncode,
+                                                                   "systemd_error"),
+            message=_map_exit(proc.returncode, result.stderr),
+            stdout=result.stdout, stderr=result.stderr, code=proc.returncode,
+        )
+    return result
+
+
+def call_unit_cat(helper_path: str, unit: str, timeout: float = 30.0) -> HelperResult:
+    """unit-cat (v0.3.19): содержимое юнит-файла через helper (allowlist-действие)."""
+    if not unit or "/" in unit or "\x00" in unit or "\n" in unit:
+        raise HelperError(kind="usage", message="Недопустимое имя юнита")
+    return _sudo_run(helper_path, ["unit-cat", unit], timeout=timeout)
+
+
+def call_unit_write(helper_path: str, unit: str, content: str,
+                    timeout: float = 30.0) -> HelperResult:
+    """unit-write (v0.3.19): правка юнит-файла — содержимое уходит в STDIN helper-а."""
+    if not unit or "/" in unit or "\x00" in unit or "\n" in unit:
+        raise HelperError(kind="usage", message="Недопустимое имя юнита")
+    if not content or not content.strip():
+        raise HelperError(kind="usage", message="Пустое содержимое юнит-файла")
+    if len(content.encode("utf-8")) > 262144:
+        raise HelperError(kind="usage", message="Юнит-файл слишком большой (> 256 КБ)")
+    return _sudo_run(helper_path, ["unit-write", unit], timeout=timeout,
+                     input_text=content)
+
+
 def spawn_helper_follow(helper_path: str, unit: str, lines: int) -> subprocess.Popen:
     """Потоковое чтение журнала (journal-follow) для SSE. Ответственность вызывающего — kill."""
     argv = ["sudo", "-n", helper_path, "journal-follow", unit, str(int(lines))]

@@ -480,7 +480,21 @@ button.btn { font: inherit; }
 .toast.err { border-color: var(--status-err-border); }
 
 /* ------------------------------ настройки ссылок -------------------------- */
-.settings-links { display: flex; gap: 10px; margin: 16px 0 0; }
+.settings-links { display: flex; align-items: center; flex-wrap: wrap; gap: 20px; margin: 16px 0 0; }
+/* <form> внутри flex-контейнера: кнопка становится прямым flex-элементом,
+   все кнопки в одну линию (v0.3.19; урок 2026-11-11 — form внутри <p>
+   парсер закрывает <p>, поэтому контейнер обязан быть div). */
+.settings-links form { display: contents; }
+
+/* --- редактор юнит-файла (unit-config, v0.3.19) --- */
+.unit-editor { margin-top: 16px; }
+.unit-editor textarea {
+  width: 100%; min-height: 460px; resize: vertical; box-sizing: border-box;
+  font-family: ui-monospace, SFMono-Regular, Consolas, "Liberation Mono", monospace;
+  font-size: 12px; line-height: 1.5; tab-size: 4;
+  padding: 12px; border: 1px solid var(--line-soft); border-radius: 10px;
+  background: var(--track-bg); color: var(--val-fg);
+}
 
 /* фрагменты SSE (#*-init → #*-live): отступ между блоками Система / GPU / Сервисы */
 #sse-root > section:not(:first-child) { margin-top: 16px; }

@@ -218,13 +218,24 @@ Check: `sudo -n /usr/local/sbin/llm-panel-systemd status myservice.service`
 (exit code 0), then the buttons on the card. User units do not need to be
 added to the allowlist.
 
-Two extra actions from the service settings (v0.3.18): `reset-failed`
-("Reset failed status") — a regular per-unit action, add it to `actions`
-as above; `daemon-reload` ("Daemon reload") — an operation over the ENTIRE
-manager (re-reads all unit files), it does NOT go into per-unit `actions`:
-it is permitted by the optional top-level allowlist key
-`"daemon_reload": true` (absent/false = refusal). User units need none of
-this — `systemctl --user daemon-reload` is run by the panel directly.
+Actions from the service settings and the "Unit config" page
+(v0.3.18/0.3.19):
+
+- `reset-failed` ("Reset failed status") — a per-unit action. To avoid
+  listing it in every `actions`, permit it globally: the top-level
+  allowlist key `"reset_failed": true` applies to ALL units listed in the
+  allowlist (current and future ones).
+- `daemon-reload` ("Daemon reload") — an operation over the ENTIRE manager
+  (re-reads all unit files), it does NOT go into per-unit `actions`: it is
+  permitted by a single key `"daemon_reload": true` — that covers all
+  units at once. User units need none of this — `systemctl --user
+  daemon-reload` is run by the panel directly.
+- `unit-cat` / `unit-write` ("Unit config": view/edit the unit file
+  /etc/systemd/system/<unit>) — strictly per-unit (editing a root file is
+  more dangerous): add them to `actions` only for units that really need
+  editing from the UI. Before every write the helper makes a backup in
+  /etc/systemd/system/.panel-backups/; creating NEW units via the panel is
+  forbidden.
 
 ---
 

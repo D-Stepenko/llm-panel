@@ -42,7 +42,9 @@
     <dt>health</dt><dd>{% if svc.health %}{{ svc.health.kind }}: {{ svc.health.url or (svc.health.host ~ ':' ~ svc.health.port) }}{% else %}{{ t('health_none') }}{% endif %}</dd>
   </dl>
   {% if svc.notes %}<p class="muted">{{ svc.notes }}</p>{% endif %}
-  <p class="settings-links">
+  {# div, а НЕ p: <form> внутри <p> запрещён HTML-парсером — <p> закрывается
+     до формы, кнопки выпадают из flex-контейнера (урок 2026-11-11). #}
+  <div class="settings-links">
     {# --- v0.3.18: reset-failed и daemon-reload (POST + CSRF, как карточки) --- #}
     <form method="post" action="/services/{{ svc.id }}/reset-failed">
       <input type="hidden" name="csrf" value="{{ csrf }}">
@@ -50,10 +52,11 @@
     </form>
     <form method="post" action="/services/{{ svc.id }}/daemon-reload">
       <input type="hidden" name="csrf" value="{{ csrf }}">
-      <button type="submit" class="action-btn btn-muted" title="{{ t('daemon_reload_title') }}">{{ t('btn_daemon_reload') }}</button>
+      <button type="submit" class="action-btn" title="{{ t('daemon_reload_title') }}">{{ t('btn_daemon_reload') }}</button>
     </form>
+    <a class="btn" href="/services/{{ svc.id }}/unit-config">{{ t('btn_unit_config') }}</a>
     <a class="btn" href="/services/{{ svc.id }}/logs">{{ t('btn_logs') }}</a>
     <a class="btn" href="/">{{ t('back_status') }}</a>
-  </p>
+  </div>
 </div>
 {% endblock %}

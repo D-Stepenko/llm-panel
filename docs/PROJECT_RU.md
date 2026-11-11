@@ -389,6 +389,37 @@ services.yaml, allowlist.json, systemd-юниты, sudoers. Редактор к�
   аргументы; роуты: system через моки call_helper/call_daemon_reload,
   user через моки run_user_action/daemon_reload_user, CSRF 403, рендер
   кнопок, аудит-записи). Живая проверка на станции — после копии.
+- **0.3.19 — «Конфиг юнита»: просмотр/правка юнит-файла + правки UI**
+  (11.11.2026). По запросу владельца:
+  (1) кнопки страницы настроек в ОДНУ линию с зазорами 20px. Причина
+  переносов: `<form>` внутри `<p class="settings-links">` запрещён
+  HTML-парсером — `<p>` закрывается до формы, кнопки выпадают из
+  flex-контейнера и становятся блоками. Контейнер теперь `<div>`, CSS:
+  `.settings-links` gap 20px + `.settings-links form { display: contents }`.
+  (2) «Daemon reload» больше НЕ бледный: убран класс btn-muted
+  (opacity .5 — ставился по ошибке в 0.3.18).
+  (3) Новая кнопка «Конфиг юнита» → страница /services/<id>/unit-config:
+  полный юнит-файл в textarea (как nano /etc/systemd/system/<unit>.service),
+  кнопки «Сохранить» (POST unit-config/save) и «Daemon reload» на той же
+  странице. system-юниты — через helper: НОВЫЕ allowlist-действия
+  unit-cat (чтение) и unit-write (правка: содержимое в STDIN, только
+  СУЩЕСТВУЮЩИЕ файлы — создание юнитов через панель запрещено; валидация
+  UTF-8/NUL/секций [Unit]/[Service]/[Install]; резервная копия в
+  .panel-backups перед каждой записью; атомарная запись tmp+os.replace,
+  root:root 0644; отказ при ошибке возвращает правки в форму);
+  user-юниты — напрямую ~/.config/systemd/user (unit_cat_user/
+  unit_write_user, backup .panel-backups). Аудит: unit-write[:user].
+  (4) Глобальные ключи allowlist для «действий по умолчанию» (решение
+  владельца — действия разрешены всем текущим и БУДУЩИМ юнитам):
+  "reset_failed": true — reset-failed любому allowlist-юниту без
+  per-unit вхождения; "daemon_reload": true — manager-wide (уже покрывал
+  все юниты). unit-cat/unit-write остаются строго per-unit (правка
+  root-файла — опаснее).
+  Тесты: 272/272 + 2 skip (win32) — +23 (helper: глобальный ключ, планы
+  unit-cat/unit-write, реальный roundtrip с backup/отказами; роуты:
+  рендер, ошибки загрузки, save ok/отказ с сохранением правок, CSRF,
+  пустой ввод, кнопки/раскладка; user-юниты: чтение/запись, файловый
+  roundtrip). Живая проверка на станции — после копии.
 
 ## 8. Известные ограничения
 

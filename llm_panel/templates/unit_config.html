@@ -1,0 +1,42 @@
+{% extends "base.html" %}
+{% block title %}{{ t('unitcfg_title', name=svc.name) }}{% endblock %}
+{% block content %}
+<div class="page-head">
+  <div>
+    <div class="eyebrow"><span class="live-dot amber"></span>systemd unit</div>
+    <h1>{{ t('unitcfg_h1', name=svc.name) }}</h1>
+    <p class="subtitle"><code>{{ svc.unit }}</code> — {{ t('unitcfg_subtitle') }}{% if scope == 'user' %} · {{ t('user_unit') }}{% endif %}</p>
+  </div>
+</div>
+
+{% if saved %}<div class="notice ok">
+  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><path d="M20 6 9 17l-5-5"/></svg>
+  <span>{{ t('unitcfg_saved') }}</span>
+</div>{% endif %}
+{% if err %}<div class="notice err">
+  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><path d="M12 9v4M12 17h.01"/><path d="M10.3 3.9 1.8 18a2 2 0 0 0 1.7 3h17a2 2 0 0 0 1.7-3L13.7 3.9a2 2 0 0 0-3.4 0z"/></svg>
+  <span>{{ err }}</span>
+</div>{% endif %}
+
+<div class="notice">
+  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><path d="M12 9v4M12 17h.01"/><path d="M10.3 3.9 1.8 18a2 2 0 0 0 1.7 3h17a2 2 0 0 0 1.7-3L13.7 3.9a2 2 0 0 0-3.4 0z"/></svg>
+  <span>{{ t('unitcfg_note_system', unit=svc.unit) if scope != 'user' else t('unitcfg_note_user', unit=svc.unit) }}</span>
+</div>
+
+<form method="post" action="/services/{{ svc.id }}/unit-config/save" class="unit-editor">
+  <input type="hidden" name="csrf" value="{{ csrf }}">
+  <textarea name="content" spellcheck="false" rows="26">{{ content }}</textarea>
+  <div class="settings-links">
+    <button type="submit" class="action-btn primary">{{ t('unitcfg_save') }}</button>
+  </div>
+</form>
+
+<div class="settings-links">
+  <form method="post" action="/services/{{ svc.id }}/daemon-reload">
+    <input type="hidden" name="csrf" value="{{ csrf }}">
+    <button type="submit" class="action-btn" title="{{ t('daemon_reload_title') }}">{{ t('btn_daemon_reload') }}</button>
+  </form>
+  <a class="btn" href="/services/{{ svc.id }}/settings">{{ t('back_settings') }}</a>
+  <a class="btn" href="/services/{{ svc.id }}/logs">{{ t('btn_logs') }}</a>
+</div>
+{% endblock %}

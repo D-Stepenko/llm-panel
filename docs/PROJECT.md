@@ -419,6 +419,38 @@ sudoers. The service configuration editor — stage 2.
   arguments; routes: system via call_helper/call_daemon_reload mocks, user
   via run_user_action/daemon_reload_user mocks, CSRF 403, button render,
   audit entries). Live check on the station — after copying.
+- **0.3.19 — "Unit config": view/edit the unit file + UI fixes**
+  (2026-11-11). At the owner's request:
+  (1) the settings-page buttons are on ONE line with 20px gaps. The cause
+  of the stacking: `<form>` inside `<p class="settings-links">` is invalid
+  HTML — the parser closes the `<p>` before the form, so the buttons fell
+  out of the flex container and became blocks. The container is now a
+  `<div>`, CSS: `.settings-links` gap 20px +
+  `.settings-links form { display: contents }`.
+  (2) "Daemon reload" is NO LONGER pale: the btn-muted class removed
+  (opacity .5 — was set by mistake in 0.3.18).
+  (3) A new "Unit config" button → the /services/<id>/unit-config page:
+  the full unit file in a textarea (like nano
+  /etc/systemd/system/<unit>.service), with "Save" (POST unit-config/save)
+  and "Daemon reload" buttons on the same page. System units — through the
+  helper: NEW allowlist actions unit-cat (read) and unit-write (edit:
+  content passed on STDIN, ONLY existing files — creating new units via
+  the panel is forbidden; UTF-8/NUL/[Unit]/[Service]/[Install] validation;
+  a backup in .panel-backups before every write; atomic tmp+os.replace,
+  root:root 0644; on an error the edits are returned to the form);
+  user units — directly ~/.config/systemd/user (unit_cat_user/
+  unit_write_user, .panel-backups backup). Audit: unit-write[:user].
+  (4) Global allowlist keys for "default actions" (the owner's decision —
+  the actions are permitted to ALL current and FUTURE units):
+  "reset_failed": true — reset-failed for any allowlisted unit without a
+  per-unit entry; "daemon_reload": true — manager-wide (already covered
+  every unit). unit-cat/unit-write remain strictly per-unit (editing a
+  root file is more dangerous).
+  Tests: 272/272 + 2 skip (win32) — +23 (helper: the global key,
+  unit-cat/unit-write plans, a real roundtrip with backup/refusals;
+  routes: render, load errors, save ok/refusal keeping the edits, CSRF,
+  empty input, buttons/layout; user units: read/write, a file roundtrip).
+  Live check on the station — after copying.
 
 ## 8. Known limitations
 

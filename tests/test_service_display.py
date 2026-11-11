@@ -355,6 +355,128 @@ def test_new_actions_csrf_required(authed_client):
     assert r2.status_code == 403
 
 
+# -------------------------------------- unit-config (v0.3.19) ----------------
+
+def test_unit_config_page_renders(authed_client, monkeypatch):
+    """Страница «Конфиг юнита»: содержимое в textarea, Save + Daemon reload рядом."""
+    c = authed_client
+    import llm_panel.routes.services as svc_mod
+    from llm_panel.helper_client import HelperResult
+
+    calls = []
+
+    def fake_cat(helper_path, unit, timeout=30.0):
+        calls.append(unit)
+        return HelperResult(ok=True, stdout="[Unit]\nDescription=x\n", stderr="", code=0)
+
+    monkeypatch.setattr(svc_mod, "call_unit_cat", fake_cat)
+    page = c.get("/services/vllm/unit-config", headers={"host": "localhost"})
+    assert page.status_code == 200
+    assert calls == ["vllm.service"]
+    assert "[Unit]" in page.text
+    assert 'name="content"' in page.text
+    assert 'action="/services/vllm/unit-config/save"' in page.text
+    assert 'action="/services/vllm/daemon-reload"' in page.text
+
+
+def test_unit_config_load_error_shown(authed_client, monkeypatch):
+    c = authed_client
+    import llm_panel.routes.services as svc_mod
+    from llm_panel.helper_client import HelperError
+
+    monkeypatch.setattr(svc_mod, "call_unit_cat",
+                        lambda *a, **k: (_ for _ in ()).throw(
+                            HelperError(kind="denied", message="отказано: allowlist")))
+    page = c.get("/services/vllm/unit-config", headers={"host": "localhost"})
+    assert page.status_code == 200
+    assert "отказано" in page.text
+
+
+def test_unit_config_save_ok(authed_client, monkeypatch):
+    c = authed_client
+    import llm_panel.routes.services as svc_mod
+    from llm_panel.helper_client import HelperResult
+
+    captured = {}
+    new_content = "[Unit]\nDescription=new\n\n[Service]\nExecStart=/bin/new\n"
+
+    def fake_write(helper_path, unit, content, timeout=30.0):
+        captured["unit"] = unit
+        captured["content"] = content
+        return HelperResult(ok=True, stdout="", stderr="", code=0)
+
+    def fake_cat(helper_path, unit, timeout=30.0):
+        return HelperResult(ok=True, stdout=captured.get("content", ""), stderr="", code=0)
+
+    monkeypatch.setattr(svc_mod, "call_unit_write", fake_write)
+    monkeypatch.setattr(svc_mod, "call_unit_cat", fake_cat)
+    r = c.post("/services/vllm/unit-config/save",
+               data={"csrf": _csrf(c), "content": new_content},
+               headers={"host": "localhost"})
+    assert r.status_code == 200
+    assert captured == {"unit": "vllm.service", "content": new_content}
+    assert "Saved" in r.text
+    assert "ExecStart=/bin/new" in r.text   # перечитано после записи
+    tail = c.app.state.panel.db.audit_tail(5)
+    assert any(a["action"] == "unit-write" and a["object"] == "vllm.service"
+               and a["result"] == "ok" for a in tail)
+
+
+def test_unit_config_save_error_keeps_edits(authed_client, monkeypatch):
+    """При отказе helper правки пользователя НЕ теряются (возвращаются в форму)."""
+    c = authed_client
+    import llm_panel.routes.services as svc_mod
+    from llm_panel.helper_client import HelperError
+
+    monkeypatch.setattr(svc_mod, "call_unit_write",
+                        lambda *a, **k: (_ for _ in ()).throw(
+                            HelperError(kind="denied", message="отказано: unit-write")))
+    r = c.post("/services/vllm/unit-config/save",
+               data={"csrf": _csrf(c), "content": "[Unit]\nDescription=MY-EDIT\n"},
+               headers={"host": "localhost"})
+    assert r.status_code == 200
+    assert "отказано" in r.text
+    assert "MY-EDIT" in r.text
+    tail = c.app.state.panel.db.audit_tail(5)
+    assert any(a["action"] == "unit-write" and a["result"] == "helper_error"
+               for a in tail)
+
+
+def test_unit_config_save_csrf_required(authed_client):
+    c = authed_client
+    r = c.post("/services/vllm/unit-config/save",
+               data={"csrf": "WRONG", "content": "[Unit]\n"},
+               headers={"host": "localhost"})
+    assert r.status_code == 403
+
+
+def test_unit_config_save_empty_rejected(authed_client, monkeypatch):
+    c = authed_client
+    import llm_panel.routes.services as svc_mod
+    calls = []
+    monkeypatch.setattr(svc_mod, "call_unit_write",
+                        lambda *a, **k: calls.append(1))
+    r = c.post("/services/vllm/unit-config/save",
+               data={"csrf": _csrf(c), "content": "   "},
+               headers={"host": "localhost"})
+    assert r.status_code == 200
+    assert calls == []   # до helper дело не дошло
+    assert "Empty content" in r.text or "Пустое содержимое" in r.text
+
+
+def test_settings_buttons_layout_and_not_muted(authed_client):
+    """v0.3.19: контейнер div (form внутри p парсер закрывает), кнопки в линию,
+    Daemon reload БЕЗ btn-muted, кнопка «Конфиг юнита» на месте."""
+    c = authed_client
+    page = c.get("/services/vllm/settings", headers={"host": "localhost"})
+    assert page.status_code == 200
+    assert '<div class="settings-links">' in page.text
+    assert '<p class="settings-links">' not in page.text
+    assert 'href="/services/vllm/unit-config"' in page.text
+    idx = page.text.index('action="/services/vllm/daemon-reload"')
+    assert "btn-muted" not in page.text[idx:idx + 400]
+
+
 # ----------------------------------------------- самоперезапуск панели (0.1.6) --
 
 def test_panel_self_restart_uses_no_block(authed_client, monkeypatch):

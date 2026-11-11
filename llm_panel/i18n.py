@@ -85,6 +85,27 @@ STRINGS: dict[str, dict[str, str]] = {
         "daemon_reload_title": ("systemctl daemon-reload: re-read ALL unit files of the manager "
                                 "(not only this unit; for system units — through the helper, "
                                 'requires "daemon_reload": true in allowlist.json)'),
+        # --- v0.3.19: unit-config (view/edit the unit file) ---
+        "btn_unit_config": "Unit config",
+        "unitcfg_title": "Unit config: {name}",
+        "unitcfg_h1": "Unit config: {name}",
+        "unitcfg_subtitle": "the systemd unit file — view and edit",
+        "unitcfg_note_system": ('File {unit} in /etc/systemd/system (root:root 0644). Saving goes '
+                                'through the root-owned helper (the "unit-write" allowlist '
+                                "action); a backup is kept in .panel-backups before every "
+                                "write; every save is audited. Drop-in files (systemctl edit) "
+                                "are NOT shown here. After saving run Daemon reload so "
+                                "systemd re-reads the unit."),
+        "unitcfg_note_user": ("File {unit} in ~/.config/systemd/user (owned by the panel user). "
+                              "A backup is kept in .panel-backups before every write; every "
+                              "save is audited. Drop-in files are NOT shown here. After "
+                              "saving run Daemon reload so systemd re-reads the unit."),
+        "unitcfg_saved": ("Saved (a backup was made). Run Daemon reload so systemd re-reads "
+                          "the unit."),
+        "unitcfg_save": "Save",
+        "unitcfg_empty": "Empty content: the unit file was not saved.",
+        "unitcfg_too_big": "The unit file is too large (> 256 KB) — not saved.",
+        "back_settings": "← Back to settings",
         "no_services": "No services: fill in services.yaml (see deploy/services.yaml.example).",
         # --- матрица GPU (этап 2) ---
         "page_matrix_title": "GPU matrix — llm-panel",
@@ -433,6 +454,28 @@ STRINGS: dict[str, dict[str, str]] = {
         "daemon_reload_title": ("systemctl daemon-reload: перечитать ВСЕ файлы юнитов менеджера "
                                 "(не только этого юнита; для системных юнитов — через helper, "
                                 'требуется "daemon_reload": true в allowlist.json)'),
+        # --- v0.3.19: unit-config (просмотр/правка юнит-файла) ---
+        "btn_unit_config": "Конфиг юнита",
+        "unitcfg_title": "Конфиг юнита: {name}",
+        "unitcfg_h1": "Конфиг юнита: {name}",
+        "unitcfg_subtitle": "файл systemd-юнита — просмотр и редактирование",
+        "unitcfg_note_system": ('Файл {unit} в /etc/systemd/system (root:root 0644). Сохранение '
+                                'идёт через root-owned helper (действие "unit-write" в '
+                                "allowlist); перед каждой записью создаётся резервная копия в "
+                                ".panel-backups; каждое сохранение — в аудите. Drop-in-файлы "
+                                "(systemctl edit) здесь НЕ показываются. После сохранения "
+                                "выполните Daemon reload, чтобы systemd перечитал юнит."),
+        "unitcfg_note_user": ("Файл {unit} в ~/.config/systemd/user (владелец — пользователь "
+                              "панели). Перед каждой записью создаётся резервная копия в "
+                              ".panel-backups; каждое сохранение — в аудите. Drop-in-файлы "
+                              "здесь НЕ показываются. После сохранения выполните Daemon "
+                              "reload, чтобы systemd перечитал юнит."),
+        "unitcfg_saved": ("Сохранено (резервная копия создана). Выполните Daemon reload, чтобы "
+                          "systemd перечитал юнит."),
+        "unitcfg_save": "Сохранить",
+        "unitcfg_empty": "Пустое содержимое: юнит-файл не сохранён.",
+        "unitcfg_too_big": "Юнит-файл слишком большой (> 256 КБ) — не сохранён.",
+        "back_settings": "← К настройкам",
         "no_services": "Сервисов нет: заполните services.yaml (см. deploy/services.yaml.example).",
         # --- матрица GPU (этап 2) ---
         "page_matrix_title": "Матрица GPU — llm-panel",

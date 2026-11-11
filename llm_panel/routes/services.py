@@ -11,8 +11,10 @@ import asyncio
 from fastapi import APIRouter, Request
 from fastapi.responses import HTMLResponse, PlainTextResponse
 
-from ..systemd_units import daemon_reload_user, run_user_action, show_unit
-from ..helper_client import HelperError, call_daemon_reload, call_helper
+from ..systemd_units import (daemon_reload_user, run_user_action, show_unit,
+                              unit_cat_user, unit_write_user)
+from ..helper_client import (HelperError, call_daemon_reload, call_helper,
+                             call_unit_cat, call_unit_write)
 from ..i18n import translate
 from ..security import csrf_matches
 
@@ -159,6 +161,119 @@ async def run_action(request: Request, svc_id: str, action: str):
         status=actual,
     )
     return HTMLResponse(body, status_code=200)
+
+
+@router.get("/{svc_id}/unit-config")
+async def unit_config(request: Request, svc_id: str):
+    """Конфиг юнита (v0.3.19): просмотр + редактирование юнит-файла.
+
+    system-юниты — через helper (unit-cat/unit-write, allowlist);
+    user-юниты — напрямую файлы ~/.config/systemd/user (панель — владелец).
+    """
+    state = request.app.state.panel
+    svc = _find_def(state, svc_id)
+    if svc is None:
+        return PlainTextResponse(translate(state.i18n_lang, "svc_not_found"), status_code=404)
+    scope = getattr(svc, "scope", "system")
+    if scope == "user":
+        ok, content = unit_cat_user(svc.unit)
+        err = "" if ok else content
+        if not ok:
+            content = ""
+    else:
+        try:
+            res = call_unit_cat(state.cfg.helper_path, svc.unit)
+            content, err = res.stdout, ""
+        except HelperError as e:
+            content, err = "", e.message
+    return state.render(
+        "unit_config.html",
+        request=request,
+        svc=svc,
+        content=content,
+        err=err,
+        saved=False,
+        scope=scope,
+    )
+
+
+@router.post("/{svc_id}/unit-config/save")
+async def unit_config_save(request: Request, svc_id: str):
+    """Сохранение юнит-файла (v0.3.19): CSRF, аудит, backup делает helper.
+
+    При ошибке содержимое ВОЗВРАЩАЕТСЯ в форму (правки не теряются).
+    """
+    state = request.app.state.panel
+    svc = _find_def(state, svc_id)
+    if svc is None:
+        return PlainTextResponse(translate(state.i18n_lang, "svc_not_found"), status_code=404)
+    try:
+        form = await request.form()
+    except Exception:  # noqa: BLE001
+        form = {}
+    if not csrf_matches(form.get("csrf"), request.state.csrf):
+        return PlainTextResponse(translate(state.i18n_lang, "bad_csrf"), status_code=403)
+
+    ip = request.client.host if request.client else ""
+    user = request.state.session["username"]
+    db = state.db
+    lang = state.i18n_lang
+    scope = getattr(svc, "scope", "system")
+    content = form.get("content")
+    if not isinstance(content, str) or not content.strip():
+        return await _render_unit_config_page(
+            request, svc, content=content if isinstance(content, str) else "",
+            err=translate(lang, "unitcfg_empty"), scope=scope)
+    if len(content.encode("utf-8")) > 262144:
+        return await _render_unit_config_page(
+            request, svc, content=content,
+            err=translate(lang, "unitcfg_too_big"), scope=scope)
+
+    if scope == "user":
+        ok, msg = unit_write_user(svc.unit, content)
+        db.audit(ip, user, "unit-write:user", svc.unit, "ok" if ok else "failed",
+                 msg[:200])
+        err = "" if ok else msg
+    else:
+        try:
+            res = call_unit_write(state.cfg.helper_path, svc.unit, content)
+            ok, err = res.ok, ""
+            db.audit(ip, user, "unit-write", svc.unit, "ok", (res.stdout or "")[:200])
+        except HelperError as e:
+            ok = False
+            err = e.message
+            db.audit(ip, user, "unit-write", svc.unit, "helper_error", e.message[:200])
+
+    # Перечитываем ФАКТ (что записалось), при ошибке показываем введённое
+    fresh = content
+    if ok:
+        if scope == "user":
+            read_ok, fresh = unit_cat_user(svc.unit)
+            if not read_ok:
+                fresh, err = content, fresh
+        else:
+            try:
+                fresh = call_unit_cat(state.cfg.helper_path, svc.unit).stdout
+            except HelperError as e:
+                fresh, err = content, e.message
+    return await _render_unit_config_page(
+        request, svc, content=fresh,
+        err=err, saved=ok, scope=scope)
+
+
+async def _render_unit_config_page(request: Request, svc, content: str,
+                                   err: str = "", saved: bool = False,
+                                   scope: str = "system"):
+    state = request.app.state.panel
+    return state.render(
+        "unit_config.html",
+        request=request,
+        svc=svc,
+        content=content,
+        err=err,
+        saved=saved,
+        scope=scope,
+    )
 
 
 @router.get("/{svc_id}/settings")

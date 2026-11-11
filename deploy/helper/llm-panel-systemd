@@ -17,8 +17,10 @@ Helper сам проверяет действие, точное имя юнит�
 import json
 import os
 import re
+import stat
 import subprocess
 import sys
+import time
 
 # syslog доступен только в Linux (helper предназначен для станции); на других ОС — no-op
 try:
@@ -33,9 +35,14 @@ ALLOWLIST_PATH = "/etc/llm-panel/allowlist.json"
 UNIT_RE = re.compile(r"^[A-Za-z0-9_.@-]{1,64}\.service$")
 JOURNAL_MAX_LINES = 5000
 ACTIONS = ("start", "stop", "restart", "enable", "disable", "reset-failed",
+           "unit-cat", "unit-write",
            "status", "journal", "journal-follow")
 # Хостовые power-операции (не юниты): выключение/перезагрузка СТАНЦИИ.
 POWER_ACTIONS = ("poweroff", "reboot")
+# Юнит-файлы: чтение (unit-cat) и правка (unit-write) /etc/systemd/system/<unit>.
+# Каталог переопределяется в тестах (LLM_PANEL_UNITS_DIR_TEST, только не от root).
+UNITS_DIR = "/etc/systemd/system"
+UNIT_MAX_BYTES = 262144  # 256 КБ: юнит-файлы на порядки меньше
 
 SHOW_PROPS = ("ActiveState", "SubState", "Result", "ExecMainPID",
               "ExecMainStartTimestamp", "ExecMainExitTimestamp", "NRestarts", "UnitFileState")
@@ -91,6 +98,99 @@ def validate_unit(unit: str) -> str:
     return unit
 
 
+def unit_path(unit: str) -> str:
+    """Полный путь юнит-файла; unit уже прошёл validate_unit (без «/», «..», NUL)."""
+    return os.path.join(UNITS_DIR, unit)
+
+
+def do_unit_cat(unit: str) -> int:
+    """unit-cat: содержимое /etc/systemd/system/<unit> в stdout (только существующие файлы)."""
+    path = unit_path(unit)
+    try:
+        st = os.stat(path)
+        if not stat.S_ISREG(st.st_mode):
+            die(4, f"целевой путь не является регулярным файлом: {path}")
+        if st.st_size > UNIT_MAX_BYTES:
+            die(4, f"юнит-файл слишком большой (> {UNIT_MAX_BYTES} байт)")
+        with open(path, "rb") as f:
+            data = f.read()
+    except FileNotFoundError:
+        die(4, f"юнит-файл не найден: {path} (создание новых юнитов через панель запрещено)")
+    except OSError as e:
+        die(4, f"юнит-файл нечитаем: {type(e).__name__}")
+    try:
+        sys.stdout.buffer.write(data)
+        sys.stdout.buffer.flush()
+    except (AttributeError, OSError):
+        sys.stdout.write(data.decode("utf-8", errors="replace"))
+    syslog.syslog(syslog.LOG_INFO, f"helper: unit-cat {unit} -> {len(data)} байт")
+    return 0
+
+
+def do_unit_write(unit: str) -> int:
+    """unit-write: новое содержимое юнит-файла приходит в STDIN.
+
+    Только правка СУЩЕСТВУЮЩЕГО файла (создание новых юнитов через панель
+    запрещено — безопасный дефолт). Резервная копия — <UNITS_DIR>/.panel-backups/
+    (0700 root) перед каждой записью; запись атомарная (tmp + os.replace),
+    владелец/права восстанавливаются root:root 0644.
+    """
+    path = unit_path(unit)
+    try:
+        raw = sys.stdin.buffer.read()  # type: ignore[union-attr]
+    except (AttributeError, OSError) as e:
+        die(2, f"stdin недоступен: {type(e).__name__}")
+    if not raw or not raw.strip():
+        die(2, "пустой ввод: содержимое юнит-файла ожидалось в stdin")
+    if len(raw) > UNIT_MAX_BYTES:
+        die(2, f"слишком большой ввод (> {UNIT_MAX_BYTES} байт)")
+    try:
+        text = raw.decode("utf-8")
+    except UnicodeDecodeError:
+        die(2, "ввод не является корректным UTF-8 — отказ")
+    if "\x00" in text:
+        die(2, "ввод содержит NUL — отказ")
+    sections = re.findall(r"^\s*\[([A-Za-z][A-Za-z0-9._-]*)\]", text, re.M)
+    if not any(s in ("Unit", "Service", "Install") for s in sections):
+        die(2, "ввод не похож на systemd-юнит (нет секции [Unit]/[Service]/[Install]) — отказ")
+    try:
+        st = os.stat(path)
+        if not stat.S_ISREG(st.st_mode):
+            die(4, "целевой путь не является регулярным файлом — отказ")
+    except FileNotFoundError:
+        die(4, f"юнит-файл не найден: {path} (создание новых юнитов через панель запрещено)")
+    except OSError as e:
+        die(4, f"юнит-файл недоступен: {type(e).__name__}")
+
+    backup_dir = os.path.join(UNITS_DIR, ".panel-backups")
+    stamp = time.strftime("%Y%m%d-%H%M%S")
+    backup = os.path.join(backup_dir, f"{unit}.{stamp}.bak")
+    tmp = path + ".panel-tmp"
+    try:
+        os.makedirs(backup_dir, mode=0o700, exist_ok=True)
+        with open(path, "rb") as src:
+            old = src.read()
+        with open(backup, "wb") as dst:
+            dst.write(old)
+        os.chmod(backup, 0o600)
+        with open(tmp, "wb") as f:
+            f.write(raw)
+        os.chmod(tmp, 0o644)
+        if hasattr(os, "chown"):
+            os.chown(tmp, 0, 0)
+        os.replace(tmp, path)
+    except OSError as e:
+        if os.path.exists(tmp):
+            try:
+                os.unlink(tmp)
+            except OSError:
+                pass
+        die(4, f"запись не выполнена: {type(e).__name__} ({e})")
+    syslog.syslog(syslog.LOG_WARNING,
+                  f"helper: unit-write {unit} -> ok ({len(raw)} байт, backup {backup})")
+    return 0
+
+
 def _euid() -> int:
     """posix geteuid; на не-posix (Windows, для тестов) — -1 (не root)."""
     return getattr(os, "geteuid", lambda: -1)()
@@ -111,11 +211,22 @@ def main() -> int:
         argv.remove("--dry-run")
         if _euid() == 0:
             die(2, "dry-run недоступен от root (используется только при тестировании)")
-        if os.environ.get("LLM_PANEL_ALLOWLIST_TEST"):  # ТОЛЬКО не от root (sudo сбрасывает env)
+    elif _euid() != 0:
+        # Тестовый режим (pytest, не-root): реальный запуск разрешён ТОЛЬКО когда
+        # заданы ОБА тестовых env (allowlist + каталог юнитов). Через sudo env
+        # стирается (env_reset) — smuggle невозможен; не-root процесс и так не
+        # может писать в root-файлы вне тестового каталога.
+        if not (os.environ.get("LLM_PANEL_ALLOWLIST_TEST")
+                and os.environ.get("LLM_PANEL_UNITS_DIR_TEST")):
+            die(3, "запуск возможен только от root (через sudo -n /usr/local/sbin/llm-panel-systemd)")
+    # Тестовые переопределения путей: ТОЛЬКО не от root (sudo сбрасывает env).
+    if _euid() != 0:
+        if os.environ.get("LLM_PANEL_ALLOWLIST_TEST"):
             global ALLOWLIST_PATH
             ALLOWLIST_PATH = os.environ["LLM_PANEL_ALLOWLIST_TEST"]
-    elif _euid() != 0:
-        die(3, "запуск возможен только от root (через sudo -n /usr/local/sbin/llm-panel-systemd)")
+        if os.environ.get("LLM_PANEL_UNITS_DIR_TEST"):
+            global UNITS_DIR
+            UNITS_DIR = os.environ["LLM_PANEL_UNITS_DIR_TEST"]
 
     if not argv:
         die(2, "нет аргументов; ожидалось: <action> <unit> [extra]")
@@ -207,7 +318,11 @@ def main() -> int:
         return 3
 
     actions = entry.get("actions", []) if isinstance(entry, dict) else []
-    if action not in actions:
+    # Глобальный ключ "reset_failed": true (v0.3.19) разрешает reset-failed для
+    # ВСЕХ юнитов, внесённых в allowlist (текущих и добавляемых в будущем),
+    # без перечисления в каждом actions. Отсутствие/false — только per-unit.
+    if action not in actions and not (
+            action == "reset-failed" and allowlist.get("reset_failed") is True):
         print(f"ОТКАЗ: действие {action} не разрешено для {unit} (allowlist)", file=sys.stderr)
         syslog.syslog(syslog.LOG_NOTICE, f"helper: действие {action} для {unit} не разрешено — отказ")
         return 3
@@ -230,8 +345,8 @@ def main() -> int:
             no_block = True
         elif extra:
             die(2, "изменяющие действия принимают максимум один флаг --no-block")
-    elif action in ("status", "reset-failed"):
-        if extra:  # status, reset-failed
+    elif action in ("status", "reset-failed", "unit-cat", "unit-write"):
+        if extra:
             die(2, f"действие {action} не принимает дополнительных аргументов")
     elif extra:
         die(2, "дополнительные аргументы для этого действия не разрешены")
@@ -242,6 +357,10 @@ def main() -> int:
             plan["argv"] = ["journalctl", "--unit", unit, "--lines", str(lines), "--no-pager"]
         elif action == "journal-follow":
             plan["argv"] = ["journalctl", "--unit", unit, "--lines", "50", "--no-pager", "-f"]
+        elif action == "unit-cat":
+            plan["argv"] = ["cat", unit_path(unit)]
+        elif action == "unit-write":
+            plan["argv"] = ["write", unit_path(unit), "(stdin)"]
         elif action == "status":
             plan["argv"] = ["systemctl", "show", "--no-pager", unit]
         else:
@@ -265,7 +384,11 @@ def main() -> int:
         sys.stdout.write(proc.stdout or "")
         return 0
 
-    if action == "status":
+    if action == "unit-cat":
+        rc = do_unit_cat(unit)
+    elif action == "unit-write":
+        rc = do_unit_write(unit)
+    elif action == "status":
         props = []
         for p in SHOW_PROPS:
             props.append(f"--property={p}")

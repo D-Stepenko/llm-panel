@@ -102,7 +102,11 @@ NVML на момент запуска.
   разрешает само по себе — права действий всегда проверяются по актуальному
   allowlist (безопасный дефолт: отказ). После правки — dry-run БЕЗ sudo
   (`/usr/local/sbin/llm-panel-systemd --dry-run reset-failed <unit>`) и
-  `sudo systemctl restart llm-panel`.
+  `sudo systemctl restart llm-panel`. РЕШЕНИЕ владельца (v0.3.19, 2026-11-11):
+  чтобы не править allowlist на каждый новый юнит, установлены глобальные
+  ключи `"reset_failed": true` и `"daemon_reload": true` — ОДИН раз на
+  менеджер, покрывают все текущие и будущие юниты; правка юнит-файлов
+  (unit-cat/unit-write) остаётся строго per-unit.
 
 ## 4. Обновление станции из репозитория
 

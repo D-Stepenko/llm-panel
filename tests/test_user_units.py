@@ -348,6 +348,89 @@ def test_user_daemon_reload_failure(user_client, monkeypatch):
                for a in tail)
 
 
+# -------------------------------------- unit-config, user-юниты (v0.3.19) ----
+
+def test_user_unit_config_read(user_client, monkeypatch):
+    c = user_client
+    import llm_panel.routes.services as svc_mod
+
+    monkeypatch.setattr(svc_mod, "unit_cat_user",
+                        lambda unit: (True, "[Unit]\nDescription=user unit\n"))
+    page = c.get("/services/openclaw/unit-config", headers={"host": "localhost"})
+    assert page.status_code == 200
+    assert "Description=user unit" in page.text
+    assert 'action="/services/openclaw/unit-config/save"' in page.text
+    assert 'action="/services/openclaw/daemon-reload"' in page.text
+
+
+def test_user_unit_config_save(user_client, monkeypatch):
+    c = user_client
+    import llm_panel.routes.services as svc_mod
+
+    captured = {}
+
+    def fake_write(unit, content):
+        captured["unit"], captured["content"] = unit, content
+        return True, "ok (backup)"
+
+    def fake_cat(unit):
+        return True, captured.get("content", "")
+
+    monkeypatch.setattr(svc_mod, "unit_write_user", fake_write)
+    monkeypatch.setattr(svc_mod, "unit_cat_user", fake_cat)
+    r = c.post("/services/openclaw/unit-config/save",
+               data={"csrf": _csrf(c), "content": "[Unit]\nDescription=new\n"},
+               headers={"host": "localhost"})
+    assert r.status_code == 200
+    assert captured == {"unit": "openclaw-gateway.service",
+                        "content": "[Unit]\nDescription=new\n"}
+    assert "Saved" in r.text or "Сохранено" in r.text
+    tail = c.app.state.panel.db.audit_tail(5)
+    assert any(a["action"] == "unit-write:user" and a["result"] == "ok"
+               for a in tail)
+
+
+def test_unit_write_user_roundtrip(tmp_path, monkeypatch):
+    """Файловый roundtrip unit_write_user/unit_cat_user: backup, запрет создания."""
+    import llm_panel.systemd_units as su
+
+    base = tmp_path / "user-units"
+    base.mkdir()
+    (base / "openclaw-gateway.service").write_text(
+        "[Unit]\nDescription=a\n\n[Service]\nExecStart=/bin/x\n", encoding="utf-8")
+    monkeypatch.setattr(su, "_user_unit_base", lambda: base)
+
+    ok, msg = su.unit_write_user(
+        "openclaw-gateway.service",
+        "[Unit]\nDescription=b\n\n[Service]\nExecStart=/bin/y\n")
+    assert ok, msg
+    assert "/bin/y" in (base / "openclaw-gateway.service").read_text(encoding="utf-8")
+    backups = list((base / ".panel-backups").glob("openclaw-gateway.service.*.bak"))
+    assert len(backups) == 1
+    assert "/bin/x" in backups[0].read_text(encoding="utf-8")
+
+    ok3, text = su.unit_cat_user("openclaw-gateway.service")
+    assert ok3 and "/bin/y" in text
+
+    ok4, _ = su.unit_write_user("new-unit.service", "[Unit]\nDescription=n\n")
+    assert not ok4                       # создание НОВЫХ юнитов запрещено
+    assert not (base / "new-unit.service").exists()
+
+    ok5, _ = su.unit_write_user("openclaw-gateway.service", "no sections")
+    assert not ok5                       # не похож на systemd-юнит
+
+    ok6, _ = su.unit_write_user("../escape.service", "[Unit]\n")
+    assert not ok6                       # путь вне каталога юнитов
+
+
+def test_user_unit_config_csrf(user_client):
+    c = user_client
+    r = c.post("/services/openclaw/unit-config/save",
+               data={"csrf": "WRONG", "content": "[Unit]\n"},
+               headers={"host": "localhost"})
+    assert r.status_code == 403
+
+
 def test_logs_user_scope(user_client, monkeypatch):
     """Журнал user-юнита: прямой journalctl --user + маскирование секретов."""
     c = user_client

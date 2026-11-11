@@ -11,6 +11,7 @@ from __future__ import annotations
 
 import dataclasses
 import datetime as _dt
+import pathlib
 import subprocess
 
 
@@ -236,6 +237,86 @@ def daemon_reload_user(timeout: float = 60.0) -> tuple[bool, str]:
         return False, "timeout"
     out = (proc.stdout or "") + (proc.stderr or "")
     return proc.returncode == 0, out.strip()[:2000]
+
+
+def _user_unit_base() -> pathlib.Path:
+    """Каталог user-юнитов владельца панели (~/.config/systemd/user).
+    Отдельная функция — для точечного monkeypatch в тестах."""
+    return pathlib.Path.home() / ".config" / "systemd" / "user"
+
+
+def _user_unit_path(unit: str) -> pathlib.Path | None:
+    """Безопасный путь юнит-файла: строго внутри каталога user-юнитов."""
+    if not unit or "/" in unit or "\\" in unit or ".." in unit or "\x00" in unit:
+        return None
+    base = _user_unit_base()
+    p = base / unit
+    if p.parent != base:
+        return None
+    return p
+
+
+USER_UNIT_MAX_BYTES = 262144
+
+
+def unit_cat_user(unit: str) -> tuple[bool, str]:
+    """unit-cat для user-юнита (v0.3.19): чтение ~/.config/systemd/user/<unit>.
+
+    Панель работает от владельца юнита — helper не нужен (как run_user_action).
+    Возврат (успех, содержимое или текст ошибки).
+    """
+    p = _user_unit_path(unit)
+    if p is None:
+        return False, "bad unit"
+    try:
+        text = p.read_text(encoding="utf-8")
+    except FileNotFoundError:
+        return False, f"юнит-файл не найден: {p} (создание юнитов через панель запрещено)"
+    except OSError as e:
+        return False, f"юнит-файл нечитаем: {type(e).__name__}"
+    return True, text
+
+
+def unit_write_user(unit: str, content: str) -> tuple[bool, str]:
+    """unit-write для user-юнита (v0.3.19): атомарная правка существующего файла.
+
+    Только СУЩЕСТВУЮЩИЕ файлы (создание — вне панели); резервная копия —
+    ~/.config/systemd/user/.panel-backups/ перед каждой записью.
+    """
+    import re as _re
+
+    p = _user_unit_path(unit)
+    if p is None:
+        return False, "bad unit"
+    if not content or not content.strip():
+        return False, "пустое содержимое юнит-файла"
+    raw = content.encode("utf-8")
+    if len(raw) > USER_UNIT_MAX_BYTES:
+        return False, f"юнит-файл слишком большой (> {USER_UNIT_MAX_BYTES} байт)"
+    if "\x00" in content:
+        return False, "ввод содержит NUL — отказ"
+    sections = _re.findall(r"^\s*\[([A-Za-z][A-Za-z0-9._-]*)\]", content, _re.M)
+    if not any(s in ("Unit", "Service", "Install") for s in sections):
+        return False, "ввод не похож на systemd-юнит (нет секции [Unit]/[Service]/[Install])"
+    if not p.is_file():
+        return False, f"юнит-файл не найден: {p} (создание юнитов через панель запрещено)"
+    backup_dir = p.parent / ".panel-backups"
+    stamp = _dt.datetime.now().strftime("%Y%m%d-%H%M%S")
+    backup = backup_dir / f"{unit}.{stamp}.bak"
+    tmp = p.parent / (unit + ".panel-tmp")
+    try:
+        backup_dir.mkdir(mode=0o700, exist_ok=True)
+        backup.write_bytes(p.read_bytes())
+        tmp.write_bytes(raw)
+        tmp.replace(p)
+    except OSError as e:
+        if tmp.exists():
+            try:
+                tmp.unlink()
+            except OSError:
+                pass
+        return False, f"запись не выполнена: {type(e).__name__} ({e})"
+    return True, f"ok ({len(raw)} байт, backup {backup})"
 
 
 def journal_user_text(unit: str, lines: int, timeout: float = 10.0) -> tuple[int, str]:

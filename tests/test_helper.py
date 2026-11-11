@@ -186,6 +186,146 @@ def test_daemon_reload_takes_no_arguments():
     assert run_helper(["daemon-reload", "extra"], allowlist=wl).returncode == 2
 
 
+# -------------------------- глобальный ключ reset_failed (v0.3.19) -----------
+
+def test_reset_failed_global_key_allows_without_per_unit():
+    """Ключ "reset_failed": true разрешает reset-failed ЛЮБОМУ allowlist-юниту
+    (текущему и будущему) — без перечисления в каждом actions."""
+    wl = {"units": {"vllm.service": {"actions": ["status", "journal"]}},
+          "reset_failed": True}
+    r = run_helper(["reset-failed", "vllm.service"], allowlist=wl)
+    assert r.returncode == 0
+    plan = json.loads(r.stdout)
+    assert plan["argv"] == ["systemctl", "reset-failed", "--no-ask-password", "vllm.service"]
+
+
+def test_reset_failed_without_global_key_still_per_unit():
+    """Без ключа (или false) — только юнитам с явным вхождением в actions."""
+    wl = {"units": {"vllm.service": {"actions": ["status", "journal"]}}}
+    assert run_helper(["reset-failed", "vllm.service"], allowlist=wl).returncode == 3
+    wl2 = {**wl, "reset_failed": False}
+    assert run_helper(["reset-failed", "vllm.service"], allowlist=wl2).returncode == 3
+
+
+# -------------------------- unit-cat / unit-write (v0.3.19) ------------------
+
+UNIT_FILE = """[Unit]
+Description=Test unit
+
+[Service]
+ExecStart=/bin/true
+
+[Install]
+WantedBy=multi-user.target
+"""
+
+# Для real-ранов unit-cat/unit-write: действия должны быть явно разрешены юниту.
+UNITS_ALLOWLIST = {
+    "units": {
+        "vllm.service": {"actions": ["status", "journal", "unit-cat", "unit-write"]},
+    }
+}
+
+
+def test_unit_cat_dry_run_plan():
+    r = run_helper(["unit-cat", "vllm.service"], allowlist=UNITS_ALLOWLIST)
+    assert r.returncode == 0
+    plan = json.loads(r.stdout)
+    assert plan["argv"] == ["cat", os.path.join("/etc/systemd/system", "vllm.service")]
+
+
+def test_unit_write_dry_run_plan():
+    r = run_helper(["unit-write", "vllm.service"], allowlist=UNITS_ALLOWLIST)
+    assert r.returncode == 0
+    plan = json.loads(r.stdout)
+    assert plan["argv"] == ["write", os.path.join("/etc/systemd/system", "vllm.service"),
+                            "(stdin)"]
+
+
+def test_unit_actions_not_allowed_without_per_unit():
+    """unit-cat/unit-write — строго per-unit: без явного вхождения — отказ."""
+    assert run_helper(["unit-cat", "gpu-power-limit.service"]).returncode == 3
+    assert run_helper(["unit-write", "gpu-power-limit.service"]).returncode == 3
+    assert run_helper(["unit-cat", "stranger.service"]).returncode == 3
+
+
+def test_unit_actions_extra_rejected():
+    assert run_helper(["unit-cat", "vllm.service", "x"],
+                      allowlist=UNITS_ALLOWLIST).returncode == 2
+    assert run_helper(["unit-write", "vllm.service", "x"],
+                      allowlist=UNITS_ALLOWLIST).returncode == 2
+
+
+def _real_run(args: list[str], allowlist: dict, units_dir, stdin: str | None = None):
+    """Реальный запуск helper (не dry-run) против тестовых каталогов.
+
+    Разрешено только при euid != 0 с ОБОИМИ тестовыми env (см. helper)."""
+    env = dict(os.environ)
+    env["LLM_PANEL_ALLOWLIST_TEST"] = _write_allowlist(allowlist)
+    env["LLM_PANEL_UNITS_DIR_TEST"] = str(units_dir)
+    return subprocess.run(
+        [sys.executable, str(HELPER), *args],
+        input=stdin, capture_output=True, text=True, env=env, timeout=30,
+    )
+
+
+def test_unit_cat_real_run(tmp_path):
+    units = tmp_path / "units"
+    units.mkdir()
+    (units / "vllm.service").write_text(UNIT_FILE, encoding="utf-8")
+    r = _real_run(["unit-cat", "vllm.service"], UNITS_ALLOWLIST, units)
+    assert r.returncode == 0, r.stderr
+    assert "[Service]" in r.stdout and "ExecStart=/bin/true" in r.stdout
+
+
+def test_unit_cat_missing_file(tmp_path):
+    units = tmp_path / "units"
+    units.mkdir()
+    r = _real_run(["unit-cat", "vllm.service"], UNITS_ALLOWLIST, units)
+    assert r.returncode == 4
+    assert "не найден" in r.stderr
+
+
+def test_unit_write_real_run_roundtrip(tmp_path):
+    units = tmp_path / "units"
+    units.mkdir()
+    p = units / "vllm.service"
+    p.write_text(UNIT_FILE, encoding="utf-8")
+    new = UNIT_FILE.replace("/bin/true", "/bin/echo")
+    r = _real_run(["unit-write", "vllm.service"], UNITS_ALLOWLIST, units, stdin=new)
+    assert r.returncode == 0, r.stderr
+    assert "/bin/echo" in p.read_text(encoding="utf-8")
+    backups = list((units / ".panel-backups").glob("vllm.service.*.bak"))
+    assert len(backups) == 1
+    assert "/bin/true" in backups[0].read_text(encoding="utf-8")
+
+
+def test_unit_write_rejects_creating_new_unit(tmp_path):
+    """Создание НОВЫХ юнитов через панель запрещено (безопасный дефолт)."""
+    units = tmp_path / "units"
+    units.mkdir()
+    r = _real_run(["unit-write", "vllm.service"], UNITS_ALLOWLIST, units, stdin=UNIT_FILE)
+    assert r.returncode == 4
+    assert not (units / "vllm.service").exists()
+
+
+def test_unit_write_rejects_invalid_content(tmp_path):
+    units = tmp_path / "units"
+    units.mkdir()
+    (units / "vllm.service").write_text(UNIT_FILE, encoding="utf-8")
+    r = _real_run(["unit-write", "vllm.service"], UNITS_ALLOWLIST, units,
+                  stdin="no sections here")
+    assert r.returncode == 2
+
+
+def test_unit_write_rejects_empty(tmp_path):
+    units = tmp_path / "units"
+    units.mkdir()
+    (units / "vllm.service").write_text(UNIT_FILE, encoding="utf-8")
+    r = _real_run(["unit-write", "vllm.service"], UNITS_ALLOWLIST, units, stdin="   ")
+    assert r.returncode == 2
+
+
 def test_broken_allowlist_is_refused():
     import tempfile
     tmp = tempfile.NamedTemporaryFile("w", suffix=".json", delete=False, encoding="utf-8")

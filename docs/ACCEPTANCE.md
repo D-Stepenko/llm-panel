@@ -37,7 +37,8 @@ the owner's explicit approval.
 | 2.5 | Narrow to ~760px | Everything in 1 column; the GPU strip keeps 10+px from the border |
 | 2.6 | Check the pill | Neutral border; theme-aware shading |
 | 2.7 | Bindings in a GPU tile | "Services:"/"planned binding" as separate rows UNDER the grid (gpu-binds), not in the gauge columns |
-| 2.8 | Service settings (v0.3.18) | "Reset failed status" and "Daemon reload" buttons present; system unit without allowlist entry for the action → clear refusal, no errors in the console |
+| 2.8 | Service settings (v0.3.19) | "Reset failed status", "Daemon reload", "Unit config", "Logs", "← Back" — ALL on one line with 20px gaps; "Daemon reload" is NOT pale (no btn-muted); a system unit without the allowlist permission → clear refusal, no console errors |
+| 2.9 | Unit config page (v0.3.19) | The full unit file in the textarea (as in nano /etc/systemd/system/<unit>.service); "Save" + "Daemon reload" on the same page; an allowlist refusal shows an error and keeps the edits in the textarea; after a successful save the green notice suggests Daemon reload |
 
 ## 3. GPU tiles (main page)
 

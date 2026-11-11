@@ -121,7 +121,11 @@ index-services are re-derived from NVML at start time.
   permits NOTHING by itself — action rights are always checked against the
   current allowlist (the safe default: refusal). After editing — a dry-run
   WITHOUT sudo (`/usr/local/sbin/llm-panel-systemd --dry-run reset-failed
-  <unit>`) and `sudo systemctl restart llm-panel`.
+  <unit>`) and `sudo systemctl restart llm-panel`. THE OWNER'S SOLUTION
+  (v0.3.19, 2026-11-11): to avoid editing the allowlist for every new unit,
+  the global keys `"reset_failed": true` and `"daemon_reload": true` are
+  set — ONCE per manager, they cover all current and future units;
+  unit-file editing (unit-cat/unit-write) remains strictly per-unit.
 
 ## 4. Updating the station from the repository
 

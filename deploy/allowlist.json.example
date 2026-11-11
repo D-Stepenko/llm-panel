@@ -2,13 +2,16 @@
   "_note": "Root-owned allowlist helper'а. Файл на сервере: /etc/llm-panel/allowlist.json, владелец root:root, права 0644. УНИВЕРСАЛЬНЫЙ ШАБЛОН: замените имена юнитов на ФАКТИЧЕСКИЕ (systemctl list-unit-files) и ограничьте действия по необходимости. Проверка root-владельца выполняется самим helper'ом. Юнит вне allowlist = полный отказ (безопасный дефолт). Реальный пример — deploy/examples/allowlist.json.station-llm.json.",
   "units": {
     "vllm-example.service": {
-      "actions": ["start", "stop", "restart", "enable", "disable", "reset-failed", "status", "journal", "journal-follow"]
+      "actions": ["start", "stop", "restart", "enable", "disable", "reset-failed",
+                  "unit-cat", "unit-write", "status", "journal", "journal-follow"]
     },
     "llamacpp-example.service": {
-      "actions": ["start", "stop", "restart", "enable", "disable", "reset-failed", "status", "journal", "journal-follow"]
+      "actions": ["start", "stop", "restart", "enable", "disable", "reset-failed",
+                  "unit-cat", "unit-write", "status", "journal", "journal-follow"]
     },
     "generic-example.service": {
-      "actions": ["start", "stop", "restart", "enable", "disable", "reset-failed", "status", "journal", "journal-follow"]
+      "actions": ["start", "stop", "restart", "enable", "disable", "reset-failed",
+                  "unit-cat", "unit-write", "status", "journal", "journal-follow"]
     },
     "oneshot-example.service": {
       "actions": ["status", "journal"],
@@ -21,6 +24,9 @@
     "poweroff": false,
     "note": "true разрешает операцию; helper выполняет systemctl reboot/poweroff от root. См. docs/DEPLOY.md §6.2."
   },
-  "_daemon_reload": "Опциональный ключ «daemon_reload»: systemctl daemon-reload из настроек сервиса (v0.3.18). Отсутствует/false = отказ (безопасный дефолт). true разрешает helper'у выполнить systemctl daemon-reload от root — перечитываются ВСЕ юниты менеджера; включать только по отдельному решению владельца (после ручной правки юнит-файлов вне панели).",
-  "daemon_reload": false
+  "_daemon_reload": "Опциональный ключ «daemon_reload»: systemctl daemon-reload из настроек/конфига юнита (v0.3.18). true разрешает helper'у выполнить systemctl daemon-reload от root — ОДИН ключ покрывает ВСЕ юниты (текущие и будущие), перечислять по юнитам не нужно. Отсутствие/false = отказ (безопасный дефолт).",
+  "daemon_reload": false,
+  "_reset_failed": "Опциональный ключ «reset_failed» (v0.3.19): разрешает действие reset-failed («Сбросить статус failed») для ВСЕХ юнитов, внесённых в allowlist, без перечисления в каждом actions. Отсутствие/false — reset-failed разрешается только юнитам с явным вхождением в actions.",
+  "reset_failed": false,
+  "_unit_files": "Действия «unit-cat»/«unit-write» (v0.3.19): просмотр/правка юнит-файла /etc/systemd/system/<unit> с панели (страница «Конфиг юнита»). ОПАСНЕЕ остальных: правка root-файла; включать ТОЛЬКО для юнитов, которым действительно нужна правка из UI. Перед каждой записью helper делает резервную копию в .panel-backups; запись атомарная, root:root 0644; создание НОВЫХ юнитов через панель запрещено."
 }
