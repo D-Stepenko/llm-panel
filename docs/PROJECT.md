@@ -479,6 +479,17 @@ sudoers. The service configuration editor — stage 2.
   deliberately NOT done (a panel able to change its own permissions is
   a privilege-escalation path). Tests: 294/294 + 2 skip — +20
   (validation, backup/prune, commands, sync-services, idempotency).
+- **0.3.21 — correct memory units: binary GB/MB (as the OS shows)**
+  (2026-11-11). Reported by the owner: on the station a 32 GB card showed
+  as "32.77 GB", 128 GB RAM as "128.7 GB", swap as "8.19 GB". The cause:
+  values are collected in MiB (as NVML/psutil report), but fmt_mem_mb
+  divided by 1000 and labeled them "GB" — decimal gigabytes that do not
+  match nvidia-smi/the OS. Fixed: binary division (1 GB = 1024 MB) —
+  32768 MB = exactly "32 GB", 131072 MB = "128 GB", 8192 MB = "8 GB";
+  the GB threshold is 1024 MB; KB is binary now too (*1024). Disks were
+  already binary (1024**3) — unchanged. Also human_bytes (model sizes)
+  drops trailing zeros ("1 GB", "16.1 GB"). Tests: 294/294 + 2 skip
+  (updated fmt_mem_mb/human_bytes expectations, added 32 GB/128 GB/8 GB).
 
 ## 8. Known limitations
 

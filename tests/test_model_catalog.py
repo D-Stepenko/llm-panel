@@ -120,9 +120,12 @@ def test_scan_multi_gguf_dir_grouped_as_one(tmp_path):
 
 
 def test_human_bytes():
+    """Двоичные единицы без лишних нулей (v0.3.21): 1 МБ, 16.1 ГБ."""
     assert human_bytes(None) == ""
     assert human_bytes(0) == "0 Б"
-    assert human_bytes(1024 * 1024) == "1.0 МБ"
+    assert human_bytes(1024 * 1024) == "1 МБ"
+    assert human_bytes(1024 * 1024 * 1024) == "1 ГБ"
+    assert human_bytes(int(16.1 * 1024 ** 3)) == "16.1 ГБ"
 
 
 # ------------------------------------------------ роут -----------------------

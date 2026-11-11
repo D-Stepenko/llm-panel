@@ -211,12 +211,17 @@ def _walk(root: pathlib.Path, max_depth: int):
 
 
 def human_bytes(n: int | None) -> str:
-    """Человекочитаемый размер (для шаблонов — как фильтр)."""
+    """Человекочитаемый размер (для шаблонов — как фильтр).
+
+    Двоичные единицы (1 ГБ = 1024 МБ), без лишних нулей: 16.1 ГБ, 1 ГБ.
+    """
     if n is None:
         return ""
     value = float(n)
     for unit in ("Б", "КБ", "МБ", "ГБ", "ТБ", "ПБ"):
         if value < 1024 or unit == "ПБ":
-            return f"{value:.1f} {unit}" if unit not in ("Б",) else f"{int(value)} {unit}"
+            if unit == "Б":
+                return f"{int(value)} {unit}"
+            return f"{value:.1f}".rstrip("0").rstrip(".") + f" {unit}"
         value /= 1024
     return f"{value:.1f} ПБ"

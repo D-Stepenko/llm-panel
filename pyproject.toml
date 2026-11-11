@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "llm-panel"
-version = "0.3.20"
+version = "0.3.21"
 description = "Local web panel for an LLM server: systemd service status and control, GPU/RAM/CPU/disk summary, journals with secret masking, action audit"
 readme = "README.md"
 requires-python = ">=3.11"

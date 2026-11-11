@@ -63,10 +63,13 @@ _MEM_UNITS = {
 
 
 def fmt_mem_mb(mb, units: str = "ru") -> str:
-    """Единицы памяти по-человечески: 13784 → «13.78 ГБ» (ru) / «13.78 GB» (en)
+    """Единицы памяти по-человечески: 13784 → «13.46 ГБ» (ru) / «13.46 GB» (en)
 
-    Десятичные гигабайты (1 ГБ = 1000 МБ), 1–2 знака без лишних нулей;
-    ниже 0.95 ГБ — МБ, ниже 1 МБ — КБ. None → «нет данных».
+    ДВОИЧНЫЕ единицы (1 ГБ = 1024 МБ) — как показывает ОС, nvidia-smi и
+    systemd: 32768 МБ = ровно «32 ГБ», 131072 МБ = «128 ГБ» (до v0.3.21
+    делили на 1000 и карта на 32 ГБ показывалась как «32.77 ГБ», RAM
+    128 ГБ — как «131.1 ГБ», что путает). 1–2 знака без лишних нулей;
+    ниже 1 ГБ — МБ, ниже 1 МБ — КБ. None → «нет данных».
     """
     gb_lbl, mb_lbl, kb_lbl, nd = _MEM_UNITS.get(units, _MEM_UNITS["ru"])
     if mb is None:
@@ -75,13 +78,13 @@ def fmt_mem_mb(mb, units: str = "ru") -> str:
         mb = float(mb)
     except (TypeError, ValueError):
         return nd
-    if mb >= 950:
-        gb = mb / 1000.0
-        s = f"{gb:.2f}" if gb < 40 else f"{gb:.1f}"   # 13.78 ГБ, 32.77 ГБ; 50.4 ГБ, 64.2 ГБ
+    if mb >= 1024:
+        gb = mb / 1024.0
+        s = f"{gb:.2f}" if gb < 40 else f"{gb:.1f}"   # 13.46 ГБ; 32 ГБ, 50.4 ГБ
         return f"{s.rstrip('0').rstrip('.')} {gb_lbl}"
     if mb >= 1:
         return f"{int(round(mb))} {mb_lbl}"
-    return f"{mb * 1000:.0f} {kb_lbl}"
+    return f"{mb * 1024:.0f} {kb_lbl}"
 
 
 def fmt_uptime(seconds: float | None, lang: str = "ru") -> str:

@@ -179,14 +179,19 @@ def test_logout_with_auto_csrf(authed_client):
 
 # ------------------------------------------------------------ имена GPU
 def test_fmt_mem_mb_units():
+    """Двоичные единицы (1 ГБ = 1024 МБ) — как ОС/nvidia-smi: карта 32 ГБ
+    показывает ровно «32 ГБ», RAM 128 ГБ — «128 ГБ» (v0.3.21)."""
     from llm_panel.metrics import fmt_mem_mb
 
-    assert fmt_mem_mb(13784) == "13.78 ГБ"
-    assert fmt_mem_mb(64197) == "64.2 ГБ"
-    assert fmt_mem_mb(50413) == "50.4 ГБ"
-    assert fmt_mem_mb(32768) == "32.77 ГБ"
+    assert fmt_mem_mb(13784) == "13.46 ГБ"
+    assert fmt_mem_mb(64197) == "62.7 ГБ"
+    assert fmt_mem_mb(50413) == "49.2 ГБ"
+    assert fmt_mem_mb(32768) == "32 ГБ"      # карта 32 ГБ — ровно 32, не «32.77»
+    assert fmt_mem_mb(131072) == "128 ГБ"    # RAM 128 ГБ
+    assert fmt_mem_mb(8192) == "8 ГБ"        # swap
+    assert fmt_mem_mb(273) == "273 МБ"
     assert fmt_mem_mb(512) == "512 МБ"
-    assert fmt_mem_mb(0.5) == "500 КБ"
+    assert fmt_mem_mb(0.5) == "512 КБ"
     assert fmt_mem_mb(None) == "нет данных"
 
 
@@ -200,8 +205,8 @@ def test_host_cpu_and_units(authed_client):
         "cpu_ghz": 2.0, "cpu_temp_c": 30.0, "cpu_power_w": 34.9, "disks": [],
     }
     page = c.get("/", headers={"host": "localhost"})
-    assert ">RAM:</span>" in page.text and "13.78 ГБ / 64.2 ГБ (доступно 50.4 ГБ)" in page.text  # RAM: красивые ГБ
-    assert ">Swap:</span>" in page.text and "512 МБ / 8.19 ГБ" in page.text                      # Swap в ГБ/МБ
+    assert ">RAM:</span>" in page.text and "13.46 ГБ / 62.7 ГБ (доступно 49.2 ГБ)" in page.text  # RAM: красивые ГБ
+    assert ">Swap:</span>" in page.text and "512 МБ / 8 ГБ" in page.text                      # Swap в ГБ/МБ
     # модель/ядра/частота + температура/мощность; процент загрузки — только на шкале
     assert ">CPU:</span>" in page.text and "Xeon E5-2680 v4 · 14 ядер / 28 потоков · 2.0 ГГц 30 °C 35 Вт" in page.text
     assert "— 46 %" not in page.text
@@ -220,7 +225,7 @@ def test_host_cpu_and_units(authed_client):
            "assigned": ["vllm"]}
     c.app.state.panel.collector.snapshot.gpus = [gpu]
     page = c.get("/", headers={"host": "localhost"})
-    assert '<span class="nb">31.16 ГБ</span> / <span class="nb">32.77 ГБ</span>' in page.text  # память GPU, неразрывные куски
+    assert '<span class="nb">30.43 ГБ</span> / <span class="nb">32 ГБ</span>' in page.text  # память GPU, неразрывные куски
     assert '<span class="nb">56.5 Вт</span> / <span class="nb">150 Вт</span>' in page.text    # мощность с единицей у лимита
     assert 'load-pill">95%' in page.text                              # pill нейтральный (v0.3.9)
     # строки процессов и UUID из карточки GPU убраны
