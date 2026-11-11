@@ -117,6 +117,15 @@ NVML на момент запуска.
   «ошибка аргументов helper: неизвестное действие». Признак для
   диагностики: страница есть, textarea пустая, ошибка при первом открытии.
   Лечение: переустановить helper + dry-run БЕЗ sudo.
+- **2026-11-11, правка /etc/llm-panel/allowlist.json — больше НЕ вручную**:
+  с v0.3.20 есть deploy/allowlist_tool.py (backup + валидация + атомарная
+  запись при каждом изменении). Типовые команды из корня ~/llm-panel:
+  `sudo .venv/bin/python deploy/allowlist_tool.py sync-services --dry-run`
+  (добавить юниты из /etc/llm-panel/services.yaml, которых нет в allowlist;
+  без --dry-run — записать), `... grant vllm.service unit-cat unit-write`,
+  `... set-global reset_failed true`, `... set-global daemon_reload true`,
+  `... list` / `... check`. После правки перезапуск панели не нужен
+  (allowlist читается helper'ом на каждое действие).
 
 ## 4. Обновление станции из репозитория
 

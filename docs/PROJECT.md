@@ -460,6 +460,25 @@ sudoers. The service configuration editor — stage 2.
   unit-cat/unit-write; installing the new one: sudo install -o root -g
   root -m 0755 deploy/helper/llm-panel-systemd
   /usr/local/sbin/llm-panel-systemd). Tests: 274/274 + 2 skip.
+- **0.3.20 — allowlist_tool: automating allowlist.json edits**
+  (2026-11-11). At the owner's request ("editing it per unit by hand is
+  extremely inconvenient"): the new deploy/allowlist_tool.py — a safe
+  editor for /etc/llm-panel/allowlist.json instead of hand-editing JSON.
+  Commands: list/check, add-unit/remove-unit (--actions, --note),
+  grant/revoke (add/remove unit actions), set-global (reset_failed |
+  daemon_reload), sync-services — adds units from
+  /etc/llm-panel/services.yaml that are missing from the allowlist
+  (existing entries are NOT touched; user units are skipped — they do
+  not need the allowlist; the default for new units: management WITHOUT
+  unit-cat/unit-write — those stay strictly per-unit; --actions
+  overrides). Safety: unit-name and action validation BEFORE writing,
+  a allowlist.json.bak-<ts> backup before every write (last 5 kept),
+  atomic tmp+os.replace write, root:root 0644, comment keys and key
+  order are preserved, --dry-run on every mutation, the system file is
+  edited only via sudo. Editing the allowlist from the panel UI is
+  deliberately NOT done (a panel able to change its own permissions is
+  a privilege-escalation path). Tests: 294/294 + 2 skip — +20
+  (validation, backup/prune, commands, sync-services, idempotency).
 
 ## 8. Known limitations
 

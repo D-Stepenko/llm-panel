@@ -217,6 +217,27 @@ EOF
   /etc/systemd/system/.panel-backups/; создание НОВЫХ юнитов через панель
   запрещено.
 
+Править allowlist.json вручную не обязательно (v0.3.20): для этого есть
+инструмент `deploy/allowlist_tool.py` (backup + валидация + атомарная
+запись при каждом изменении). Примеры:
+
+```bash
+cd ~/llm-panel
+# добавить недостающие юниты из /etc/llm-panel/services.yaml (сначала план):
+sudo .venv/bin/python deploy/allowlist_tool.py sync-services --dry-run
+sudo .venv/bin/python deploy/allowlist_tool.py sync-services
+# разрешить «Конфиг юнита» юниту:
+sudo .venv/bin/python deploy/allowlist_tool.py grant vllm.service unit-cat unit-write
+# глобальные ключи (один раз на менеджер):
+sudo .venv/bin/python deploy/allowlist_tool.py set-global reset_failed true
+sudo .venv/bin/python deploy/allowlist_tool.py set-global daemon_reload true
+# показать текущее состояние:
+sudo .venv/bin/python deploy/allowlist_tool.py list
+```
+
+После правки allowlist перезапускать панель не нужно (allowlist читается
+helper'ом при каждом действии), но полезно проверить файл: `... check`.
+
 ---
 
 ## 4. Чек-лист добавления нового сервиса

@@ -237,6 +237,29 @@ Actions from the service settings and the "Unit config" page
   /etc/systemd/system/.panel-backups/; creating NEW units via the panel is
   forbidden.
 
+Editing allowlist.json by hand is not required (v0.3.20): the tool
+`deploy/allowlist_tool.py` does it for you (a backup + validation + an
+atomic write on every change). Examples:
+
+```bash
+cd ~/llm-panel
+# add units missing from the allowlist out of /etc/llm-panel/services.yaml
+# (the plan first):
+sudo .venv/bin/python deploy/allowlist_tool.py sync-services --dry-run
+sudo .venv/bin/python deploy/allowlist_tool.py sync-services
+# permit "Unit config" for a unit:
+sudo .venv/bin/python deploy/allowlist_tool.py grant vllm.service unit-cat unit-write
+# global keys (once per manager):
+sudo .venv/bin/python deploy/allowlist_tool.py set-global reset_failed true
+sudo .venv/bin/python deploy/allowlist_tool.py set-global daemon_reload true
+# show the current state:
+sudo .venv/bin/python deploy/allowlist_tool.py list
+```
+
+After an allowlist edit there is no need to restart the panel (the
+allowlist is read by the helper on every action), but it is useful to
+validate the file: `... check`.
+
 ---
 
 ## 4. Checklist for adding a new service

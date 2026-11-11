@@ -429,6 +429,24 @@ services.yaml, allowlist.json, systemd-юниты, sudoers. Редактор к�
   (старый v0.3.18 не знает unit-cat/unit-write; установка нового:
   sudo install -o root -g root -m 0755 deploy/helper/llm-panel-systemd
   /usr/local/sbin/llm-panel-systemd). Тесты: 274/274 + 2 skip.
+- **0.3.20 — allowlist_tool: автоматизация правки allowlist.json**
+  (11.11.2026). По запросу владельца («крайне неудобно править по каждому
+  юниту вручную»): новый инструмент deploy/allowlist_tool.py — безопасный
+  редактор /etc/llm-panel/allowlist.json вместо ручного JSON. Команды:
+  list/check, add-unit/remove-unit (--actions, --note), grant/revoke
+  (добавить/убрать действия юниту), set-global (reset_failed |
+  daemon_reload), sync-services — добавляет юниты из
+  /etc/llm-panel/services.yaml, которых нет в allowlist (существующие НЕ
+  трогает; user-юниты пропускает — им allowlist не нужен; дефолт для
+  новых: управление БЕЗ unit-cat/unit-write — они остаются строго
+  per-unit, --actions переопределяет). Безопасность: валидация имён
+  юнитов и действий ДО записи, backup allowlist.json.bak-<ts> перед
+  каждой записью (последние 5), атомарная запись tmp+os.replace,
+  root:root 0644, ключи-комментарии и порядок ключей сохраняются,
+  --dry-run у каждой мутации, правка системного файла только через sudo.
+  Правка allowlist из UI панели СОЗНАТЕЛЬНО не делается (панель, умеющая
+  менять собственные права — путь к эскалации). Тесты: 294/294 + 2 skip
+  — +20 (валидация, backup/prune, команды, sync-services, idempotency).
 
 ## 8. Известные ограничения
 

@@ -136,6 +136,16 @@ index-services are re-derived from NVML at start time.
   "helper argument error: unknown action". Diagnostic sign: the page
   loads, the textarea is empty, the error appears on first open. Fix:
   reinstall the helper + a dry-run WITHOUT sudo.
+- **2026-11-11, editing /etc/llm-panel/allowlist.json — NOT by hand
+  anymore**: since v0.3.20 there is deploy/allowlist_tool.py (a backup +
+  validation + an atomic write on every change). Typical commands from
+  the ~/llm-panel root: `sudo .venv/bin/python deploy/allowlist_tool.py
+  sync-services --dry-run` (add units from /etc/llm-panel/services.yaml
+  missing from the allowlist; without --dry-run — write), `... grant
+  vllm.service unit-cat unit-write`, `... set-global reset_failed true`,
+  `... set-global daemon_reload true`, `... list` / `... check`. After an
+  edit there is no need to restart the panel (the allowlist is read by
+  the helper on every action).
 
 ## 4. Updating the station from the repository
 
