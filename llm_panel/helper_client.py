@@ -51,7 +51,13 @@ def _map_exit(code: int, stderr: str) -> str:
             msg += ": " + detail[0][:160]
         return msg
     if code == HELPER_EXIT_USAGE:
-        return "ошибка аргументов helper"
+        msg = "ошибка аргументов helper"
+        detail = stderr.strip().splitlines()
+        if detail:
+            # точная причина от helper (напр. «неизвестное действие» —
+            # признак устаревшего helper без новых действий v0.3.19)
+            msg += ": " + detail[0][:160]
+        return msg
     if code == HELPER_EXIT_SYSTEMD:
         return f"systemd вернул ошибку: {stderr.strip()[:300] or '--'}"
     detail = stderr.strip()[:200]

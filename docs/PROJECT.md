@@ -451,6 +451,15 @@ sudoers. The service configuration editor — stage 2.
   routes: render, load errors, save ok/refusal keeping the edits, CSRF,
   empty input, buttons/layout; user units: read/write, a file roundtrip).
   Live check on the station — after copying.
+  Addendum (2026-11-11, after the first station deploy): (a) __version__
+  in llm_panel/__init__.py was still "0.3.17" — the panel header showed
+  the old version; bumped to 0.3.19 + a sync test against pyproject.toml;
+  (b) on helper exit code 2 the panel now also shows the helper's stderr
+  ("helper argument error: unknown action") — "unknown action" is the
+  sign of a NOT reinstalled helper (the old v0.3.18 does not know
+  unit-cat/unit-write; installing the new one: sudo install -o root -g
+  root -m 0755 deploy/helper/llm-panel-systemd
+  /usr/local/sbin/llm-panel-systemd). Tests: 274/274 + 2 skip.
 
 ## 8. Known limitations
 

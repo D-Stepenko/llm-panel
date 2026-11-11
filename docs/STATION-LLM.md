@@ -126,6 +126,16 @@ index-services are re-derived from NVML at start time.
   the global keys `"reset_failed": true` and `"daemon_reload": true` are
   set — ONCE per manager, they cover all current and future units;
   unit-file editing (unit-cat/unit-write) remains strictly per-unit.
+- **2026-11-11, "helper argument error" on the Unit config page — the
+  OLD helper**: a WinSCP directory copy does NOT update the installed
+  helper at /usr/local/sbin/llm-panel-systemd — that is a SEPARATE step
+  (`sudo install -o root -g root -m 0755
+  deploy/helper/llm-panel-systemd /usr/local/sbin/llm-panel-systemd`).
+  The old v0.3.18 helper does not know the unit-cat/unit-write actions
+  and answers with code 2 ("unknown action"); panel v0.3.19 shows it as
+  "helper argument error: unknown action". Diagnostic sign: the page
+  loads, the textarea is empty, the error appears on first open. Fix:
+  reinstall the helper + a dry-run WITHOUT sudo.
 
 ## 4. Updating the station from the repository
 
