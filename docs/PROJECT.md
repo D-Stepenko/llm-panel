@@ -490,6 +490,22 @@ sudoers. The service configuration editor — stage 2.
   already binary (1024**3) — unchanged. Also human_bytes (model sizes)
   drops trailing zeros ("1 GB", "16.1 GB"). Tests: 294/294 + 2 skip
   (updated fmt_mem_mb/human_bytes expectations, added 32 GB/128 GB/8 GB).
+- **0.3.22 — stopping the service no longer "hangs" because of an open
+  panel tab** (2026-11-22). The owner's symptom: after `systemctl restart
+  llm-panel` or `reboot` the console did not return the prompt until the
+  open panel tab in the browser was refreshed; the same at machine boot
+  ("hangs, waits for input"). The cause: an open tab holds an SSE
+  connection (status page/logs), and uvicorn on SIGTERM waits for ALL
+  open connections to finish; an SSE stream never ends by itself (the
+  journal is quiet — the generator waits for a line), so the service/machine
+  stop dragged on until the tab was refreshed. Fixed: uvicorn
+  timeout_graceful_shutdown=5 (v0.3.22, cli.py) — on shutdown normal
+  requests get to finish, "eternal" SSE streams are closed forcibly;
+  stop/restart/reboot take ≤5s regardless of tabs. The SSE internals
+  were verified and are fine: Starlette cancels the generator on client
+  disconnect by itself (listen_for_disconnect), the journal-follow
+  subscriber is killed in finally. Tests: 294/294 + 2 skip (unchanged —
+  the shutdown behavior is verified live on the station).
 
 ## 8. Known limitations
 

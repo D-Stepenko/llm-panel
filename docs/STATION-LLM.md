@@ -146,6 +146,15 @@ index-services are re-derived from NVML at start time.
   `... set-global daemon_reload true`, `... list` / `... check`. After an
   edit there is no need to restart the panel (the allowlist is read by
   the helper on every action).
+- **2026-11-22, "the console does not return the prompt after
+  restart/reboot until you refresh the panel tab" — NOT a service
+  hang**: an open panel tab holds an SSE connection, and uvicorn on
+  SIGTERM waited for ALL connections to finish; an SSE stream never
+  ends by itself, so the service stop (and machine shutdown) dragged on
+  until the page was refreshed. Fixed in v0.3.22: uvicorn
+  timeout_graceful_shutdown=5 — stop/restart/reboot finish in ≤5s
+  regardless of open tabs. If the symptom comes back on the old code —
+  just refresh the tab or update the panel.
 
 ## 4. Updating the station from the repository
 

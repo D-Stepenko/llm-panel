@@ -127,6 +127,13 @@ def _cmd_serve(args) -> int:
         proxy_headers=True,
         forwarded_allow_ips="127.0.0.1",
         log_level="info",
+        # v0.3.22: SSE-соединения (открытая вкладка панели) держали graceful
+        # shutdown бесконечно — `systemctl restart llm-panel` и `reboot` не
+        # возвращали приглашение в консоль, пока пользователь не обновит
+        # страницу в браузере (SSE рвётся → shutdown завершается). Лимит 5с:
+        # обычные запросы успевают завершиться, «вечные» SSE-потоки
+        # закрываются принудительно, остановка сервиса занимает ≤5с.
+        timeout_graceful_shutdown=5,
     )
     return 0
 
